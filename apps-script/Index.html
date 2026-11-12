@@ -115,6 +115,7 @@
   .vtk input{width:22px;height:22px;padding:0;flex:none;accent-color:var(--conf)}
   .vtk.on{border-color:var(--conf);background:#f0f8f3;color:var(--conf)}
   .nq{margin-top:6px;font-size:13px;font-weight:700;color:var(--danger)}
+  .mg{margin-top:6px;font-size:13px;font-weight:600;color:var(--cost)}
   .acts{margin-top:8px;border-top:1px dashed var(--line);padding-top:6px}
   .acts .sg{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--cost);margin:6px 0 2px;display:flex;gap:8px;flex-wrap:wrap}
   .acts .sg em{font-style:normal;text-transform:none;letter-spacing:0;font-weight:600;color:var(--muted)}
@@ -159,6 +160,7 @@
   <button class="chip" data-f="Blocked">Blocked</button>
   <button class="chip" data-f="Confirmed">Confirmed</button>
   <button class="chip" data-f="NoQuote">No quote given</button>
+  <button class="chip" data-f="SiteOnly">Migrate quote</button>
   <button class="chip" data-f="Action">Action due</button>
 </div>
 <label class="past"><input type="checkbox" id="showPast" style="width:auto"> Include past events</label>
@@ -296,6 +298,8 @@
   function daysTo(i) { return Math.round((toDate(i.date) - toDate(today)) / 86400000); }
   function isoAdd(iso, n) { var d = toDate(iso); d.setDate(d.getDate() + n); return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()); }
   function noQuote(i) { return FL.ready && i.status === 'Confirmed' && !!i.date && !FL.sites[wkey(i)] && FL.cloud[wkey(i)] === 0; }
+  // quote exists only as a Google Site: counted as quoted, but outside vendors cannot be auto-picked from it until it is re-issued as a GitHub quote
+  function siteOnly(i) { return FL.ready && i.status === 'Confirmed' && !!i.date && FL.sites[wkey(i)] > 0 && FL.cloud[wkey(i)] === 0; }
   function isDone(i, t) { return !!FL.acts[wkey(i) + '|' + t]; }
   function pending(i) {   // due tasks not yet ticked
     var n = 0;
@@ -328,6 +332,7 @@
     var list = items.filter(function (i) {
       if (!showPast && i.date && i.date < today && !(i.date >= cutoff && pending(i) > 0)) return false;
       if (filter === 'NoQuote') { if (!noQuote(i)) return false; }
+      else if (filter === 'SiteOnly') { if (!siteOnly(i)) return false; }
       else if (filter === 'Action') { if (pending(i) === 0) return false; }
       else if (filter !== 'All' && i.status !== filter) return false;
       if (ql && (i.name + ' ' + i.venue).toLowerCase().indexOf(ql) < 0) return false;
@@ -337,7 +342,7 @@
     $('#count').textContent = (showPast ? 'Oldest first' : 'Upcoming events, soonest first') +
       (FL.ready ? '' : ' - quote flags and reminders need the updated Code.gs');
     if (!list.length) {
-      $('#list').innerHTML = '<div class="empty">' + (filter === 'NoQuote' ? 'Every confirmed work has a quote.' : filter === 'Action' ? 'No actions pending.' : 'Nothing here yet.') + '</div>';
+      $('#list').innerHTML = '<div class="empty">' + (filter === 'NoQuote' ? 'Every confirmed work has a quote.' : filter === 'SiteOnly' ? 'No quotes left on Google Sites.' : filter === 'Action' ? 'No actions pending.' : 'Nothing here yet.') + '</div>';
       return;
     }
     $('#list').innerHTML = list.map(function (i) {
@@ -347,6 +352,7 @@
         '<div class="r2">' + fmt(i.date) + ' &middot; ' + when(i.date) + '</div>' +
         '<div class="r3">' + esc(i.venue) + '</div>' +
         (noQuote(i) ? '<div class="nq">&#9888; No quote given yet</div>' : '') +
+        (siteOnly(i) ? '<div class="mg">&#9888; Quote is on Google Sites only - re-issue it as a GitHub quote so outside vendors can be picked automatically</div>' : '') +
         (i.status === 'Costing' && i.since ? '<div class="since">Costing since ' + fmt(i.since, true) + ' &middot; reminder every 2 days</div>' : '') +
         actHtml(i, false) +
         '</div>';
