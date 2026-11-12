@@ -111,6 +111,9 @@
   .vchip.on{background:var(--burgundy);border-color:var(--burgundy);color:#fff}
   .vi .vv{color:var(--muted);font-size:13px}
   .wa{display:inline-flex;align-items:center;margin-top:10px;background:#1f9d55;color:#fff;border-radius:10px;padding:9px 16px;font-size:14px;font-weight:600;text-decoration:none}
+  .vtk{display:inline-flex;align-items:center;gap:10px;margin:6px 0 2px;padding:7px 12px;border:1px solid var(--line);border-radius:10px;font-size:15px;font-weight:600;color:var(--ink);background:var(--bg,#faf5ea)}
+  .vtk input{width:22px;height:22px;padding:0;flex:none;accent-color:var(--conf)}
+  .vtk.on{border-color:var(--conf);background:#f0f8f3;color:var(--conf)}
   /* Vendor list: "Not assigned" view - every outside-vendor item with no vendor name yet */
   .una{display:grid;grid-template-columns:1fr;gap:6px;border-top:1px solid var(--line);padding:10px 0 4px}
   .vg h4 + .una{border-top:0}
@@ -711,7 +714,8 @@
       return '<div class="vg"><h4>' + esc(g.name) + '<span>' + g.items.length + (g.items.length === 1 ? ' booking' : ' bookings') + '</span></h4>' +
         g.items.map(function (r) {
           return '<div class="vi"><div><span class="d">' + fmt(r.date) + '</span> &middot; ' + esc(r.client) +
-            '<span class="bk' + (r.booked ? '' : ' no') + '">' + (r.booked ? 'Booked' : 'Not booked') + '</span></div>' +
+            '</div>' +
+            '<label class="vtk' + (r.booked ? ' on' : '') + '"><input type="checkbox" class="vbk" data-id="' + esc(r.id) + '" data-date="' + esc(r.date) + '" data-v="' + esc(r.vendor) + '"' + (r.booked ? ' checked' : '') + '><span>' + (r.booked ? 'Booked' : 'Mark as booked') + '</span></label>' +
             ((r.venue || '').trim() ? '<div class="vv">Venue: ' + esc(r.venue) + '</div>' : '') +
             '<div class="w">' + esc(r.vendor) + ((r.details || '').trim() ? ' <i>&mdash;</i> ' + esc(r.details) : '') + '</div></div>';
         }).join('') +
@@ -818,6 +822,26 @@
         }
       })
       .catch(function (err) { toast('Not saved: ' + err.message, true); })
+      .then(function () { busy(false); });
+  });
+
+  // tick "Booked" straight from the By vendor list
+  $('#vlList').addEventListener('change', function (e) {
+    var cb = e.target.closest('.vbk'); if (!cb) return;
+    var id = cb.getAttribute('data-id'), date = cb.getAttribute('data-date'), vendor = cb.getAttribute('data-v'), on = cb.checked;
+    var it = items.filter(function (i) { return i.id === id && i.date === date; })[0];
+    var lab = cb.closest('.vtk');
+    if (!it) { cb.checked = !on; toast('Could not find this work. Refresh and try again.', true); return; }
+    lab.classList.toggle('on', on); lab.querySelector('span').textContent = on ? 'Booked' : 'Mark as booked';
+    busy(true);
+    call('api_vendor', pin, { row: it.row, id: id, date: date, vendor: vendor, fields: { booked: on } })
+      .then(function () {
+        VL.forEach(function (r) { if (r.id === id && r.date === date && r.vendor === vendor) r.booked = on; });
+      })
+      .catch(function (err) {
+        cb.checked = !on; lab.classList.toggle('on', !on); lab.querySelector('span').textContent = !on ? 'Booked' : 'Mark as booked';
+        toast('Not saved: ' + err.message, true);
+      })
       .then(function () { busy(false); });
   });
 
