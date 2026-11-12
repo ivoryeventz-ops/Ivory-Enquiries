@@ -287,10 +287,10 @@
   }
 
   /* ---------- reminders + "no quote given" flags (Confirmed works) ---------- */
-  var FL = { ready: false, sites: {}, cloud: {}, acts: {} };
+  var FL = { ready: false, sites: {}, cloud: {}, acts: {}, tl: {} };   // tl: works that already have a wedding timeline page published
   var LOOKBACK = 7;   // a finished wedding stays on the list this many days while its "day after" task is still pending
   var STAGES = [
-    { title: '3 days before wedding', at: 3, tasks: [['timeline', 'Wedding timeline to be given'], ['vendorChk', 'Checklist to be finalised with vendors'], ['payAdv', 'Payment & advance details to be sent to client']] },
+    { title: '3 days before wedding', at: 3, tasks: [['timeline', 'Wedding timeline to be given'], ['signage', 'Signage board details'], ['vendorChk', 'Checklist to be finalised with vendors'], ['payAdv', 'Payment & advance details to be sent to client']] },
     { title: '1 day before wedding', at: 1, tasks: [['staffChk', 'Checklist to staff']] },
     { title: 'Day after wedding', at: -1, tasks: [['finalPay', 'Final payment details to be sent']] }
   ];
@@ -300,7 +300,12 @@
   function noQuote(i) { return FL.ready && i.status === 'Confirmed' && !!i.date && !FL.sites[wkey(i)] && FL.cloud[wkey(i)] === 0; }
   // quote exists only as a Google Site: counted as quoted, but outside vendors cannot be auto-picked from it until it is re-issued as a GitHub quote
   function siteOnly(i) { return FL.ready && i.status === 'Confirmed' && !!i.date && FL.sites[wkey(i)] > 0 && FL.cloud[wkey(i)] === 0; }
-  function isDone(i, t) { return !!FL.acts[wkey(i) + '|' + t]; }
+  // A saved tick (or an explicit un-tick) always wins. With nothing saved, the wedding timeline shows ticked once its page exists in the timeline repo.
+  function isDone(i, t) {
+    var k = wkey(i) + '|' + t;
+    if (k in FL.acts) return !!FL.acts[k];
+    return t === 'timeline' && !!FL.tl[wkey(i)];
+  }
   function pending(i) {   // due tasks not yet ticked
     var n = 0;
     if (!FL.ready || i.status !== 'Confirmed' || !i.date) return 0;
@@ -366,9 +371,11 @@
     var gh = Promise.all(conf.map(function (it) {
       return ghQuotes(it).then(function (qs) { return { it: it, n: qs.length }; }, function () { return { it: it, n: -1 }; });
     }));
-    return Promise.all([srv, gh]).then(function (res) {
+    var tl = tlGet().then(function (t) { return t; }, function () { return null; });
+    return Promise.all([srv, gh, tl]).then(function (res) {
       var r = res[0];
-      FL.sites = {}; FL.acts = {}; FL.cloud = {};
+      FL.sites = {}; FL.acts = {}; FL.cloud = {}; FL.tl = {};
+      if (res[2]) conf.forEach(function (it) { if (tlMatches(it, res[2])) FL.tl[wkey(it)] = true; });
       if (r) {
         Object.keys(r.quotes || {}).forEach(function (k) { FL.sites[k] = r.quotes[k]; });
         (r.actions || []).forEach(function (a) { FL.acts[a.key + '|' + a.task] = a.done; });
@@ -386,12 +393,12 @@
   function actToggle(e) {
     var cb = e.target.closest('.actcb'); if (!cb) return;
     var it = items.filter(function (i) { return i.row === +cb.getAttribute('data-row'); })[0]; if (!it) return;
-    var task = cb.getAttribute('data-task'), on = cb.checked, k = wkey(it) + '|' + task, was = !!FL.acts[k];
+    var task = cb.getAttribute('data-task'), on = cb.checked, k = wkey(it) + '|' + task, had = k in FL.acts, was = FL.acts[k];
     FL.acts[k] = on;
     render(); if (cur === it) renderActsDetail(it);
     busy(true);
     call('api_action', pin, { row: it.row, id: it.id, date: it.date, task: task, done: on })
-      .catch(function (err) { FL.acts[k] = was; render(); if (cur === it) renderActsDetail(it); toast('Not saved: ' + err.message, true); })
+      .catch(function (err) { if (had) FL.acts[k] = was; else delete FL.acts[k]; render(); if (cur === it) renderActsDetail(it); toast('Not saved: ' + err.message, true); })
       .then(function () { busy(false); });
   }
 
@@ -624,6 +631,58 @@
       return Promise.all(jobs);
     }).then(function (all) {
       return all.filter(function (q) { return q && (!q.date || q.date === it.date); });
+    });
+  }
+
+  /* ---------- wedding timelines already published (ivory-wedding-timeline repo) ---------- */
+  var TL_REPO = 'ivoryeventz-ops/Ivory-Wedding-Timeline', TL_BRANCH = 'main';
+  var tlDates = null, tlDatesAt = 0;
+  var MON3 = { jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12 };
+  // every "14 Nov 2026" / "22 October 2026" found in a page, as yyyy-mm-dd
+  function allDates(html) {
+    var out = [], re = /(\d{1,2})\s+([A-Za-z]{3,9})\s+(\d{4})/g, m;
+    while ((m = re.exec(html || ''))) {
+      var mo = MON3[m[2].slice(0, 3).toLowerCase()];
+      if (mo) out.push(m[3] + '-' + pad2(mo) + '-' + pad2(+m[1]));
+    }
+    return out;
+  }
+  function tlFolderDates(folder, files) {
+    var page = files.indexOf('index.html') >= 0 ? 'index.html' : 'timeline.html';
+    return fetch('https://raw.githubusercontent.com/' + TL_REPO + '/' + TL_BRANCH + '/' + encodeURIComponent(folder) + '/' + page)
+      .then(function (r) { if (!r.ok) throw new Error('timeline page not readable'); return r.text(); })
+      .then(allDates);
+  }
+  // { folder: [dates it mentions] } for every client folder in the timeline repo
+  function tlGet() {
+    if (tlDates && Date.now() - tlDatesAt < 300000) return Promise.resolve(tlDates);
+    return fetch('https://api.github.com/repos/' + TL_REPO + '/git/trees/' + TL_BRANCH + '?recursive=1')
+      .then(function (r) { if (!r.ok) throw new Error('GitHub answered ' + r.status); return r.json(); })
+      .then(function (j) {
+        var dirs = {};
+        (j.tree || []).forEach(function (x) {
+          var m = /^([^\/]+)\/(index|timeline)\.html$/.exec(x.path);
+          if (m) (dirs[m[1]] = dirs[m[1]] || []).push(m[2] + '.html');
+        });
+        return Promise.all(Object.keys(dirs).map(function (f) {
+          return tlFolderDates(f, dirs[f]).then(function (d) { return [f, d]; }, function () { return [f, []]; });
+        }));
+      })
+      .then(function (pairs) {
+        var t = {};
+        pairs.forEach(function (p) { t[p[0]] = p[1]; });
+        tlDates = t; tlDatesAt = Date.now();
+        return t;
+      });
+  }
+  // A work counts as "timeline given" when a folder shares a name word with the client AND its page mentions the work's event date,
+  // so two weddings for the same client never get each other's tick.
+  function tlMatches(it, t) {
+    var words = {};
+    it.name.toLowerCase().split(/[^a-z0-9]+/).forEach(function (w) { if (w.length > 2) words[w] = 1; });
+    return Object.keys(t).some(function (f) {
+      var hit = f.toLowerCase().split(/[^a-z0-9]+/).some(function (w) { return w.length > 2 && words[w]; });
+      return hit && t[f].indexOf(it.date) >= 0;
     });
   }
 
