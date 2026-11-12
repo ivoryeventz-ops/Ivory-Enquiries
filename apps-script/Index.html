@@ -30,7 +30,7 @@
   .past{display:flex;align-items:center;gap:8px;padding:6px 16px 0;font-size:13px;color:var(--muted)}
   main{padding:8px 16px calc(100px + env(safe-area-inset-bottom))}
   .count{font-size:12px;color:var(--muted);margin:6px 2px 8px}
-  .card{display:block;width:100%;text-align:left;background:var(--paper);border:1px solid var(--line);border-left:5px solid var(--other);border-radius:12px;padding:12px 14px;margin-bottom:10px;font:inherit;color:inherit}
+  .card{cursor:pointer;display:block;width:100%;text-align:left;background:var(--paper);border:1px solid var(--line);border-left:5px solid var(--other);border-radius:12px;padding:12px 14px;margin-bottom:10px;font:inherit;color:inherit}
   .card.s-Enquiry{border-left-color:var(--enq)} .card.s-Costing{border-left-color:var(--cost)} .card.s-Blocked{border-left-color:var(--blk)} .card.s-Confirmed{border-left-color:var(--conf)}
   .r1{display:flex;justify-content:space-between;align-items:center;gap:8px}
   .name{font-weight:650;font-size:17px}
@@ -114,6 +114,16 @@
   .vtk{display:inline-flex;align-items:center;gap:10px;margin:6px 0 2px;padding:7px 12px;border:1px solid var(--line);border-radius:10px;font-size:15px;font-weight:600;color:var(--ink);background:var(--bg,#faf5ea)}
   .vtk input{width:22px;height:22px;padding:0;flex:none;accent-color:var(--conf)}
   .vtk.on{border-color:var(--conf);background:#f0f8f3;color:var(--conf)}
+  .nq{margin-top:6px;font-size:13px;font-weight:700;color:var(--danger)}
+  .acts{margin-top:8px;border-top:1px dashed var(--line);padding-top:6px}
+  .acts .sg{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--cost);margin:6px 0 2px;display:flex;gap:8px;flex-wrap:wrap}
+  .acts .sg em{font-style:normal;text-transform:none;letter-spacing:0;font-weight:600;color:var(--muted)}
+  .acts .sg em.late{color:var(--danger)}
+  .acts .sg.later{color:var(--muted)}
+  .act{display:flex;align-items:flex-start;gap:10px;margin:2px 0;padding:6px 0;font-size:15px;color:var(--ink)}
+  .act input{width:22px;height:22px;padding:0;flex:none;accent-color:var(--conf);margin-top:1px}
+  .act.done span{text-decoration:line-through;color:var(--muted)}
+  #dActs h3{margin-top:22px}
   /* Vendor list: "Not assigned" view - every outside-vendor item with no vendor name yet */
   .una{display:grid;grid-template-columns:1fr;gap:6px;border-top:1px solid var(--line);padding:10px 0 4px}
   .vg h4 + .una{border-top:0}
@@ -148,6 +158,8 @@
   <button class="chip" data-f="Costing">Costing</button>
   <button class="chip" data-f="Blocked">Blocked</button>
   <button class="chip" data-f="Confirmed">Confirmed</button>
+  <button class="chip" data-f="NoQuote">No quote given</button>
+  <button class="chip" data-f="Action">Action due</button>
 </div>
 <label class="past"><input type="checkbox" id="showPast" style="width:auto"> Include past events</label>
 
@@ -170,6 +182,7 @@
     <button class="st" data-s="Confirmed">Confirmed</button>
     <button class="st lost" data-s="Lost">Lost - remove from list</button>
   </div>
+  <div id="dActs"></div>
   <div id="dQuotes"></div>
   <div id="dVend"></div>
   <button class="link" id="dClose">Close</button>
@@ -271,29 +284,109 @@
     tt = setTimeout(function () { t.style.display = 'none'; }, 3200);
   }
 
+  /* ---------- reminders + "no quote given" flags (Confirmed works) ---------- */
+  var FL = { ready: false, sites: {}, cloud: {}, acts: {} };
+  var LOOKBACK = 7;   // a finished wedding stays on the list this many days while its "day after" task is still pending
+  var STAGES = [
+    { title: '3 days before wedding', at: 3, tasks: [['timeline', 'Wedding timeline to be given'], ['vendorChk', 'Checklist to be finalised with vendors'], ['payAdv', 'Payment & advance details to be sent to client']] },
+    { title: '1 day before wedding', at: 1, tasks: [['staffChk', 'Checklist to staff']] },
+    { title: 'Day after wedding', at: -1, tasks: [['finalPay', 'Final payment details to be sent']] }
+  ];
+  function wkey(i) { return i.id + '|' + i.date; }
+  function daysTo(i) { return Math.round((toDate(i.date) - toDate(today)) / 86400000); }
+  function isoAdd(iso, n) { var d = toDate(iso); d.setDate(d.getDate() + n); return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()); }
+  function noQuote(i) { return FL.ready && i.status === 'Confirmed' && !!i.date && !FL.sites[wkey(i)] && FL.cloud[wkey(i)] === 0; }
+  function isDone(i, t) { return !!FL.acts[wkey(i) + '|' + t]; }
+  function pending(i) {   // due tasks not yet ticked
+    var n = 0;
+    if (!FL.ready || i.status !== 'Confirmed' || !i.date) return 0;
+    var d = daysTo(i);
+    STAGES.forEach(function (s) { if (d <= s.at) s.tasks.forEach(function (t) { if (!isDone(i, t[0])) n++; }); });
+    return n;
+  }
+  // all=false: only tasks that are due and not done (main list). all=true: every stage with ticks (work detail).
+  function actHtml(i, all) {
+    if (!FL.ready || i.status !== 'Confirmed' || !i.date) return '';
+    var d = daysTo(i), out = '';
+    STAGES.forEach(function (s) {
+      var due = d <= s.at;
+      var tasks = s.tasks.filter(function (t) { return all || (due && !isDone(i, t[0])); });
+      if (!tasks.length) return;
+      var tag = due ? (d < s.at ? '<em class="late">overdue</em>' : '<em>due today</em>') : '<em>in ' + (d - s.at) + (d - s.at === 1 ? ' day' : ' days') + '</em>';
+      out += '<div class="sg' + (due ? '' : ' later') + '">' + s.title + ' ' + tag + '</div>' +
+        tasks.map(function (t) {
+          var dn = isDone(i, t[0]);
+          return '<label class="act' + (dn ? ' done' : '') + '"><input type="checkbox" class="actcb" data-row="' + i.row + '" data-id="' + esc(i.id) + '" data-date="' + esc(i.date) + '" data-task="' + t[0] + '"' + (dn ? ' checked' : '') + '><span>' + t[1] + '</span></label>';
+        }).join('');
+    });
+    return out ? '<div class="acts">' + out + '</div>' : '';
+  }
+
   function render() {
     var ql = q.trim().toLowerCase();
+    var cutoff = today ? isoAdd(today, -LOOKBACK) : '';
     var list = items.filter(function (i) {
-      if (!showPast && i.date && i.date < today) return false;
-      if (filter !== 'All' && i.status !== filter) return false;
+      if (!showPast && i.date && i.date < today && !(i.date >= cutoff && pending(i) > 0)) return false;
+      if (filter === 'NoQuote') { if (!noQuote(i)) return false; }
+      else if (filter === 'Action') { if (pending(i) === 0) return false; }
+      else if (filter !== 'All' && i.status !== filter) return false;
       if (ql && (i.name + ' ' + i.venue).toLowerCase().indexOf(ql) < 0) return false;
       return true;
     });
     $('#sub').textContent = list.length + ' shown';
-    $('#count').textContent = showPast ? 'Oldest first' : 'Upcoming events, soonest first';
+    $('#count').textContent = (showPast ? 'Oldest first' : 'Upcoming events, soonest first') +
+      (FL.ready ? '' : ' - quote flags and reminders need the updated Code.gs');
     if (!list.length) {
-      $('#list').innerHTML = '<div class="empty">Nothing here yet.</div>';
+      $('#list').innerHTML = '<div class="empty">' + (filter === 'NoQuote' ? 'Every confirmed work has a quote.' : filter === 'Action' ? 'No actions pending.' : 'Nothing here yet.') + '</div>';
       return;
     }
     $('#list').innerHTML = list.map(function (i) {
       var sc = 's-' + esc(i.status);
-      return '<button class="card ' + sc + '" data-row="' + i.row + '">' +
+      return '<div class="card ' + sc + '" role="button" tabindex="0" data-row="' + i.row + '">' +
         '<div class="r1"><span class="name">' + esc(i.name) + '</span><span class="badge ' + sc + '">' + esc(i.status) + '</span></div>' +
         '<div class="r2">' + fmt(i.date) + ' &middot; ' + when(i.date) + '</div>' +
         '<div class="r3">' + esc(i.venue) + '</div>' +
+        (noQuote(i) ? '<div class="nq">&#9888; No quote given yet</div>' : '') +
         (i.status === 'Costing' && i.since ? '<div class="since">Costing since ' + fmt(i.since, true) + ' &middot; reminder every 2 days</div>' : '') +
-        '</button>';
+        actHtml(i, false) +
+        '</div>';
     }).join('');
+  }
+
+  // one call for quote flags + ticks, plus the new-style quote pages of every confirmed work
+  function loadFlags() {
+    var conf = items.filter(function (i) { return i.status === 'Confirmed' && i.date; });
+    var srv = call('api_flags', pin).then(function (r) { return r; }, function () { return null; });
+    var gh = Promise.all(conf.map(function (it) {
+      return ghQuotes(it).then(function (qs) { return { it: it, n: qs.length }; }, function () { return { it: it, n: -1 }; });
+    }));
+    return Promise.all([srv, gh]).then(function (res) {
+      var r = res[0];
+      FL.sites = {}; FL.acts = {}; FL.cloud = {};
+      if (r) {
+        Object.keys(r.quotes || {}).forEach(function (k) { FL.sites[k] = r.quotes[k]; });
+        (r.actions || []).forEach(function (a) { FL.acts[a.key + '|' + a.task] = a.done; });
+      }
+      res[1].forEach(function (x) { if (x.n >= 0) FL.cloud[wkey(x.it)] = x.n; });
+      FL.ready = !!r;
+      render();
+      if (cur) renderActsDetail(cur);
+    });
+  }
+  function renderActsDetail(it) {
+    var h = actHtml(it, true);
+    $('#dActs').innerHTML = h ? '<h3>Actions</h3>' + h : '';
+  }
+  function actToggle(e) {
+    var cb = e.target.closest('.actcb'); if (!cb) return;
+    var it = items.filter(function (i) { return i.row === +cb.getAttribute('data-row'); })[0]; if (!it) return;
+    var task = cb.getAttribute('data-task'), on = cb.checked, k = wkey(it) + '|' + task, was = !!FL.acts[k];
+    FL.acts[k] = on;
+    render(); if (cur === it) renderActsDetail(it);
+    busy(true);
+    call('api_action', pin, { row: it.row, id: it.id, date: it.date, task: task, done: on })
+      .catch(function (err) { FL.acts[k] = was; render(); if (cur === it) renderActsDetail(it); toast('Not saved: ' + err.message, true); })
+      .then(function () { busy(false); });
   }
 
   function showPin(msg) {
@@ -312,6 +405,7 @@
       dl.innerHTML = r.names.map(function (n) { return '<option value="' + esc(n) + '">'; }).join('');
       $('#pin').classList.remove('show');
       render();
+      loadFlags();
     }).catch(function (e) {
       if (/Wrong PIN/.test(e.message)) {
         try { localStorage.removeItem('ivoryPin'); } catch (x) {}
@@ -336,10 +430,12 @@
     $('#form').classList.remove('show');
     $('#vl').classList.remove('show');
     cur = null;
+    $('#dActs').innerHTML = '';
   }
 
   // list taps
   $('#list').addEventListener('click', function (e) {
+    if (e.target.closest('.acts')) return;   // ticking a reminder must not open the work
     var b = e.target.closest('.card');
     if (!b) return;
     var row = +b.getAttribute('data-row');
@@ -351,6 +447,7 @@
       s.classList.toggle('cur', s.getAttribute('data-s') === cur.status);
     });
     openSheet('#detail');
+    renderActsDetail(cur);
     loadDetail(cur);
   });
 
@@ -399,6 +496,11 @@
     });
   });
 
+  $('#list').addEventListener('change', actToggle);
+  $('#dActs').addEventListener('change', actToggle);
+  $('#list').addEventListener('keydown', function (e) {
+    if ((e.key === 'Enter' || e.key === ' ') && e.target.classList && e.target.classList.contains('card')) { e.preventDefault(); e.target.click(); }
+  });
   $('#scrim').addEventListener('click', closeSheets);
   $('#dClose').addEventListener('click', closeSheets);
   $('#fClose').addEventListener('click', closeSheets);

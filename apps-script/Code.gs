@@ -356,6 +356,77 @@ function api_vendors(pin) {
   return { rows: rows };
 }
 
+/* ---------- quote flags + per-work action reminders ---------- */
+
+const ACTION_TAB = 'Actions';
+
+function actionsTab_(ss) {
+  let sh = ss.getSheetByName(ACTION_TAB);
+  if (!sh) {
+    sh = ss.insertSheet(ACTION_TAB);
+    sh.getRange(1, 1, 1, 5).setValues([['Key', 'Client', 'Task', 'Done', 'Updated']]);
+    sh.setFrozenRows(1);
+    sh.getRange('A:C').setNumberFormat('@');
+  }
+  return sh;
+}
+
+// For the main list: which works have a Google Sites quote on record (Quotes tab), and which reminder tasks are ticked done.
+function api_flags(pin) {
+  check_(pin);
+  const ss = ss_();
+  const quotes = {};
+  const qs = ss.getSheetByName(QUOTE_TAB), ql = qs ? lastRowWith_(qs, 1) : 1;
+  if (ql > 1) {
+    qs.getRange(2, 1, ql - 1, 9).getValues().forEach(function (r) {
+      const id = String(r[1]).trim(), d = isoAny_(r[3]);
+      if (!id || !d) return;
+      const k = id + '|' + d;
+      quotes[k] = (quotes[k] || 0) + 1;
+    });
+  }
+  const actions = [];
+  const as = ss.getSheetByName(ACTION_TAB), al = as ? lastRowWith_(as, 1) : 1;
+  if (al > 1) {
+    as.getRange(2, 1, al - 1, 5).getValues().forEach(function (r) {
+      if (!r[0]) return;
+      actions.push({ key: String(r[0]), task: String(r[2]), done: r[3] === true || String(r[3]).toLowerCase() === 'true' });
+    });
+  }
+  return { quotes: quotes, actions: actions };
+}
+
+function api_action(pin, p) {
+  check_(pin);
+  const task = String(p.task || '').trim();
+  if (!task || task.length > 40) throw new Error('Unknown task');
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    const ss = ss_();
+    const row = checkRow_(ss.getSheetByName(CFG.ENQ), p);
+    const sh = actionsTab_(ss);
+    const key = p.id + '|' + p.date;
+    const last = lastRowWith_(sh, 1);
+    let r = -1;
+    if (last > 1) {
+      sh.getRange(2, 1, last - 1, 3).getValues().forEach(function (v, i) {
+        if (r < 0 && String(v[0]) === key && String(v[2]) === task) r = i + 2;
+      });
+    }
+    if (r < 0) {
+      r = last + 1;
+      sh.getRange(r, 1, 1, 3).setNumberFormat('@').setValues([[key, String(row[1]), task]]);
+    }
+    sh.getRange(r, 4).insertCheckboxes().setValue(p.done === true);
+    sh.getRange(r, 5).setValue(new Date()).setNumberFormat('d mmm yyyy h:mm AM/PM');
+    SpreadsheetApp.flush();
+    return { ok: true };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
 /* ---------- reminders ---------- */
 
 // Runs every morning. For each enquiry in Costing it makes a calendar reminder
