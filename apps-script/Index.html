@@ -542,6 +542,7 @@
 
 
   /* ---------- quotes sent + outside vendors ---------- */
+  var APP_VERSION = 'v13-Nov-b';   // shown under Outside vendors, so you can tell which Index.html is running
   var GH_REPO = 'ivoryeventz-ops/Ivory-Packages', GH_BRANCH = 'main', GH_SITE = 'https://ivory-packages.pages.dev';
   // The 12 standard outside vendors (same list as VENDOR_NAMES in Code.gs).
   var VNAMES = ['Garland and Bouquet', 'Wedding cake', 'Confetti', 'Cold Spark', 'Dry Ice', 'Ambiance lighting',
@@ -790,7 +791,7 @@
     }
     // anything already saved for this work stays visible, even if a later quote no longer lists it
     Object.keys(VS).forEach(function (n) { if (main.indexOf(n) < 0 && vSaved(n)) main.push(n); });
-    $('#dVend').innerHTML = '<h3>Outside vendors <span class="vcount" id="vcount"></span></h3><div class="note">' + note + '</div>' +
+    $('#dVend').innerHTML = '<h3>Outside vendors <span class="vcount" id="vcount"></span></h3><div class="note">' + note + ' <span style="opacity:.6">(app ' + APP_VERSION + ')</span></div>' +
       '<div id="vmain">' + main.map(vRow).join('') + '</div>' +
       '<datalist id="supList">' + (d.suppliers || []).map(function (n) { return '<option value="' + esc(n) + '">'; }).join('') + '</datalist>' +
       '<div class="vstate" id="vstate"></div>';
