@@ -542,7 +542,7 @@
 
 
   /* ---------- quotes sent + outside vendors ---------- */
-  var APP_VERSION = 'v13-Nov-b';   // shown under Outside vendors, so you can tell which Index.html is running
+  var APP_VERSION = 'v13-Nov-c';   // shown under Outside vendors, so you can tell which Index.html is running
   var GH_REPO = 'ivoryeventz-ops/Ivory-Packages', GH_BRANCH = 'main', GH_SITE = 'https://ivory-packages.pages.dev';
   // The 12 standard outside vendors (same list as VENDOR_NAMES in Code.gs).
   var VNAMES = ['Garland and Bouquet', 'Wedding cake', 'Confetti', 'Cold Spark', 'Dry Ice', 'Ambiance lighting',
@@ -602,6 +602,7 @@
     entry.p = fetch('https://raw.githubusercontent.com/' + GH_REPO + '/' + GH_BRANCH + '/' + encodeURIComponent(folder) + '/' + no + '.html' + (fresh ? '?t=' + Date.now() : ''))
       .then(function (r) { if (!r.ok) throw new Error('quote ' + no + ' not readable'); return r.text(); })
       .then(function (html) {
+        html = html.replace(/></g, '> <');   // keeps neighbouring items apart in the page text, so "₹ 15,000" + "Anchor / MC" never glue into one word
         var doc = new DOMParser().parseFromString(html, 'text/html'), date = null, venue = '';
         Array.prototype.forEach.call(doc.querySelectorAll('.info-item'), function (it) {
           var l = ((it.querySelector('.info-label') || {}).textContent || '').trim().toLowerCase();
