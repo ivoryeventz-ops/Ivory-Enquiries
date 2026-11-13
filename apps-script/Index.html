@@ -184,9 +184,9 @@
     <button class="st" data-s="Confirmed">Confirmed</button>
     <button class="st lost" data-s="Lost">Lost - remove from list</button>
   </div>
-  <div id="dActs"></div>
   <div id="dQuotes"></div>
   <div id="dVend"></div>
+  <div id="dActs"></div>
   <button class="link" id="dClose">Close</button>
 </div>
 
@@ -313,16 +313,17 @@
     STAGES.forEach(function (s) { if (d <= s.at) s.tasks.forEach(function (t) { if (!isDone(i, t[0])) n++; }); });
     return n;
   }
-  // all=false: only tasks that are due and not done (main list). all=true: every stage with ticks (work detail).
+  // A stage only appears from the day its action is needed (3 days before, 1 day before, day after) - never earlier.
+  // all=false: only due tasks not yet ticked (main list). all=true: every due task, ticked or not (work detail).
   function actHtml(i, all) {
     if (!FL.ready || i.status !== 'Confirmed' || !i.date) return '';
     var d = daysTo(i), out = '';
     STAGES.forEach(function (s) {
-      var due = d <= s.at;
-      var tasks = s.tasks.filter(function (t) { return all || (due && !isDone(i, t[0])); });
+      if (d > s.at) return;   // not yet time for this stage
+      var tasks = s.tasks.filter(function (t) { return all || !isDone(i, t[0]); });
       if (!tasks.length) return;
-      var tag = due ? (d < s.at ? '<em class="late">overdue</em>' : '<em>due today</em>') : '<em>in ' + (d - s.at) + (d - s.at === 1 ? ' day' : ' days') + '</em>';
-      out += '<div class="sg' + (due ? '' : ' later') + '">' + s.title + ' ' + tag + '</div>' +
+      var tag = d < s.at ? '<em class="late">overdue</em>' : '<em>due today</em>';
+      out += '<div class="sg">' + s.title + ' ' + tag + '</div>' +
         tasks.map(function (t) {
           var dn = isDone(i, t[0]);
           return '<label class="act' + (dn ? ' done' : '') + '"><input type="checkbox" class="actcb" data-row="' + i.row + '" data-id="' + esc(i.id) + '" data-date="' + esc(i.date) + '" data-task="' + t[0] + '"' + (dn ? ' checked' : '') + '><span>' + t[1] + '</span></label>';
@@ -544,7 +545,7 @@
   var GH_REPO = 'ivoryeventz-ops/Ivory-Packages', GH_BRANCH = 'main', GH_SITE = 'https://ivory-packages.pages.dev';
   // The 12 standard outside vendors (same list as VENDOR_NAMES in Code.gs).
   var VNAMES = ['Garland and Bouquet', 'Wedding cake', 'Confetti', 'Cold Spark', 'Dry Ice', 'Ambiance lighting',
-    'Parking Security', 'Live Band', 'Wedding Car', 'Generator', 'Pagoda', 'Table & Chair covers'];
+    'Parking Security', 'Live Band', 'Wedding Car', 'Generator', 'Pagoda', 'Table & Chair covers', 'Anchor / MC', 'LED Wall'];
   // Wording used to pick a work's vendors out of its latest quote page. Vendor names themselves come from the sheet side.
   var VENDOR_RE = {
     'Garland and Bouquet': /garland|bouquet/i,
@@ -552,13 +553,15 @@
     'Confetti': /confetti/i,
     'Cold Spark': /spark/i,
     'Dry Ice': /dry\s*ice|\bfog\b/i,
-    'Ambiance lighting': /ambian[ct]e/i,
+    'Ambiance lighting': /ambi[ae]n[ct]/i,          // ambiance / ambience / ambient
     'Parking Security': /parking/i,
     'Live Band': /live\s*band/i,
     'Wedding Car': /wedding\s*car(?!\s*decor)|\b(mercedes|bmw|audi)\b/i,
     'Generator': /generator/i,
     'Pagoda': /pagoda/i,
-    'Table & Chair covers': /(table|chair)s?\s*covers?/i
+    'Table & Chair covers': /(table|chair)s?\s*covers?/i,
+    'Anchor / MC': /\banchor\b|\bmc\b/i,
+    'LED Wall': /\bled\s*(wall|screen)/i
   };
   var MONTHS = { january: 1, february: 2, march: 3, april: 4, may: 5, june: 6, july: 7, august: 8, september: 9, october: 10, november: 11, december: 12 };
   function pad2(n) { return (n < 10 ? '0' : '') + n; }
@@ -574,8 +577,8 @@
   }
 
   var ghTree = null, ghTreeAt = 0, ghCache = {};
-  function ghTreeGet() {
-    if (ghTree && Date.now() - ghTreeAt < 300000) return Promise.resolve(ghTree);
+  function ghTreeGet(maxAge) {
+    if (ghTree && Date.now() - ghTreeAt < (maxAge || 300000)) return Promise.resolve(ghTree);
     return fetch('https://api.github.com/repos/' + GH_REPO + '/git/trees/' + GH_BRANCH + '?recursive=1')
       .then(function (r) { if (!r.ok) throw new Error('GitHub answered ' + r.status); return r.json(); })
       .then(function (j) {
@@ -588,10 +591,13 @@
         return t;
       });
   }
-  function ghQuote(folder, no) {
-    var k = folder + '/' + no;
-    if (ghCache[k]) return ghCache[k];
-    ghCache[k] = fetch('https://raw.githubusercontent.com/' + GH_REPO + '/' + GH_BRANCH + '/' + encodeURIComponent(folder) + '/' + no + '.html')
+  // fresh=true (opening a work, Vendor list): a quote page read more than 90 seconds ago is read again, so a re-issued quote is picked up.
+  function ghQuote(folder, no, fresh) {
+    var k = folder + '/' + no, c = ghCache[k];
+    if (c && Date.now() - c.at < (fresh ? 90000 : 600000)) return c.p;
+    var entry = { at: Date.now() };
+    ghCache[k] = entry;
+    entry.p = fetch('https://raw.githubusercontent.com/' + GH_REPO + '/' + GH_BRANCH + '/' + encodeURIComponent(folder) + '/' + no + '.html' + (fresh ? '?t=' + Date.now() : ''))
       .then(function (r) { if (!r.ok) throw new Error('quote ' + no + ' not readable'); return r.text(); })
       .then(function (html) {
         var doc = new DOMParser().parseFromString(html, 'text/html'), date = null, venue = '';
@@ -615,18 +621,18 @@
         if (cut > 0) text = text.slice(0, cut);
         return { no: no, src: 'cloud', url: GH_SITE + '/' + encodeURIComponent(folder) + '/' + no, date: date, venue: venue, text: text, outside: outside };
       })
-      .catch(function (e) { delete ghCache[k]; throw e; });
-    return ghCache[k];
+      .catch(function (e) { if (ghCache[k] === entry) delete ghCache[k]; throw e; });
+    return entry.p;
   }
   // Newer quote pages (ivory-packages.pages.dev). Two clients can share a first name, so a quote written for another event date is dropped.
-  function ghQuotes(it) {
-    return ghTreeGet().then(function (tree) {
+  function ghQuotes(it, fresh) {
+    return ghTreeGet(fresh ? 90000 : 0).then(function (tree) {
       var full = ' ' + it.name.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim() + ' ';
       var jobs = [];
       Object.keys(tree).forEach(function (f) {
         var fn = ' ' + f.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim() + ' ';
         if (full.indexOf(fn) < 0) return;
-        tree[f].forEach(function (no) { jobs.push(ghQuote(f, no).then(function (q) { return q; }, function () { return null; })); });
+        tree[f].forEach(function (no) { jobs.push(ghQuote(f, no, fresh).then(function (q) { return q; }, function () { return null; })); });
       });
       return Promise.all(jobs);
     }).then(function (all) {
@@ -686,17 +692,31 @@
     });
   }
 
+  // The last result for each work is kept, so tapping a name shows quotes + vendors straight away and refreshes quietly behind it.
+  var dCache = {};
+  function detailSig(d, gh) { return JSON.stringify([d.sites, d.vendors, d.suppliers, gh.err || '', (gh.q || []).map(function (q) { return [q.no, q.url, q.text, q.outside]; })]); }
   function loadDetail(it) {
-    var tok = ++dTok;
-    $('#dQuotes').innerHTML = '<h3>Quotes sent</h3><div class="note">Loading...</div>';
-    $('#dVend').innerHTML = '';
+    var tok = ++dTok, ck = wkey(it), cached = dCache[ck];
+    if (cached) {
+      renderDetail(it, cached.d, cached.gh);
+    } else {
+      $('#dQuotes').innerHTML = '<h3>Quotes sent</h3><div class="note">Loading...</div>';
+      $('#dVend').innerHTML = '';
+    }
     var srv = call('api_detail', pin, { row: it.row, id: it.id, date: it.date });
-    var gh = ghQuotes(it).then(function (q) { return { q: q }; }, function (e) { return { q: [], err: e.message }; });
+    var gh = ghQuotes(it, true).then(function (q) { return { q: q }; }, function (e) { return { q: [], err: e.message }; });   // fresh: vendors always follow the latest quote
     Promise.all([srv, gh]).then(function (res) {
       if (tok !== dTok) return;
+      var same = cached && detailSig(cached.d, cached.gh) === detailSig(res[0], res[1]);
+      dCache[ck] = { d: res[0], gh: res[1] };
+      if (same) return;
+      // never redraw the vendor boxes under someone who is typing or has an unsaved change
+      var editing = cached && (Object.keys(vPend).length || ($('#dVend').contains(document.activeElement) && document.activeElement !== $('#dVend')));
+      if (editing) return;
       renderDetail(it, res[0], res[1]);
     }).catch(function (e) {
       if (tok !== dTok) return;
+      if (cached) return;   // keep showing what was already on screen
       $('#dQuotes').innerHTML = '<h3>Quotes sent</h3><div class="note warn">Could not load (' + esc(e.message) +
         ').<button class="retryb" data-act="reload">Try again</button></div>';
     });
@@ -747,7 +767,8 @@
     vItem = null;
     if (it.status !== 'Confirmed') { $('#dVend').innerHTML = ''; return; }
     vItem = it; VS = d.vendors || {};
-    var names = d.vendorList || [];
+    var names = (d.vendorList || []).slice();
+    VNAMES.forEach(function (n) { if (names.indexOf(n) < 0) names.push(n); });   // new vendor types work even before Code.gs is redeployed
     var latest = list[0], text = latest && latest.src === 'cloud' ? latest.text : '';
     var main = [], note;
     if (text) {
@@ -912,7 +933,7 @@
     works.sort(function (a, b) { return (a.date || '').localeCompare(b.date || ''); });
     $('#vlList').innerHTML = '<div class="note">Checking the quotes of ' + works.length + ' confirmed works...</div>';
     return Promise.all(works.map(function (it) {
-      return ghQuotes(it).then(function (qs) { return { it: it, qs: qs }; }, function () { return { it: it, qs: [], err: true }; });
+      return ghQuotes(it, true).then(function (qs) { return { it: it, qs: qs }; }, function () { return { it: it, qs: [], err: true }; });
     })).then(function (res) {
       if (tok !== unaTok) return;
       var named = {}, saved = {};

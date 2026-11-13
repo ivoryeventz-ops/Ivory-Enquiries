@@ -22,7 +22,7 @@ const STATUSES = ['Enquiry', 'Costing', 'Blocked', 'Confirmed', 'Lost'];
 
 // Outside vendors: tracked ONLY in this app (tick = booked, plus name/details). Saved in a "Vendors" tab of the Enquiry Book.
 const VENDOR_NAMES = ['Garland and Bouquet', 'Wedding cake', 'Confetti', 'Cold Spark', 'Dry Ice', 'Ambiance lighting',
-  'Parking Security', 'Live Band', 'Wedding Car', 'Generator', 'Pagoda', 'Table & Chair covers'];
+  'Parking Security', 'Live Band', 'Wedding Car', 'Generator', 'Pagoda', 'Table & Chair covers', 'Anchor / MC', 'LED Wall'];
 const VENDOR_TAB = 'Vendors';
 const QUOTE_TAB = 'Quotes';
 
