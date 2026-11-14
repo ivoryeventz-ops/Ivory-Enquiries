@@ -2285,18 +2285,20 @@
       types.forEach(function (t) { for (var i = 0; i < t.n; i++) cars.push({ who: who, type: t.t }); });
     });
 
-    // Cars the quote does not label: one car is taken as the bride's; with two, the first is the groom's.
+    // Cars the quote does not label are taken as the groom's. A second unlabeled car is the bride's.
+    // Exception: a lone car with a separate "Bride" car decoration line in the quote is taken as the bride's.
     var brideDeco = decos.indexOf('bride') >= 0, groomDeco = decos.some(function (d) { return d !== 'bride'; });
     var haveG = cars.some(function (c) { return c.who === 'groom'; }), guessed = false;
     cars.forEach(function (c) {
       if (c.who) return;
-      if (!haveG && cars.length > 1) { c.who = 'groom'; haveG = true; guessed = true; }
-      else { c.who = 'bride'; if (cars.length > 1 || !brideDeco) guessed = true; }   // a lone car with a "Bride" decoration line is clearly the bride's
+      if (cars.length === 1 && brideDeco) { c.who = 'bride'; return; }
+      if (!haveG) { c.who = 'groom'; haveG = true; guessed = cars.length > 1; }
+      else { c.who = 'bride'; guessed = true; }
     });
     out.cars = cars.map(function (c) { return { who: c.who, type: c.type, where: '', time: '', deco: c.who === 'bride' ? brideDeco : groomDeco }; });
 
     if (!cars.length) out.notes.push('No wedding car is listed in the quote, so only the decoration line is used.');
-    if (guessed) out.notes.push('The quote does not say whose car it is. Check the Groom / Bride choice below.');
+    if (guessed) out.notes.push('The quote does not say which car is whose. Check the Groom / Bride choice below.');
     out.cars.forEach(function (c) {
       if (c.who === 'bride' && !c.deco) out.notes.push('Bride’s car decoration is not in the quote, so the page will not say it is fixed on the car.');
     });
