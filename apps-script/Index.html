@@ -567,7 +567,7 @@
 
 
   /* ---------- quotes sent + outside vendors ---------- */
-  var APP_VERSION = 'v14-Nov-b';   // shown under Outside vendors, so you can tell which Index.html is running
+  var APP_VERSION = 'v14-Nov-c';   // shown under Outside vendors, so you can tell which Index.html is running
   var GH_REPO = 'ivoryeventz-ops/Ivory-Packages', GH_BRANCH = 'main', GH_SITE = 'https://ivory-packages.pages.dev';
   // The 12 standard outside vendors (same list as VENDOR_NAMES in Code.gs).
   var VNAMES = ['Garland and Bouquet', 'Wedding cake', 'Confetti', 'Cold Spark', 'Dry Ice', 'Ambiance lighting',
@@ -995,13 +995,18 @@
 
   function payFromQuote(list) {
     var q = (list || []).filter(function (x) { return x.src === 'cloud' && x.items; })[0];
-    return q ? q.items.map(function (r) { return { name: r.name, amount: r.amount }; }) : [];
+    var out = q ? q.items.map(function (r) { return { name: r.name, amount: r.amount }; }) : [];
+    return withDecor(out);
   }
+  // The decor package is always the first row; left blank (and flagged) when the quote has no single package rate.
+  function hasDecor(a) { return a.some(function (r) { return /decor\s*package|package/i.test(r.name || ''); }); }
+  function withDecor(a) { if (!hasDecor(a)) a.unshift({ name: 'Decor Package', amount: 0 }); return a; }
+  function decorMissing() { return P.items.some(function (r) { return /decor\s*package/i.test(r.name || '') && !num(r.amount); }); }
   function openPay(it, list) {
     var folder = payFolder(it, list), q = (list || []).filter(function (x) { return x.src === 'cloud'; })[0];
     P = { it: it, list: list, folder: folder, name: it.name, date: it.date, venue: (q && q.venue) || it.venue || '',
       items: payFromQuote(list), total: null, totalAuto: true, discount: 0, adv: [{ label: 'Advance Received', amount: 0 }] };
-    $('#payMeta').textContent = it.name + ' - ' + fmt(it.date) + (P.venue ? ' - ' + P.venue : '') + '  (saves to ' + folder + '/payment)';
+    $('#payMeta').textContent = it.name + ' - ' + fmt(it.date) + (P.venue ? ' - ' + P.venue : '') + '  (saves to ' + folder + '/payment) - app ' + APP_VERSION;
     payRender();
     openSheet('#pay');
     payStatus('Checking for saved payment details...');
@@ -1011,14 +1016,14 @@
       .then(function (html) {
         if (P !== tok) return;
         var o = parseSavedPayment(html);
-        if (o.items && o.items.length) P.items = o.items;
+        if (o.items && o.items.length) P.items = withDecor(o.items);
         P.discount = num(o.discount);
         if (o.adv && o.adv.length) P.adv = o.adv;
         if (o.total != null) { P.total = o.total; P.totalAuto = (o.total === itemsSum()); }
         payRender();
-        payStatus('Loaded the saved payment details.');
+        payStatus(decorMissing() ? 'Saved details loaded. Decor package rate is blank - type it in the first row, or tap Pick rates again from quote.' : 'Loaded the saved payment details.', decorMissing());
       })
-      .catch(function () { if (P === tok) payStatus(P.items.length ? 'Rates picked up from the latest quote.' : 'No priced items found in the quote - add them below.'); });
+      .catch(function () { if (P === tok) payStatus(decorMissing() ? 'The decor package rate is not in the quote as one price - type it in the first row.' : 'Rates picked up from the latest quote.', decorMissing()); });
   }
 
   function payHtml() {
@@ -1125,7 +1130,7 @@
     var a = b.getAttribute('data-act'), row = b.closest('.prow');
     if (a === 'pdel') { P.items.splice(+row.getAttribute('data-i'), 1); payRender(); }
     else if (a === 'padd') { P.items.push({ name: '', amount: 0 }); payRender(); }
-    else if (a === 'preload') { P.items = payFromQuote(P.list); P.totalAuto = true; payRender(); payStatus('Rates picked up again from the latest quote.'); }
+    else if (a === 'preload') { P.items = payFromQuote(P.list); P.totalAuto = true; payRender(); payStatus(decorMissing() ? 'The decor package rate is not in the quote as one price - type it in the first row.' : 'Rates picked up again from the latest quote.', decorMissing()); }
     else if (a === 'adel') { P.adv.splice(+row.getAttribute('data-a'), 1); payRender(); }
     else if (a === 'aadd') { P.adv.push({ label: 'Advance Received on ', amount: 0 }); payRender(); }
     else if (a === 'psave') payPublish();
