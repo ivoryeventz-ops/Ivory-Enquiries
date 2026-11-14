@@ -151,6 +151,16 @@
   .pbtn{border:1px solid var(--line);background:#fff;border-radius:10px;padding:9px 14px;font-size:14px;font-weight:600;color:var(--burgundy);margin:2px 6px 0 0}
   .pst{font-size:13px;min-height:18px;margin-top:8px;color:var(--muted)}
   .pst.err{color:var(--danger);font-weight:600}
+
+  /* wedding timeline sheet */
+  #tl h4{font-size:12px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin:18px 0 8px}
+  #tl textarea{width:100%;border:1px solid var(--line);border-radius:10px;padding:10px 12px;font:inherit;font-size:15px;background:#fff;color:var(--ink);resize:vertical}
+  .tl2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .tlcar{border:1px solid var(--line);border-radius:12px;padding:6px 12px 12px;margin:10px 0;background:#fff}
+  .tlch{display:flex;justify-content:space-between;align-items:center;margin-top:4px}
+  .tlch .x{border:1px solid var(--line);background:#fff;border-radius:8px;width:34px;height:34px;font-size:18px;color:var(--danger)}
+  .tlchk{display:flex;align-items:center;gap:8px;color:var(--ink);font-size:14px;margin-top:12px}
+  #tlPrev{display:none;width:100%;height:70vh;border:1px solid var(--line);border-radius:12px;margin-top:10px;background:#fff}
 </style>
 </head>
 <body>
@@ -212,6 +222,17 @@
   <div class="meta" id="payMeta"></div>
   <div id="payBody"></div>
   <button class="link" id="payClose">Back</button>
+</div>
+
+<div class="sheet" id="tl">
+  <h2>Wedding timeline</h2>
+  <div class="meta" id="tlMeta"></div>
+  <div id="tlBody"></div>
+  <iframe id="tlPrev" title="Preview of the wedding day guide"></iframe>
+  <div id="tlKeyBox" style="display:none"><h4>GitHub key</h4><div class="note" id="tlKeyNote"></div><input id="tlKey" type="password" autocomplete="off" placeholder="Paste GitHub key"></div>
+  <button class="primary" id="tlSave" type="button">Save &amp; publish</button>
+  <div class="pst" id="tlState"></div><div id="tlShare"></div>
+  <button class="link" id="tlClose">Back</button>
 </div>
 
 <div class="sheet" id="vl">
@@ -468,6 +489,7 @@
     $('#form').classList.remove('show');
     $('#vl').classList.remove('show');
     $('#pay').classList.remove('show');
+    $('#tl').classList.remove('show');
     cur = null;
     $('#dActs').innerHTML = '';
   }
@@ -567,7 +589,7 @@
 
 
   /* ---------- quotes sent + outside vendors ---------- */
-  var APP_VERSION = 'v14-Nov-d';   // shown under Outside vendors, so you can tell which Index.html is running
+  var APP_VERSION = 'v14-Nov-e';   // shown under Outside vendors, so you can tell which Index.html is running
   var GH_REPO = 'ivoryeventz-ops/Ivory-Packages', GH_BRANCH = 'main', GH_SITE = 'https://ivory-packages.pages.dev';
   // The 12 standard outside vendors (same list as VENDOR_NAMES in Code.gs).
   var VNAMES = ['Garland and Bouquet', 'Wedding cake', 'Confetti', 'Cold Spark', 'Dry Ice', 'Ambiance lighting',
@@ -637,6 +659,7 @@
           if (l === 'date') date = isoFromText(v);
           if (l === 'venue') venue = v;
         });
+        var scan = tlScan(doc);   // car and cake lines, used to pre-fill the wedding timeline
         var items = [];   // priced lines (decor package + each additional service), used to pre-fill the payment details
         Array.prototype.forEach.call(doc.querySelectorAll('.section-card'), function (sc) {
           var st = ((sc.querySelector('.section-title') || {}).textContent || '');
@@ -678,7 +701,7 @@
         var text = ((doc.body && doc.body.textContent) || '').replace(/\s+/g, ' ');
         var cut = text.search(/Complimentary Wedding Management/i);   // the free services are not outside vendors
         if (cut > 0) text = text.slice(0, cut);
-        return { no: no, src: 'cloud', folder: folder, url: GH_SITE + '/' + encodeURIComponent(folder) + '/' + no, date: date, venue: venue, text: text, outside: outside, items: items };
+        return { no: no, src: 'cloud', folder: folder, url: GH_SITE + '/' + encodeURIComponent(folder) + '/' + no, date: date, venue: venue, text: text, outside: outside, items: items, scan: scan };
       })
       .catch(function (e) { if (ghCache[k] === entry) delete ghCache[k]; throw e; });
     return entry.p;
@@ -795,6 +818,8 @@
     lastQ = list;
     h += '<button type="button" class="qrow payrow" data-act="pay"><span><b>Payment details</b>' + (ghPay[payFolder(it, list)] ? '<span class="tag">Sent</span>' : '') +
       '<span class="qs">Rates, discount and advance - send to client</span></span><span class="go">Edit &amp; send &rsaquo;</span></button>';
+    h += '<button type="button" class="qrow payrow" data-act="tl"><span><b>Wedding timeline</b>' + (FL.tl[wkey(it)] ? '<span class="tag">Sent</span>' : '') +
+      '<span class="qs">Wedding day guide - filled in from the latest quote</span></span><span class="go">Edit &amp; send &rsaquo;</span></button>';
     if (!list.length) {
       h += '<div class="note">No quote has been sent to ' + esc(it.name) + ' for this date yet.</div>';
     } else {
@@ -888,6 +913,7 @@
 
   $('#dQuotes').addEventListener('click', function (e) {
     if (e.target.closest('[data-act="pay"]') && cur) { openPay(cur, lastQ); return; }
+    if (e.target.closest('[data-act="tl"]') && cur) { tlOpen(cur, lastQ); return; }
     if (e.target.closest('[data-act="reload"]') && cur) loadDetail(cur);
   });
   $('#dVend').addEventListener('click', function (e) {
@@ -1175,6 +1201,1333 @@
     }
     paySum();
   });
+
+
+  /* ---------- wedding timeline: published to <Folder>/timeline.html in the Ivory-Wedding-Timeline repo ---------- */
+  /* TL-PURE-BEGIN */
+  var TL_SITE = 'https://ivory-wedding-timeline.pages.dev';
+  var TL_DECO = 'On the morning of the wedding, the fresh-flower decoration for the wedding car will be delivered to the groom’s residence.';
+  var TL_MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  var TL_DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  var TL_TIERS = { 1: 'single-tier', 2: 'two-tier', 3: 'three-tier' };
+  var TL_VICAR = "\n\n      <div class=\"friendly-tip\">\n        <strong>Please Confirm With the Vicar</strong>\n        Some priests prefer the bride to enter before the groom. It is always a good idea to confirm the preferred order with Achen in advance.\n      </div>";
+
+  // "an Audi A6", "a BMW 5 Series", "a Mercedes Benz E Class", "an Innova"
+  function tlArticle(w) {
+    var f = String(w || '').trim().split(/\s+/)[0];
+    if (/^[A-Z]{2,4}$/.test(f)) return 'AEFHILMNORSX'.indexOf(f.charAt(0)) >= 0 ? 'an' : 'a';
+    if (/^(uni|use|eu)/i.test(f)) return 'a';
+    return /^[aeiou]/i.test(f) ? 'an' : 'a';
+  }
+  function tlDate(iso) {
+    var p = String(iso || '').split('-');
+    if (p.length !== 3) return { weekday: '', long: '' };
+    var d = new Date(Date.UTC(+p[0], +p[1] - 1, +p[2]));
+    return { weekday: TL_DAYS[d.getUTCDay()], long: (+p[2]) + ' ' + TL_MONTHS[+p[1] - 1] + ' ' + p[0] };
+  }
+  function tlSlug(g, b) {
+    return [g, b].map(function (w) { return String(w || '').trim().replace(/[^A-Za-z0-9]+/g, '-').replace(/^-+|-+$/g, ''); }).filter(Boolean).join('-');
+  }
+  function tlNames(T) {
+    var g = String(T.groom || '').trim(), b = String(T.bride || '').trim();
+    return g && b ? g + ' & ' + b : (g || b || 'Wedding');
+  }
+
+  // Everything that changes from one wedding to the next, as ready-to-insert (already escaped) pieces.
+  function tlVars(T) {
+    var d = tlDate(T.date), orth = T.church === 'orthodox';
+    var all = (T.cars || []).filter(function (c) { return c && (c.who === 'groom' || c.who === 'bride'); });
+    var cars = all.filter(function (c) { return c.who === 'groom'; }).concat(all.filter(function (c) { return c.who === 'bride'; }));
+    var hasGroomCar = cars.some(function (c) { return c.who === 'groom'; });
+    var deco = String(T.decoLine || '').trim(), paras = [], boxes = [];
+    if (!hasGroomCar && deco) {
+      paras.push(deco);
+      boxes.push(['Groom’s Car Decoration', 'Delivered to the residence in the morning']);
+    }
+    cars.forEach(function (c) {
+      var w = c.who, type = String(c.type || '').trim(), time = String(c.time || '').trim();
+      var where = String(c.where || '').trim() || 'the ' + w + '’s residence';
+      paras.push('The ' + w + '’s car' + (type ? ', ' + tlArticle(type) + ' ' + type + ',' : '') + ' will arrive at ' + where +
+        (time ? ' by ' + time : '') + (c.deco ? ' with the car decoration already fixed on it' : '') + '.');
+      boxes.push([(w === 'groom' ? 'Groom' : 'Bride') + '’s Car' + (type ? ' (' + type + ')' : ''),
+        'At ' + where + (time ? ' by ' + time : '') + (c.deco ? ', decorated' : '')]);
+    });
+
+    var gI = ['Manthrakodi and wedding rings', 'Groom with parents and family', 'Groomsmen, if any'];
+    var bI = ['Flower girls, if any', 'Bride with parents', 'Family members', 'Bridesmaids'];
+    var side = function (sub, title, items) {
+      return '        <div class="procession-side">\n          <span class="procession-subtext">' + sub + '</span>\n          <h4>' + title + '</h4>\n          <ol>\n' +
+        items.map(function (i) { return '            <li>' + i + '</li>'; }).join('\n') + '\n          </ol>\n        </div>';
+    };
+    // MarThoma: the groom's party follows the Manthrakodi and rings. Orthodox: the bride's party does.
+    var first = orth ? side('Bride’s Side', '1. Bride’s Party', ['Manthrakodi and wedding rings'].concat(bI)) : side('Groom’s Side', '1. Groom’s Party', gI);
+    var second = orth ? side('Groom’s Side', '2. Groom’s Party', gI.slice(1)) : side('Bride’s Side', '2. Bride’s Party', bI);
+
+    var data = JSON.stringify({ v: 1, groom: T.groom || '', bride: T.bride || '', church: orth ? 'orthodox' : 'marthoma', cake: T.cake, decoLine: T.decoLine || '',
+      cars: cars, folder: T.folder || '', date: T.date || '', quote: T.quote || '' }).replace(/</g, '\\u003c');
+    return {
+      names: esc(tlNames(T)), dateLong: esc(d.long), weekday: esc(d.weekday), church: orth ? 'Orthodox' : 'MarThoma', folder: esc(T.folder || ''),
+      timingCars: boxes.map(function (b) { return '<div class="timing-box">\n          <strong>' + esc(b[0]) + '</strong>\n          <span>' + esc(b[1]) + '</span>\n        </div>'; }).join('\n        '),
+      carParas: paras.map(function (p, i) { return (i ? '<p style="margin-top: 0.75rem;">' : '<p>') + esc(p) + '</p>'; }).join('\n      '),
+      vaazh: orth ? 'Vaazhthumaala (gold chain) - 2 No.s' : 'Vaazhthumaala (gold chain)',
+      vaazhBasket: orth ? 'Vaazhthumaala - 2 No.s' : 'Vaazhthumaala',
+      procession: '\n' + first + '\n\n' + second + '\n      ',
+      vicarTip: orth ? '' : TL_VICAR,   // the "confirm with the vicar" note is only for MarThoma
+      cake: TL_TIERS[+T.cake] || TL_TIERS[2],
+      data: data
+    };
+  }
+
+  function tlHtml(T) {
+    var A = tlVars(T);
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="description" content="Wedding day guide for ${A.names}, ${A.dateLong}, by Ivory Events." />
+  <title>${A.names} | Wedding Day Guide | Ivory Events</title>
+
+  <\!-- Link preview (WhatsApp, Facebook, etc.) -->
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Ivory Events" />
+  <meta property="og:title" content="${A.names} | Wedding Day Guide" />
+  <meta property="og:description" content="Your ${A.church} wedding day guide for ${A.dateLong}, from Ivory Events." />
+  <meta property="og:url" content="https://ivory-wedding-timeline.pages.dev/${A.folder}/timeline" />
+  <meta property="og:image" content="https://ivory-wedding-timeline.pages.dev/ivory-logo.png" />
+  <meta property="og:image:secure_url" content="https://ivory-wedding-timeline.pages.dev/ivory-logo.png" />
+  <meta property="og:image:type" content="image/png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="1200" />
+  <meta property="og:image:alt" content="Ivory Events logo" />
+  <meta name="twitter:card" content="summary" />
+  <meta name="twitter:image" content="https://ivory-wedding-timeline.pages.dev/ivory-logo.png" />
+  <link rel="icon" href="/ivory-logo.png" type="image/png" />
+
+  <\!-- Premium Google Typography -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,400;1,600&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --bg-cream: #FAF7F2;
+      --surface: #FFFFFF;
+      --surface-subtle: #F6F1EC;
+      --gold-primary: #C5A059;
+      --gold-soft: #D9BE84;
+      --gold-accent: #9A7432;
+      --gold-deep: #7D5C24;
+      --text-main: #2D2926;
+      --text-muted: #6B665F;
+      --border: #E8E1D7;
+      --radius: 14px;
+      --shadow: 0 4px 20px rgba(45, 41, 38, 0.05);
+    }
+
+    /* PURE NATIVE SCROLL ARCHITECTURE (CRITICAL FOR IPHONE & WEBVIEWS) */
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    /* DO NOT add scroll-behavior: smooth on html/body as it causes momentum freezes on iOS */
+    html {
+      height: 100%;
+      background-color: var(--bg-cream);
+      -webkit-text-size-adjust: 100%;
+    }
+
+    body {
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: var(--bg-cream);
+      color: var(--text-main);
+      line-height: 1.75;
+      -webkit-font-smoothing: antialiased;
+      min-height: 100%;
+      position: relative;
+      overflow-x: hidden;
+      overflow-y: scroll;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    header {
+      background: #FFFFFF;
+      border-bottom: 1px solid var(--border);
+      position: relative;
+      z-index: 50;
+      box-shadow: 0 1px 10px rgba(0, 0, 0, 0.03);
+    }
+
+    .nav-wrap {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 1.15rem 1.5rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .brand {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.75rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      font-weight: 600;
+      color: var(--text-main);
+      text-decoration: none;
+      line-height: 1.1;
+      display: inline-flex;
+      align-items: center;
+    }
+
+    .brand span {
+      color: var(--gold-primary);
+    }
+
+    .brand-logo {
+      width: 52px;
+      height: 52px;
+      object-fit: contain;
+      margin-right: 0.7rem;
+      flex-shrink: 0;
+    }
+
+    @media (max-width: 640px) {
+      .brand-logo {
+        width: 46px;
+        height: 46px;
+      }
+    }
+
+    .nav-tag {
+      font-size: 0.86rem;
+      color: var(--gold-accent);
+      font-weight: 600;
+      letter-spacing: 0.03em;
+      line-height: 1.3;
+      padding: 6px 14px;
+      background: var(--surface-subtle);
+      border-radius: 20px;
+      border: 1px solid var(--border);
+    }
+
+    @media (max-width: 640px) {
+      .nav-wrap {
+        padding: 1.1rem 1.25rem;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        gap: 0.55rem;
+      }
+      .brand {
+        font-size: 1.6rem;
+      }
+      .nav-tag {
+        font-size: 0.8rem;
+      }
+    }
+
+    .hero {
+      text-align: center;
+      padding: 4.5rem 1.5rem 3rem;
+      background: linear-gradient(180deg, #FFFFFF 0%, var(--bg-cream) 100%);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .hero-eyebrow {
+      font-size: 0.82rem;
+      text-transform: uppercase;
+      letter-spacing: 0.22em;
+      color: var(--gold-accent);
+      font-weight: 700;
+      display: inline-block;
+      margin-bottom: 1.15rem;
+      padding: 4px 16px;
+      border: 1px solid var(--gold-soft);
+      border-radius: 30px;
+      background: #FFFDF9;
+    }
+
+    .hero h1 {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: clamp(2.2rem, 5.2vw, 3.4rem);
+      font-weight: 600;
+      line-height: 1.22;
+      margin-bottom: 0.6rem;
+      color: var(--text-main);
+    }
+
+    .hero-date {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.45rem;
+      font-style: italic;
+      color: var(--gold-accent);
+      margin-bottom: 1.1rem;
+    }
+
+    .hero p {
+      max-width: 620px;
+      margin: 0 auto;
+      color: var(--text-muted);
+      font-size: 1.05rem;
+      padding: 0 0.5rem;
+    }
+
+    @media (max-width: 640px) {
+      .hero {
+        padding: 3.25rem 1.2rem 2.5rem;
+      }
+      .hero h1 {
+        font-size: 2.15rem;
+      }
+      .hero-date {
+        font-size: 1.25rem;
+      }
+      .hero p {
+        font-size: 0.98rem;
+      }
+    }
+
+    /* Container */
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 2.5rem 1.25rem 5rem;
+    }
+
+    .summary-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 2.2rem 2rem;
+      margin-bottom: 3rem;
+    }
+
+    .summary-card h2 {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.85rem;
+      font-weight: 600;
+      margin-bottom: 1.35rem;
+      color: var(--text-main);
+    }
+
+    .timing-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 1.1rem;
+    }
+
+    .timing-box {
+      background: var(--surface-subtle);
+      padding: 1.15rem 1.25rem;
+      border-radius: 10px;
+      border-left: 3px solid var(--gold-primary);
+    }
+
+    .timing-box strong {
+      display: block;
+      font-size: 0.96rem;
+      color: var(--text-main);
+      margin-bottom: 0.25rem;
+    }
+
+    .timing-box span {
+      font-size: 0.88rem;
+      color: var(--gold-accent);
+      font-weight: 600;
+    }
+
+    .phase-header {
+      margin: 3.5rem 0 1.25rem;
+      padding-bottom: 0.6rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .phase-header h2 {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 2.05rem;
+      font-weight: 600;
+      color: var(--text-main);
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.9rem 2rem;
+      margin-bottom: 1.5rem;
+      box-shadow: var(--shadow);
+      /* Prevent WebKit compositing glitch during scroll */
+      transform: translateZ(0);
+    }
+
+    .card h3 {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.55rem;
+      font-weight: 600;
+      margin-bottom: 0.75rem;
+      color: var(--text-main);
+    }
+
+    .tagline {
+      font-size: 0.8rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--gold-accent);
+      margin-bottom: 0.35rem;
+      display: block;
+    }
+
+    .friendly-tip {
+      background: #FDF9F2;
+      border: 1px solid #EEDFBE;
+      border-radius: 10px;
+      padding: 1.15rem 1.35rem;
+      margin-top: 1.35rem;
+      font-size: 0.95rem;
+      color: #554D41;
+      line-height: 1.65;
+    }
+
+    .friendly-tip strong {
+      color: var(--gold-deep);
+      display: block;
+      margin-bottom: 0.25rem;
+      font-size: 0.95rem;
+    }
+
+    .bullet-list {
+      padding-left: 1.25rem;
+      margin-top: 0.75rem;
+      font-size: 0.96rem;
+    }
+
+    .bullet-list li {
+      margin-bottom: 0.35rem;
+    }
+
+    .essentials-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 0.75rem;
+      list-style: none;
+      margin: 1.1rem 0;
+    }
+
+    .essentials-list li {
+      background: var(--surface-subtle);
+      padding: 0.75rem 1rem;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      gap: 0.55rem;
+      border: 1px solid rgba(232, 225, 215, 0.6);
+    }
+
+    .essentials-list li::before {
+      content: "✦";
+      color: var(--gold-primary);
+      font-size: 0.9rem;
+    }
+
+    .procession-wrap {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+      gap: 1.15rem;
+      margin-top: 1.25rem;
+    }
+
+    .procession-side {
+      background: var(--surface-subtle);
+      padding: 1.3rem 1.25rem;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+    }
+
+    .procession-side h4 {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.28rem;
+      font-weight: 600;
+      color: var(--gold-deep);
+      margin-bottom: 0.65rem;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 0.4rem;
+    }
+
+    .procession-subtext {
+      display: block;
+      font-size: 0.78rem;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--gold-accent);
+      font-weight: 700;
+      margin-bottom: 0.4rem;
+    }
+
+    .procession-side ol {
+      padding-left: 1.2rem;
+      font-size: 0.94rem;
+    }
+
+    .procession-side ol li {
+      margin-bottom: 0.45rem;
+    }
+
+    .program-steps {
+      list-style: none;
+      margin-top: 0.9rem;
+    }
+
+    .program-steps li {
+      padding: 0.75rem 0;
+      border-bottom: 1px dashed var(--border);
+      font-size: 0.96rem;
+    }
+
+    .program-steps li:last-child {
+      border-bottom: none;
+    }
+
+    .gentle-reminder {
+      background: #FFFDF9;
+      border: 1px solid #ECD9BD;
+      border-radius: var(--radius);
+      padding: 1.9rem 2rem;
+      margin: 3rem 0 2rem;
+      transform: translateZ(0);
+    }
+
+    .gentle-reminder h3 {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.65rem;
+      color: var(--gold-deep);
+      margin-bottom: 0.65rem;
+    }
+
+    .fine-print {
+      margin-top: 1rem;
+      font-size: 0.88rem;
+      color: var(--text-muted);
+      line-height: 1.65;
+    }
+
+    .signoff {
+      text-align: center;
+      padding: 3.5rem 1rem 3rem;
+      transform: translateZ(0);
+    }
+
+    .signoff h2 {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 2.25rem;
+      font-weight: 500;
+      font-style: italic;
+      color: var(--text-main);
+      margin-bottom: 0.85rem;
+    }
+
+    .signoff p {
+      max-width: 600px;
+      margin: 0 auto 0.85rem;
+      color: var(--text-muted);
+      font-size: 1.05rem;
+    }
+
+    footer {
+      background: #23201D;
+      color: #ECEAE4;
+      text-align: center;
+      padding: 3.75rem 1.5rem 5rem;
+      position: relative;
+      z-index: 10;
+    }
+
+    footer p {
+      color: #A39F97;
+      font-size: 0.95rem;
+      margin-bottom: 1.25rem;
+    }
+
+    .socials {
+      display: flex;
+      justify-content: center;
+      gap: 1.75rem;
+    }
+
+    .socials a {
+      color: #FFF;
+      text-decoration: none;
+      font-size: 0.85rem;
+      letter-spacing: 0.09em;
+      text-transform: uppercase;
+      border-bottom: 1px solid var(--gold-primary);
+      padding-bottom: 3px;
+      transition: color 0.2s;
+    }
+
+    .socials a:hover {
+      color: var(--gold-soft);
+    }
+
+    /* Container has pointer-events: none so it NEVER intercepts page swipes on iPhone */
+    .quick-nav-container {
+      position: fixed;
+      right: 14px;
+      bottom: 24px;
+      z-index: 9999;
+      pointer-events: none;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 8px;
+    }
+
+    /* Only buttons accept taps */
+    .quick-nav-pill {
+      pointer-events: auto;
+      background: #FFFFFF;
+      border: 1.5px solid var(--gold-primary);
+      box-shadow: 0 6px 22px rgba(45, 41, 38, 0.16);
+      border-radius: 30px;
+      display: flex;
+      align-items: center;
+      padding: 4px 6px;
+      gap: 4px;
+    }
+
+    .q-btn {
+      background: transparent;
+      border: none;
+      color: var(--gold-deep);
+      font-size: 12px;
+      font-weight: 700;
+      padding: 8px 12px;
+      border-radius: 20px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-family: inherit;
+    }
+
+    .q-btn:active {
+      background: var(--surface-subtle);
+      color: var(--gold-accent);
+    }
+
+    .q-btn-icon {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: var(--surface-subtle);
+      border: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--gold-deep);
+      cursor: pointer;
+      font-size: 11px;
+    }
+
+    .q-btn-icon:active {
+      background: var(--gold-primary);
+      color: #FFFFFF;
+    }
+
+    /* Fast Section Selector Dropdown */
+    .section-selector {
+      pointer-events: auto;
+      appearance: none;
+      -webkit-appearance: none;
+      background: #FFFFFF url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 5 5-5z' fill='%237D5C24'/%3E%3C/svg%3E") no-repeat right 12px center;
+      border: 1px solid var(--gold-soft);
+      border-radius: 20px;
+      padding: 6px 28px 6px 12px;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--gold-deep);
+      font-family: inherit;
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+    }
+
+    /* Top Progress Bar */
+    .scroll-progress-line {
+      position: fixed;
+      top: 0;
+      left: 0;
+      height: 3px;
+      background: linear-gradient(90deg, var(--gold-soft), var(--gold-primary));
+      width: 0%;
+      z-index: 99999;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+
+  <\!-- Top Progress Indicator (Never intercepts touches) -->
+  <div class="scroll-progress-line" id="scrollProgress"></div>
+
+  <header id="nav-header">
+    <div class="nav-wrap">
+      <a href="#nav-header" class="brand"><img class="brand-logo" src="/ivory-logo.png" alt="Ivory Events logo" width="52" height="52" />Ivory<span>.</span>Events</a>
+      <span class="nav-tag">${A.names} · ${A.dateLong}</span>
+    </div>
+  </header>
+
+  <section class="hero" id="hero-section">
+    <span class="hero-eyebrow">Warm Wishes From Ivory Events</span>
+    <h1>${A.names}</h1>
+    <div class="hero-date">Your ${A.church} Wedding Day Guide · ${A.weekday}, ${A.dateLong}</div>
+    <p>A practical guide to help your wedding day run smoothly, so you can focus on enjoying every moment with family and friends.</p>
+  </section>
+
+  <main class="container">
+
+    <\!-- Key Timings Summary Card -->
+    <section class="summary-card" id="sec-summary">
+      <span class="tagline">At A Glance</span>
+      <h2>Key Timings</h2>
+      <div class="timing-grid">
+        <div class="timing-box">
+          <strong>Reception Hall Setup</strong>
+          <span>Previous afternoon or evening</span>
+        </div>
+        <div class="timing-box">
+          <strong>Venue Fully Ready</strong>
+          <span>At least 30 mins before the reception</span>
+        </div>
+        ${A.timingCars}
+        <div class="timing-box">
+          <strong>Arrival at Church</strong>
+          <span>At least 30 mins before the service</span>
+        </div>
+        <div class="timing-box">
+          <strong>Manthrakodi Items Handed to the Sexton</strong>
+          <span>At least 5 mins before the procession</span>
+        </div>
+        <div class="timing-box">
+          <strong>Bride &amp; Groom Seated</strong>
+          <span>At least 5 mins before the service</span>
+        </div>
+        <div class="timing-box">
+          <strong>Church Formalities &amp; Photos</strong>
+          <span>About 30 to 45 mins after the service</span>
+        </div>
+        <div class="timing-box">
+          <strong>Reception</strong>
+          <span>As per the invitation / programme</span>
+        </div>
+        <div class="timing-box">
+          <strong>Manthrakodi Dress Change</strong>
+          <span>During the guests’ meal</span>
+        </div>
+        <div class="timing-box">
+          <strong>Stage Photography</strong>
+          <span>After the couple returns</span>
+        </div>
+        <div class="timing-box">
+          <strong>Departure for Kacha Ceremony</strong>
+          <span>After the reception</span>
+        </div>
+      </div>
+    </section>
+
+    <\!-- Phase 1: The Day Before & Morning Prep -->
+    <div class="phase-header" id="sec-phase-1">
+      <h2>1. The Day Before &amp; Morning Prep</h2>
+    </div>
+
+    <article class="card">
+      <span class="tagline">The Day Before</span>
+      <h3>Reception Venue Setup</h3>
+      <p>Our team will reach the reception venue in the afternoon or evening before the wedding, depending on when the venue opens up, other activities taking place there, and the setup required.</p>
+      <ul class="bullet-list">
+        <li>Stage décor and other arrangements begin as soon as venue access is available.</li>
+        <li>Flowers, lighting, and final details are completed towards the end of the setup.</li>
+        <li>The entire venue will be ready at least 30 minutes before the reception begins.</li>
+      </ul>
+    </article>
+
+    <article class="card">
+      <span class="tagline">Wedding Morning</span>
+      <h3>Car Décor &amp; Things to Keep Ready</h3>
+      ${A.carParas}
+
+      <p style="margin-top: 1.25rem; font-weight: 600;">Before leaving for church, please keep these items together and ready:</p>
+      <ul class="essentials-list">
+        <li>Manthrakodi</li>
+        <li>Minnu</li>
+        <li>Wedding Rings</li>
+        <li>${A.vaazh}</li>
+      </ul>
+
+      <div class="friendly-tip">
+        <strong>Helpful Tip for the Manthrakodi &amp; Minnu</strong>
+        To stop the Manthrakodi from unfolding during the ceremony, tie its four corners lightly with a small thread. Traditionally, the Minnu is prepared using threads taken from the Manthrakodi, bonded with cooked rice. Many families now prefer a glue stick, which is cleaner and easier.
+      </div>
+    </article>
+
+    <\!-- Phase 2: Reaching the Church & The Service -->
+    <div class="phase-header" id="sec-phase-2">
+      <h2>2. Reaching the Church &amp; The Service</h2>
+    </div>
+
+    <article class="card">
+      <span class="tagline">Timing</span>
+      <h3>Arrive Early, Stay Relaxed</h3>
+      <p>We recommend that the bride and groom reach the church at least 30 minutes before the service. This gives the photographers enough time for:</p>
+      <ul class="bullet-list">
+        <li>Arrival photographs</li>
+        <li>Wedding-car photographs</li>
+        <li>Couple portraits</li>
+        <li>Family photographs</li>
+        <li>A few relaxed moments before the service</li>
+      </ul>
+      <div class="friendly-tip">
+        <strong>No Need to Rush Inside</strong>
+        There is no need to walk into the church immediately after arriving. Allow time for photographs and family coordination, and let the procession begin at a comfortable pace. It helps if the bride’s family follows a similar timeline, so that both the bride and groom are seated at least 5 minutes before the service begins.
+      </div>
+    </article>
+
+    <article class="card">
+      <span class="tagline">Preparing for the Procession</span>
+      <h3>Handing Over the Wedding Items</h3>
+      <p>Once you reach the church, please make sure the following are ready:</p>
+
+      <div class="procession-wrap">
+        <div class="procession-side">
+          <span class="procession-subtext">Basket</span>
+          <h4>Manthrakodi Basket</h4>
+          <ol>
+            <li>Manthrakodi</li>
+            <li>Minnu</li>
+            <li>${A.vaazhBasket}</li>
+          </ol>
+        </div>
+        <div class="procession-side">
+          <span class="procession-subtext">Box</span>
+          <h4>Ring Bearer Box</h4>
+          <ol>
+            <li>Bride’s wedding ring</li>
+            <li>Groom’s wedding ring</li>
+          </ol>
+        </div>
+      </div>
+
+      <p style="margin-top: 1.1rem;">The items may be carried by one person or shared between two people.</p>
+      <ul class="bullet-list">
+        <li>Please hand over the Manthrakodi basket and ring box to the sexton at least 5 minutes before the procession begins.</li>
+        <li>The sexton will place the items on the designated table near the altar.</li>
+        <li>Once the items are placed, our team will collect the basket and ring box and coordinate them for the procession.</li>
+      </ul>
+
+      <div class="friendly-tip">
+        <strong>Family Tradition</strong>
+        Traditionally, the Manthrakodi is carried to the altar by a close female relative of the groom, such as a sister, cousin, or aunt.
+      </div>
+    </article>
+
+    <article class="card">
+      <span class="tagline">Walking In</span>
+      <h3>The Procession</h3>
+      <p>The exact order can vary slightly from church to church. A typical ${A.church} procession follows this order:</p>
+
+      <div class="procession-wrap">${A.procession}</div>
+
+      <p class="fine-print">
+        Bridesmaids and groomsmen may enter individually or in pairs, depending on your preference and the church’s practice.
+      </p>${A.vicarTip}
+    </article>
+
+    <article class="card">
+      <span class="tagline">The Service</span>
+      <h3>The Wedding Ceremony</h3>
+      <p>The wedding service will proceed according to the church’s customs and schedule.</p>
+    </article>
+
+    <\!-- Phase 3: After the Service -->
+    <div class="phase-header" id="sec-phase-3">
+      <h2>3. After the Service</h2>
+    </div>
+
+    <article class="card">
+      <span class="tagline">Formalities</span>
+      <h3>Signing the Register &amp; Church Photographs</h3>
+      <p>The service is usually followed by a few formalities:</p>
+      <ul class="bullet-list">
+        <li>Signing the register</li>
+        <li>Offertory</li>
+        <li>Photographs with the bishop and priests</li>
+      </ul>
+      <p style="margin-top: 0.9rem;">Please allow approximately <strong>30 to 45 minutes</strong> for these formalities.</p>
+    </article>
+
+    <article class="card">
+      <span class="tagline">At the Church Entrance</span>
+      <h3>Garland &amp; Bouquet Presentation</h3>
+      <p>Once the church formalities are done, you will head to the church entrance for the welcome. The couple will receive:</p>
+      <ul class="bullet-list">
+        <li>2 garlands</li>
+        <li>2 greeting bouquets</li>
+      </ul>
+
+      <div class="friendly-tip">
+        <strong>Please Assign Four People in Advance</strong>
+        Two people to present the garlands and two to present the bouquets. You may choose younger family members or anyone close to the couple.
+      </div>
+
+      <p style="margin-top: 1.25rem;">To keep to the schedule, we recommend limiting photographs at the church to:</p>
+      <ul class="bullet-list">
+        <li>Clergy</li>
+        <li>Immediate family</li>
+        <li>Those presenting the garlands and bouquets at the church entrance</li>
+      </ul>
+      <p style="margin-top: 0.75rem;">Everyone else can join you for photographs at the reception venue.</p>
+    </article>
+
+    <\!-- Phase 4: The Reception & Party -->
+    <div class="phase-header" id="sec-phase-4">
+      <h2>4. The Reception</h2>
+    </div>
+
+    <article class="card">
+      <span class="tagline">Before You Arrive</span>
+      <h3>Keep the Hall Doors Open</h3>
+      <p>As guests begin arriving, we strongly recommend keeping the hall doors open so they can walk in, find their seats, and settle in without waiting outside.</p>
+      <p style="margin-top: 0.75rem;">Some caterers prefer to keep the doors closed until the couple arrives. Based on our experience, keeping them open makes for a more comfortable experience for guests. The final decision is, of course, entirely yours.</p>
+    </article>
+
+    <article class="card">
+      <span class="tagline">Getting In</span>
+      <h3>Welcoming the Couple &amp; Stage Entry</h3>
+      <p>When you arrive at the venue, these family members may gather near the entrance to welcome you:</p>
+      <ul class="bullet-list">
+        <li>Parents</li>
+        <li>Siblings</li>
+        <li>Bridesmaids and groomsmen</li>
+        <li>Cousins and other close family members</li>
+      </ul>
+    </article>
+
+    <article class="card">
+      <span class="tagline">Moving Into the Hall</span>
+      <h3>Stage Entry, Made Quick</h3>
+      <p>Once the anchor welcomes the couple, you may start moving into the hall.</p>
+      <p style="margin-top: 0.75rem;">To save time, it is a good idea to welcome the couple, parents and siblings onto the stage first, without an introduction. The family introduction can be done after the official functions on stage are over.</p>
+    </article>
+
+    <article class="card">
+      <span class="tagline">Stage Flow</span>
+      <h3>The Stage Programme</h3>
+      <p>The order of proceedings may be adjusted according to the priest’s preference. A typical order:</p>
+      <ul class="program-steps">
+        <li><strong>1. Prayer &amp; Blessing:</strong> The reception generally begins with a prayer and blessing for the newlyweds.</li>
+        <li><strong>2. Welcome Drink:</strong> The mothers of the bride and groom receive the glasses first and then present the drinks to the groom and bride. Fizzy apple juice is commonly used.</li>
+        <li><strong>3. Candle-Lighting:</strong> Two common traditions. Option 1: the couple lights all three candles together. Option 2: the parents light the two outer candles and the couple lights the centre candle.</li>
+        <li><strong>4. Cake Cutting:</strong> A ${A.cake} wedding cake is placed on the cake stand for the cake-cutting ceremony.</li>
+        <li><strong>5. Introduction:</strong> The MC will introduce the newlyweds, their parents, and their families.</li>
+      </ul>
+
+      <p class="fine-print">The order of candle lighting and cake cutting may be changed according to the priest’s preference.</p>
+
+      <p style="margin-top: 1.1rem; font-size: 0.95rem; color: var(--text-main); font-weight: 500;">
+        <em>Our hostesses will be on stage throughout to assist with the drinks, lighter, and cake knife, and to guide everyone smoothly through each of these moments.</em>
+      </p>
+
+      <div class="friendly-tip">
+        <strong>A Quick Anchor Tip</strong>
+        If you are bringing your own MC or anchor, let the priest know beforehand so they can agree on whether the prayer happens at the start or the end of the stage program.
+      </div>
+    </article>
+
+    <article class="card" id="sec-dress-change">
+      <span class="tagline">During the Meal</span>
+      <h3>Manthrakodi Dress Change</h3>
+      <p>While guests are having their meal, the dress change into the Manthrakodi will take place in the green room of the hall. Please:</p>
+      <ul class="bullet-list">
+        <li>Keep the outfit easily accessible.</li>
+        <li>Make sure the saree drapist is at the hall at the scheduled time.</li>
+        <li>Allow enough time to return without delaying photography.</li>
+      </ul>
+    </article>
+
+    <article class="card">
+      <span class="tagline">Stage Photography</span>
+      <h3>Photographs With Family &amp; Guests</h3>
+      <p>Once you are back from the dress change, stage photography begins.</p>
+      <p style="margin-top: 0.75rem;">Our hostess will guide guests to come up on one side of the stage and exit through the other end. Once stage photography is complete, you can finally sit down, relax, and enjoy a meal together with your close family.</p>
+    </article>
+
+    <article class="card">
+      <span class="tagline">Departure</span>
+      <h3>Leaving for the Kacha Ceremony</h3>
+      <p>At the end of the reception, the newlyweds will leave for the groom’s home for the traditional Kacha ceremony.</p>
+    </article>
+
+    <\!-- Custody of Gifts Reminder -->
+    <section class="gentle-reminder" id="sec-reminder">
+      <h3>A Little Note on Gifts &amp; Blessings</h3>
+      <p>On your big day, so many loved ones will come up to the stage to bless you, bringing gifts, envelopes, jewellery, ornaments, and bouquets with all their love.</p>
+      <p style="margin-top: 0.85rem;">Our team will be right beside you, taking care of the stage and keeping everything flowing beautifully. We do ask for your understanding that we are unable to take charge of gifts, valuables, or personal belongings, so that we can give our full attention to your programme.</p>
+
+      <p style="margin-top: 1.1rem; font-weight: 600; color: var(--text-main);">What we gently suggest: ask someone you trust from the family to stand beside the stage and:</p>
+      <ul class="bullet-list">
+        <li>Collect gifts and envelopes as they come.</li>
+        <li>Receive jewellery and other valuables.</li>
+        <li>Keep a simple note of what has been received.</li>
+        <li>Hand everything safely over to the family once the function is done.</li>
+      </ul>
+
+      <p class="fine-print">If needed, items can be kept for a short while behind the sofa or in another spot near the stage, at the family’s own risk. Ivory Events cannot be held responsible for the loss, damage, or misplacement of gifts, valuables, envelopes, jewellery, ornaments, bouquets, or other belongings before, during, or after the event.</p>
+    </section>
+
+    <\!-- Warm Signoff Message -->
+    <section class="signoff" id="sec-signoff">
+      <h2>We’re here to help you enjoy every minute</h2>
+      <p>A wedding day can feel busy, but it does not have to be stressful. A little preparation in advance, especially around timings, wedding items, the family members involved in ceremonies, photography, and transportation, helps everything run smoothly.</p>
+      <p>Our team will coordinate the arrangements and guide you through the day wherever needed. Your only job is to enjoy the day, spend time with your family and friends, and celebrate this beautiful beginning together.</p>
+      <p><em>Wishing ${A.names} a beautiful, joyful, and memorable wedding day!</em></p>
+    </section>
+
+  </main>
+
+  <footer id="page-footer">
+    <p>Ivory Events · Wedding Planning &amp; Day Coordination</p>
+    <div class="socials">
+      <a href="https://instagram.com/ivoryeventsweddings" target="_blank" rel="noopener">Instagram</a>
+      <a href="https://facebook.com/ivoryevents" target="_blank" rel="noopener">Facebook</a>
+    </div>
+  </footer>
+
+  <\!-- Designed with pointer-events:none on wrapper to allow free edge-to-edge finger swiping -->
+  <aside class="quick-nav-container" aria-label="Quick page navigation">
+    <div class="quick-nav-pill">
+      <button type="button" class="q-btn-icon" id="btnGoTop" title="Scroll to Top" aria-label="Top">▲</button>
+      <button type="button" class="q-btn-icon" id="btnGoBottom" title="Scroll to Bottom" aria-label="Bottom">▼</button>
+    </div>
+  </aside>
+
+  <\script>
+    (function initNativeSmoothScroller() {
+      const progressBar = document.getElementById('scrollProgress');
+      const btnTop = document.getElementById('btnGoTop');
+      const btnBottom = document.getElementById('btnGoBottom');
+
+      // Quick Top and Bottom handlers
+      btnTop.addEventListener('click', () => {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      });
+
+      btnBottom.addEventListener('click', () => {
+        const footer = document.getElementById('page-footer');
+        if (footer) {
+          footer.scrollIntoView({ behavior: 'smooth' });
+        } else {
+          window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'smooth' });
+        }
+      });
+
+      // Lightweight scroll progress line (read-only, passive, zero touch lock)
+      function updateProgress() {
+        const totalHeight = document.documentElement.scrollHeight - window.innerHeight;
+        if (totalHeight > 0) {
+          const progress = Math.min(100, Math.max(0, (window.pageYOffset / totalHeight) * 100));
+          progressBar.style.width = progress + '%';
+        }
+      }
+
+      window.addEventListener('scroll', updateProgress, { passive: true });
+    })();
+  <\/script>
+  <\script type="application/json" id="ivory-timeline-data">${A.data}<\/script>
+</body>
+</html>
+`;
+  }
+
+  // Reads what a quote says (from tlScan) and suggests the editable fields. Nothing here is final - the sheet lets you change it all.
+  function tlResolve(scan) {
+    var out = { cars: [], cake: 2, church: 'marthoma', notes: [], found: !!scan };
+    if (!scan) { out.notes.push('No readable quote for this work, so everything is at its default. Fill in the car and cake details by hand.'); return out; }
+    var lines = scan.lines || [];
+    var CAR = /^\s*wedding\s*cars?\b(?!\s*decor)/i, DECO = /car\s*decor|decor\w*\s*(?:for\s*)?(?:the\s*)?(?:wedding\s*)?car\b/i;
+    var carLines = [], decos = [];
+    lines.forEach(function (l) {
+      if (CAR.test(l.n)) carLines.push(l);
+      else if (DECO.test(l.n)) decos.push(/bride/i.test(l.n) ? 'bride' : (/groom/i.test(l.n) ? 'groom' : ''));
+    });
+
+    var cars = [];
+    carLines.forEach(function (ci) {
+      var who = '', types = [];
+      [ci.n.replace(CAR, '')].concat(ci.s || []).forEach(function (p) {
+        p = String(p).replace(/^\s*[-–—:]+\s*/, '').replace(/\s*[-–—]?\s*₹.*$/, '').trim();
+        if (!p) return;
+        var m = /^(?:for\s+)?(?:the\s+)?(bride|groom)(?:’s|'s)?(?:\s+car)?$/i.exec(p);
+        if (m) { who = m[1].toLowerCase(); return; }
+        var n = 1, mm = /(?:\s+x|\s*×)\s*(\d+)\s*$/i.exec(p);
+        if (mm) { n = Math.max(1, Math.min(4, +mm[1])); p = p.slice(0, mm.index); }
+        p = p.replace(/\([^)]*\)/g, '').replace(/\s+/g, ' ').trim();
+        if (p) types.push({ t: p, n: n });
+      });
+      if (!types.length) cars.push({ who: who, type: '' });
+      types.forEach(function (t) { for (var i = 0; i < t.n; i++) cars.push({ who: who, type: t.t }); });
+    });
+
+    // Cars the quote does not label: one car is taken as the bride's; with two, the first is the groom's.
+    var brideDeco = decos.indexOf('bride') >= 0, groomDeco = decos.some(function (d) { return d !== 'bride'; });
+    var haveG = cars.some(function (c) { return c.who === 'groom'; }), guessed = false;
+    cars.forEach(function (c) {
+      if (c.who) return;
+      if (!haveG && cars.length > 1) { c.who = 'groom'; haveG = true; guessed = true; }
+      else { c.who = 'bride'; if (cars.length > 1 || !brideDeco) guessed = true; }   // a lone car with a "Bride" decoration line is clearly the bride's
+    });
+    out.cars = cars.map(function (c) { return { who: c.who, type: c.type, where: '', time: '', deco: c.who === 'bride' ? brideDeco : groomDeco }; });
+
+    if (!cars.length) out.notes.push('No wedding car is listed in the quote, so only the decoration line is used.');
+    if (guessed) out.notes.push('The quote does not say whose car it is. Check the Groom / Bride choice below.');
+    out.cars.forEach(function (c) {
+      if (c.who === 'bride' && !c.deco) out.notes.push('Bride’s car decoration is not in the quote, so the page will not say it is fixed on the car.');
+    });
+
+    var cake = 0;
+    lines.forEach(function (l) {
+      [l.n].concat(l.s || []).forEach(function (tx) {
+        if (!/cake/i.test(tx)) return;
+        var n = /\b(?:three|3)[\s-]*(?:tier|layer)|\btriple\b/i.test(tx) ? 3 : (/\b(?:two|2|double)[\s-]*(?:tier|layer)/i.test(tx) ? 2 : (/\b(?:single|one|1)[\s-]*(?:tier|layer)/i.test(tx) ? 1 : 0));
+        if (n > cake) cake = n;
+      });
+    });
+    if (cake) out.cake = cake; else out.notes.push('The quote does not say how many tiers the cake has. Two tier is selected.');
+    if (/orthodox/i.test(scan.ceremony || '')) out.church = 'orthodox';
+    return out;
+  }
+  /* TL-PURE-END */
+
+  /* ---------- wedding timeline sheet: pre-filled from the latest quote, editable, published to <Folder>/timeline.html ---------- */
+  // Reads the lines a quote prints (priced boxes with their sub-lines, and plain bullet lists), skipping the free-services section.
+  function tlScan(doc) {
+    var clean = function (s) { return String(s || '').replace(/\s+/g, ' ').trim(); }, lines = [], ceremony = '';
+    Array.prototype.forEach.call(doc.querySelectorAll('.info-item'), function (it) {
+      var l = clean((it.querySelector('.info-label') || {}).textContent).toLowerCase();
+      if (l === 'ceremony') ceremony = clean((it.querySelector('.info-value') || {}).textContent);
+    });
+    var skipped = function (el) {
+      var sc = el.closest('.section-card');
+      return !!(sc && /complimentary|payment\s*terms/i.test((sc.querySelector('.section-title') || {}).textContent || ''));
+    };
+    Array.prototype.forEach.call(doc.querySelectorAll('.line-item-box'), function (b) {
+      if (skipped(b)) return;
+      var subs = [];
+      Array.prototype.forEach.call(b.querySelectorAll('.line-item-sublist li'), function (li) { subs.push(clean(li.textContent)); });
+      lines.push({ n: clean((b.querySelector('.line-item-name') || {}).textContent), s: subs });
+    });
+    Array.prototype.forEach.call(doc.querySelectorAll('li'), function (li) {
+      if (li.closest('.line-item-sublist') || skipped(li)) return;
+      lines.push({ n: clean(li.textContent), s: [] });
+    });
+    Array.prototype.forEach.call(doc.querySelectorAll('.separate'), function (b) {   // older quote pages list extras this way
+      if (skipped(b)) return;
+      lines.push({ n: clean((b.querySelector('b') || {}).textContent), s: [] });
+    });
+    return { lines: lines, ceremony: ceremony };
+  }
+
+  var tlS = null, tlSrv = null;   // tlSrv: null = not asked, 'key' = a key is saved, 'nokey' = key needed once, 'old' = Code.gs not updated
+  function tlFolderFor(it, t) {
+    var words = {};
+    it.name.toLowerCase().split(/[^a-z0-9]+/).forEach(function (w) { if (w.length > 2) words[w] = 1; });
+    return Object.keys(t).filter(function (f) {
+      return f.toLowerCase().split(/[^a-z0-9]+/).some(function (w) { return w.length > 2 && words[w]; }) && t[f].indexOf(it.date) >= 0;
+    })[0] || '';
+  }
+  function tlParseSaved(html) {
+    var m = /<script type="application\/json" id="ivory-timeline-data">([\s\S]*?)<\/script>/.exec(html);
+    if (m) { try { return JSON.parse(m[1]); } catch (e) {} }
+    // guides written by hand before this sheet existed: names, church and cake only
+    var o = {}, h = /<h1>([\s\S]*?)<\/h1>/.exec(html);
+    if (h) {
+      var nm = h[1].replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').split(/\s*&\s*/);
+      if (nm.length === 2 && nm[0].trim() && nm[1].trim()) { o.groom = nm[0].trim(); o.bride = nm[1].trim(); }
+    }
+    if (/Your Orthodox Wedding Day Guide/i.test(html)) o.church = 'orthodox'; else if (/Your MarThoma Wedding Day Guide/i.test(html)) o.church = 'marthoma';
+    var c = /A (single|two|three)-tier wedding cake/i.exec(html);
+    if (c) o.cake = { single: 1, two: 2, three: 3 }[c[1].toLowerCase()];
+    return o;
+  }
+  function tlLoadSaved(folder) {
+    var base = 'https://raw.githubusercontent.com/' + TL_REPO + '/' + TL_BRANCH + '/' + encodeURIComponent(folder) + '/';
+    return fetch(base + 'timeline.html?t=' + Date.now())
+      .then(function (r) { if (!r.ok) throw new Error('none'); return r.text(); })
+      .catch(function () {
+        return fetch(base + 'index.html?t=' + Date.now()).then(function (r) { if (!r.ok) throw new Error('none'); return r.text(); });
+      })
+      .then(tlParseSaved);
+  }
+  function tlStatus(msg, err) { var el = $('#tlState'); if (el) { el.className = 'pst' + (err ? ' err' : ''); el.innerHTML = msg; } }
+  function tlUrl() { return TL_SITE + '/' + encodeURIComponent((tlS.folder || '').trim()) + '/timeline'; }
+
+  function tlOpen(it, list) {
+    var q = (list || []).filter(function (x) { return x.src === 'cloud' && x.scan; })[0], res = tlResolve(q ? q.scan : null);
+    if (list && list[0] && list[0].src !== 'cloud' && q) res.notes.unshift('The latest quote (#' + list[0].no + ') is a Google Site and cannot be read here. Details are from quote #' + q.no + '.');
+    tlS = { it: it, quote: q ? q.no : '', date: it.date, groom: '', bride: '', church: res.church, cake: res.cake, decoLine: TL_DECO, cars: res.cars,
+      notes: res.notes, folder: '', folderEdited: false, existing: '', touched: false, armed: false };
+    $('#tlMeta').textContent = it.name + ' - ' + fmt(it.date) + (q ? ' - from quote #' + q.no : '') + ' - app ' + APP_VERSION;
+    $('#tlShare').innerHTML = ''; $('#tlPrev').style.display = 'none'; $('#tlPrev').removeAttribute('srcdoc');
+    tlRender(); tlAskServer(); openSheet('#tl');
+    tlStatus('Checking for an existing guide...');
+    var tok = tlS;
+    tlGet().then(function (t) {
+      var f = tlFolderFor(it, t);
+      if (!f) { if (tlS === tok) tlStatus('Type the names, check the details, then publish.'); return; }
+      return tlLoadSaved(f).then(function (o) {
+        if (tlS !== tok) return;
+        tok.existing = f; tok.folder = o.folder || f; tok.folderEdited = true;
+        if (!tok.touched) {
+          ['groom', 'bride', 'church', 'cake', 'decoLine', 'cars'].forEach(function (k) { if (o[k] !== undefined && o[k] !== '' && o[k] !== null) tok[k] = o[k]; });
+          tlRender();
+        }
+        tlStatus('A guide already exists at ' + esc(f) + '/timeline' + (o.cars ? ' and its details are loaded.' : '. Its names were loaded; car times are blank.') + ' Publishing replaces it.');
+      });
+    }).catch(function () { if (tlS === tok) tlStatus('Type the names, check the details, then publish.'); });
+  }
+
+  function tlWarn() {
+    var s = tlS, w = [];
+    if (!String(s.groom).trim() || !String(s.bride).trim()) w.push('Type the groom’s and the bride’s name.');
+    s.cars.forEach(function (c, i) {
+      var who = c.who === 'groom' ? 'Groom’s' : 'Bride’s';
+      if (!String(c.time).trim()) w.push(who + ' car: add the arrival time.');
+      if (!c.deco) w.push(who + ' car: the page will not say the decoration is fixed on it.');
+    });
+    return w;
+  }
+  function tlWarnShow() {
+    var el = $('#tlWarn'); if (!el) return;
+    var w = (tlS.notes || []).concat(tlWarn());
+    el.innerHTML = w.length ? '<div class="note warn">' + w.map(esc).join('<br>') + '</div>' : '';
+  }
+  function tlOpt(v, label, cur) { return '<option value="' + v + '"' + (String(cur) === String(v) ? ' selected' : '') + '>' + label + '</option>'; }
+  function tlCarRow(c, i) {
+    return '<div class="tlcar" data-c="' + i + '"><div class="tlch"><b>Car ' + (i + 1) + '</b><button type="button" class="x" data-act="tlcdel" aria-label="Remove car">&times;</button></div>' +
+      '<div class="tl2"><div><label>For</label><select data-f="who">' + tlOpt('groom', 'Groom’s car', c.who) + tlOpt('bride', 'Bride’s car', c.who) + '</select></div>' +
+      '<div><label>Car</label><input data-f="type" placeholder="e.g. Audi A6" autocomplete="off" value="' + esc(c.type) + '"></div></div>' +
+      '<div class="tl2"><div><label>Arrives at</label><input data-f="where" placeholder="the ' + (c.who === 'groom' ? 'groom' : 'bride') + '’s residence" autocomplete="off" value="' + esc(c.where) + '"></div>' +
+      '<div><label>By (time)</label><input data-f="time" placeholder="e.g. 9 AM" autocomplete="off" value="' + esc(c.time) + '"></div></div>' +
+      '<label class="tlchk"><input type="checkbox" data-f="deco" style="width:auto"' + (c.deco ? ' checked' : '') + '> Car decoration already fixed on it</label></div>';
+  }
+  function tlRender() {
+    var s = tlS, hasG = s.cars.some(function (c) { return c.who === 'groom'; });
+    $('#tlBody').innerHTML =
+      '<h4>Couple</h4><div class="tl2"><div><label for="tlG">Groom</label><input id="tlG" data-k="groom" autocomplete="off" value="' + esc(s.groom) + '"></div>' +
+      '<div><label for="tlB">Bride</label><input id="tlB" data-k="bride" autocomplete="off" value="' + esc(s.bride) + '"></div></div>' +
+      '<div class="note" style="margin-top:6px">Client on file: <b>' + esc(s.it.name) + '</b></div>' +
+      '<h4>Church</h4><select data-k="church">' + tlOpt('marthoma', 'MarThoma', s.church) + tlOpt('orthodox', 'Orthodox', s.church) + '</select>' +
+      '<h4>Wedding car</h4>' +
+      (hasG ? '<div class="note">A groom’s car is listed below, so the default decoration line is not used.</div>'
+        : '<label for="tlD">Car decoration line</label><textarea id="tlD" rows="3" data-k="decoLine">' + esc(s.decoLine) + '</textarea>') +
+      s.cars.map(tlCarRow).join('') +
+      '<button type="button" class="pbtn" data-act="tladd">+ Add a groom’s / bride’s car</button>' +
+      '<div id="tlWarn" style="margin-top:10px"></div>' +
+      '<h4>Wedding cake</h4><select data-k="cake">' + tlOpt(1, 'Single tier', s.cake) + tlOpt(2, 'Two tier', s.cake) + tlOpt(3, 'Three tier', s.cake) + '</select>' +
+      '<h4>Page address</h4><input data-k="folder" autocomplete="off" value="' + esc(s.folder) + '"><div class="note" id="tlUrl" style="margin-top:6px"></div>' +
+      '<button type="button" class="pbtn" data-act="tlprev" style="margin-top:12px">Preview</button>';
+    $('#tlUrl').textContent = (s.folder || '').trim() ? tlUrl() : 'Fills in from the names.';
+    tlWarnShow();
+  }
+  function tlKeyUpdate() {
+    var box = $('#tlKeyBox'); if (!box) return;
+    box.style.display = tlSrv === 'nokey' ? '' : 'none';
+    $('#tlKeyNote').textContent = 'The saved GitHub key does not reach the timeline repository. Paste a key with Contents read/write on Ivory-Wedding-Timeline - needed once, saved for both phones.';
+  }
+  function tlAskServer() {
+    if (tlSrv === 'key') { tlKeyUpdate(); return; }
+    call('api_tl_status', pin).then(function (r) { tlSrv = r && r.hasKey ? 'key' : 'nokey'; }, function () { tlSrv = 'old'; }).then(tlKeyUpdate);
+  }
+
+  function tlDone() {
+    var it = tlS.it, url = tlUrl(), names = tlNames(tlS);
+    FL.tl[wkey(it)] = true; tlDates = null;
+    var wa = 'https://wa.me/?text=' + encodeURIComponent('Wedding day guide - ' + names + '\n' + url);
+    tlStatus('Published. The page updates in a minute or so.');
+    $('#tlShare').innerHTML = '<a class="wa" href="' + esc(wa) + '" target="_blank" rel="noopener">Send on WhatsApp</a> <a class="pbtn" style="display:inline-block;text-decoration:none" href="' + esc(url) + '" target="_blank" rel="noopener">Open page</a>';
+    if (cur && lastQ) renderDetail(cur, (dCache[wkey(cur)] || {}).d || {}, (dCache[wkey(cur)] || {}).gh || { q: [] });
+    if (typeof render === 'function') { try { render(); } catch (e) {} }
+  }
+  function tlPublish() {
+    var s = tlS, btn = $('#tlSave'), folder = String(s.folder || '').trim();
+    if (!String(s.groom).trim() || !String(s.bride).trim()) { tlStatus('Type both names first.', true); return; }
+    if (!/^[A-Za-z0-9][A-Za-z0-9 _-]{0,60}$/.test(folder)) { tlStatus('The page address can use letters, numbers and hyphens only.', true); return; }
+    if (tlSrv === 'old') { tlStatus('Code.gs needs updating in Apps Script first (it must include api_tl_publish).', true); return; }
+    var ki = $('#tlKey'), typed = ki ? ki.value.trim() : '';
+    if (tlSrv === 'nokey' && !typed) { tlStatus('Paste the GitHub key first.', true); return; }
+    s.folder = folder;
+    btn.disabled = true; tlStatus('Checking...');
+    fetch('https://raw.githubusercontent.com/' + TL_REPO + '/' + TL_BRANCH + '/' + encodeURIComponent(folder) + '/timeline.html?t=' + Date.now())
+      .then(function (r) { return r.ok; }, function () { return false; })
+      .then(function (exists) {
+        if (s !== tlS) return;
+        if (exists && !confirm('A wedding day guide already exists at ' + folder + '/timeline. Replace it with this one?')) { tlStatus('Not published.'); return; }
+        tlStatus('Publishing...');
+        s.quote = s.quote || '';
+        return call('api_tl_publish', pin, { folder: folder, html: tlHtml(s), message: 'Wedding timeline - ' + tlNames(s) + ' ' + (s.date || ''), key: typed })
+          .then(function () { tlSrv = 'key'; if (ki) ki.value = ''; tlKeyUpdate(); if (s === tlS) tlDone(); })
+          .catch(function (e) {
+            var m = String(e.message || e);
+            if (/does not reach|key needed/i.test(m)) { tlSrv = 'nokey'; tlKeyUpdate(); }
+            if (/not found.*api_tl|api_tl.*not found/i.test(m)) m = 'Code.gs needs updating in Apps Script first (it must include api_tl_publish).';
+            if (s === tlS) tlStatus('Not published: ' + esc(m), true);
+          });
+      })
+      .then(function () { btn.disabled = false; });
+  }
+
+  $('#tlClose').addEventListener('click', function () { $('#tl').classList.remove('show'); });
+  $('#tlSave').addEventListener('click', function () { if (tlS) tlPublish(); });
+  $('#tl').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-act]'); if (!b || !tlS) return;
+    var a = b.getAttribute('data-act'), row = b.closest('.tlcar');
+    if (a === 'tladd') {
+      var hasB = tlS.cars.some(function (c) { return c.who === 'bride'; });
+      tlS.cars.push({ who: hasB ? 'groom' : 'bride', type: '', where: '', time: '', deco: true }); tlS.touched = true; tlRender();
+    } else if (a === 'tlcdel' && row) { tlS.cars.splice(+row.getAttribute('data-c'), 1); tlS.touched = true; tlRender(); }
+    else if (a === 'tlprev') { var f = $('#tlPrev'); f.srcdoc = tlHtml(tlS); f.style.display = 'block'; f.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+  });
+  $('#tl').addEventListener('input', function (e) { tlEdit(e.target, false); });
+  $('#tl').addEventListener('change', function (e) { tlEdit(e.target, true); });
+  function tlEdit(t, changed) {
+    if (!tlS || !t.getAttribute) return;
+    var k = t.getAttribute('data-k'), f = t.getAttribute('data-f'), row = t.closest && t.closest('.tlcar');
+    if (k) {
+      if (k === 'church' || k === 'cake') { if (!changed) return; tlS[k] = k === 'cake' ? +t.value : t.value; }
+      else tlS[k] = t.value;
+      tlS.touched = true; tlS.armed = false;
+      if (k === 'folder') tlS.folderEdited = true;
+      if ((k === 'groom' || k === 'bride') && !tlS.folderEdited) {
+        tlS.folder = tlSlug(tlS.groom, tlS.bride);
+        var fi = $('#tl [data-k="folder"]'); if (fi) fi.value = tlS.folder;
+      }
+      $('#tlUrl').textContent = (tlS.folder || '').trim() ? tlUrl() : 'Fills in from the names.';
+    } else if (f && row) {
+      var c = tlS.cars[+row.getAttribute('data-c')];
+      if (f === 'deco') { if (!changed) return; c.deco = t.checked; }
+      else if (f === 'who') { if (!changed) return; c.who = t.value; tlS.touched = true; tlRender(); return; }
+      else c[f] = t.value;
+      tlS.touched = true;
+    } else return;
+    tlWarnShow();
+  }
 
   /* ---------- Vendor list: every vendor, their dates and what is booked ---------- */
   var VL = [], vlF = 'All', vlView = 'vendor', unaTok = 0;

@@ -397,6 +397,51 @@ function api_pay_publish(pin, p) {
   return { ok: true };
 }
 
+/* ---------- wedding timeline: published to <Client>/timeline.html in the Ivory-Wedding-Timeline repo ---------- */
+// Uses its own key (TL_KEY) when one was pasted, otherwise the same key as the payment pages (GH_KEY).
+// A fine-grained key can cover both repositories: add Ivory-Wedding-Timeline with Contents read/write.
+const TL_REPO = 'ivoryeventz-ops/Ivory-Wedding-Timeline';
+const TL_BRANCH = 'main';
+
+function api_tl_status(pin) {
+  check_(pin);
+  const props = PropertiesService.getScriptProperties();
+  return { hasKey: !!(props.getProperty('TL_KEY') || props.getProperty('GH_KEY')) };
+}
+
+function api_tl_publish(pin, p) {
+  check_(pin);
+  const props = PropertiesService.getScriptProperties();
+  if (p.key) props.setProperty('TL_KEY', String(p.key).trim());
+  const key = props.getProperty('TL_KEY') || props.getProperty('GH_KEY');
+  if (!key) throw new Error('GitHub key needed');
+  const folder = String(p.folder || '').trim();
+  if (!/^[A-Za-z0-9][A-Za-z0-9 _-]{0,60}$/.test(folder)) throw new Error('Bad client folder name');
+  if (!p.html || String(p.html).indexOf('Wedding Day Guide') < 0) throw new Error('Nothing to publish');
+  const url = 'https://api.github.com/repos/' + TL_REPO + '/contents/' + encodeURIComponent(folder) + '/timeline.html';
+  const hd = { Authorization: 'Bearer ' + key, Accept: 'application/vnd.github+json' };
+  const noReach = function (code) {
+    if (code === 401 && props.getProperty('TL_KEY')) props.deleteProperty('TL_KEY');   // a rejected pasted key is asked for again
+    return new Error('GitHub key does not reach Ivory-Wedding-Timeline (GitHub answered ' + code + ')');
+  };
+  const g = UrlFetchApp.fetch(url + '?ref=' + TL_BRANCH, { headers: hd, muteHttpExceptions: true });
+  let sha = null;
+  if (g.getResponseCode() === 200) sha = JSON.parse(g.getContentText()).sha;
+  else if (g.getResponseCode() === 401 || g.getResponseCode() === 403) throw noReach(g.getResponseCode());
+  else if (g.getResponseCode() !== 404) throw new Error('GitHub answered ' + g.getResponseCode());
+  const body = {
+    message: String(p.message || 'Wedding timeline').slice(0, 200),
+    content: Utilities.base64Encode(Utilities.newBlob(String(p.html)).getBytes()),
+    branch: TL_BRANCH
+  };
+  if (sha) body.sha = sha;
+  const r = UrlFetchApp.fetch(url, { method: 'put', headers: hd, contentType: 'application/json', payload: JSON.stringify(body), muteHttpExceptions: true });
+  const c = r.getResponseCode();
+  if (c === 200 || c === 201) return { ok: true };
+  if (c === 401 || c === 403 || c === 404) throw noReach(c);
+  throw new Error('GitHub answered ' + c);
+}
+
 /* ---------- quote flags + per-work action reminders ---------- */
 
 const ACTION_TAB = 'Actions';
