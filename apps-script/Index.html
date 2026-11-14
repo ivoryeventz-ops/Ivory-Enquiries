@@ -567,7 +567,7 @@
 
 
   /* ---------- quotes sent + outside vendors ---------- */
-  var APP_VERSION = 'v14-Nov-a';   // shown under Outside vendors, so you can tell which Index.html is running
+  var APP_VERSION = 'v14-Nov-b';   // shown under Outside vendors, so you can tell which Index.html is running
   var GH_REPO = 'ivoryeventz-ops/Ivory-Packages', GH_BRANCH = 'main', GH_SITE = 'https://ivory-packages.pages.dev';
   // The 12 standard outside vendors (same list as VENDOR_NAMES in Code.gs).
   var VNAMES = ['Garland and Bouquet', 'Wedding cake', 'Confetti', 'Cold Spark', 'Dry Ice', 'Ambiance lighting',
@@ -653,6 +653,19 @@
             if (pm) items.push({ name: nm, amount: parseInt(pm[1].replace(/,/g, ''), 10) });
           });
         });
+        // Most quotes show the decor package rate as a total card right after the stage inclusions (before the first priced list), e.g. "Decor Package" or "Discounted package rate".
+        if (!items.some(function (r) { return /^decor package$/i.test(r.name); })) {
+          var pkg = null, stop = false;
+          Array.prototype.forEach.call(doc.querySelectorAll('.section-card, .total-row-card'), function (el) {
+            if (stop) return;
+            if (el.classList.contains('section-card')) { if (el.querySelector('.line-item-price')) stop = true; return; }
+            var amt = el.querySelector('.total-row-amount');
+            if (!amt || amt.classList.contains('struck') || amt.querySelector('.strike')) return;   // skip the old, struck-through rate
+            var pm2 = /([\d,]{5,})/.exec(amt.textContent || '');
+            if (pm2) pkg = parseInt(pm2[1].replace(/,/g, ''), 10);
+          });
+          if (pkg) items.unshift({ name: 'Decor Package', amount: pkg });
+        }
         var outside = [];   // items the quote itself lists under "Outside Vendors"
         Array.prototype.forEach.call(doc.querySelectorAll('.section-card'), function (sc) {
           if (!/outside\s*vendors/i.test((sc.querySelector('.section-title') || {}).textContent || '')) return;
