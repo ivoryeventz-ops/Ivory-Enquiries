@@ -356,6 +356,47 @@ function api_vendors(pin) {
   return { rows: rows };
 }
 
+/* ---------- payment details: published to <Client>/payment.html in the Ivory-Packages repo ---------- */
+// The GitHub key (fine-grained, Contents read/write on Ivory-Packages) is kept in Script Properties as GH_KEY,
+// so it is typed once in the app and works on both phones.
+const PAY_REPO = 'ivoryeventz-ops/Ivory-Packages';
+const PAY_BRANCH = 'main';
+
+function api_pay_status(pin) {
+  check_(pin);
+  return { hasKey: !!PropertiesService.getScriptProperties().getProperty('GH_KEY') };
+}
+
+function api_pay_publish(pin, p) {
+  check_(pin);
+  const props = PropertiesService.getScriptProperties();
+  if (p.key) props.setProperty('GH_KEY', String(p.key).trim());
+  const key = props.getProperty('GH_KEY');
+  if (!key) throw new Error('GitHub key needed');
+  const folder = String(p.folder || '').trim();
+  if (!/^[A-Za-z0-9][A-Za-z0-9 _-]{0,60}$/.test(folder)) throw new Error('Bad client folder name');
+  if (!p.html || String(p.html).indexOf('Payment Details') < 0) throw new Error('Nothing to publish');
+  const url = 'https://api.github.com/repos/' + PAY_REPO + '/contents/' + encodeURIComponent(folder) + '/payment.html';
+  const hd = { Authorization: 'Bearer ' + key, Accept: 'application/vnd.github+json' };
+  const bad = function (code) {
+    if (code === 401 || code === 403) { props.deleteProperty('GH_KEY'); return new Error('GitHub key not accepted - paste it again'); }
+    return new Error('GitHub answered ' + code);
+  };
+  const g = UrlFetchApp.fetch(url + '?ref=' + PAY_BRANCH, { headers: hd, muteHttpExceptions: true });
+  let sha = null;
+  if (g.getResponseCode() === 200) sha = JSON.parse(g.getContentText()).sha;
+  else if (g.getResponseCode() !== 404) throw bad(g.getResponseCode());
+  const body = {
+    message: String(p.message || 'Payment details').slice(0, 200),
+    content: Utilities.base64Encode(Utilities.newBlob(String(p.html)).getBytes()),
+    branch: PAY_BRANCH
+  };
+  if (sha) body.sha = sha;
+  const r = UrlFetchApp.fetch(url, { method: 'put', headers: hd, contentType: 'application/json', payload: JSON.stringify(body), muteHttpExceptions: true });
+  if (r.getResponseCode() !== 200 && r.getResponseCode() !== 201) throw bad(r.getResponseCode());
+  return { ok: true };
+}
+
 /* ---------- quote flags + per-work action reminders ---------- */
 
 const ACTION_TAB = 'Actions';

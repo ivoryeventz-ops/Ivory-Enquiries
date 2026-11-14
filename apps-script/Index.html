@@ -567,7 +567,7 @@
 
 
   /* ---------- quotes sent + outside vendors ---------- */
-  var APP_VERSION = 'v14-Nov-c';   // shown under Outside vendors, so you can tell which Index.html is running
+  var APP_VERSION = 'v14-Nov-d';   // shown under Outside vendors, so you can tell which Index.html is running
   var GH_REPO = 'ivoryeventz-ops/Ivory-Packages', GH_BRANCH = 'main', GH_SITE = 'https://ivory-packages.pages.dev';
   // The 12 standard outside vendors (same list as VENDOR_NAMES in Code.gs).
   var VNAMES = ['Garland and Bouquet', 'Wedding cake', 'Confetti', 'Cold Spark', 'Dry Ice', 'Ambiance lighting',
@@ -978,12 +978,26 @@
       '<div id="payAdv">' + advRows() + '</div>' +
       '<button type="button" class="pbtn" data-act="aadd">+ Additional advance received</button>' +
       '<div class="psum" id="paySum"></div>' +
-      (key ? '' : '<h4>GitHub key</h4><div class="note">Needed once on this phone (Contents read/write on Ivory-Packages).</div><input id="payKey" type="password" autocomplete="off" placeholder="Paste GitHub key">') +
+      '<div id="payKeyBox" style="display:none"><h4>GitHub key</h4><div class="note" id="payKeyNote"></div><input id="payKey" type="password" autocomplete="off" placeholder="Paste GitHub key"></div>' +
       '<button class="primary" id="paySave" type="button" data-act="psave">Save &amp; publish</button>' +
       '<div class="pst" id="payState"></div><div id="payShare"></div>';
+    payKeyUpdate();
     $('#payTotal').value = payTotal() ? payTotal().toLocaleString('en-IN') : '';
     $('#payDisc').value = num(P.discount) ? num(P.discount).toLocaleString('en-IN') : '';
     paySum();
+  }
+  // GitHub key: kept once in the Apps Script project (shared by both phones). Older Code.gs without it falls back to a key stored on this phone.
+  var paySrv = null;   // null = not asked yet, 'key' = server holds the key, 'nokey' = server ready but needs the key once, 'old' = Code.gs not updated
+  function localKey() { try { return localStorage.getItem('ivoryGhKey') || ''; } catch (e) { return ''; } }
+  function payKeyUpdate() {
+    var box = $('#payKeyBox'); if (!box) return;
+    var need = paySrv === 'nokey' || (paySrv === 'old' && !localKey());
+    box.style.display = need ? '' : 'none';
+    $('#payKeyNote').textContent = paySrv === 'old' ? 'Needed once on this phone (Contents read/write on Ivory-Packages).' : 'Needed once only - saved for both phones (Contents read/write on Ivory-Packages).';
+  }
+  function payAskServer() {
+    if (paySrv === 'key') { payKeyUpdate(); return; }
+    call('api_pay_status', pin).then(function (r) { paySrv = r && r.hasKey ? 'key' : 'nokey'; }, function () { paySrv = 'old'; }).then(payKeyUpdate);
   }
   function paySum() {
     var c = payCalc(), h = '';
@@ -1008,6 +1022,7 @@
       items: payFromQuote(list), total: null, totalAuto: true, discount: 0, adv: [{ label: 'Advance Received', amount: 0 }] };
     $('#payMeta').textContent = it.name + ' - ' + fmt(it.date) + (P.venue ? ' - ' + P.venue : '') + '  (saves to ' + folder + '/payment) - app ' + APP_VERSION;
     payRender();
+    payAskServer();
     openSheet('#pay');
     payStatus('Checking for saved payment details...');
     var tok = P;
@@ -1091,35 +1106,46 @@
     '.total-row-title{font-size:.95rem;font-weight:600;color:var(--charcoal)}.total-row-amount{font-size:1.25rem;font-weight:700;color:var(--gold-dark);text-align:right;font-variant-numeric:tabular-nums}';
 
   function utf8b64(str) { return btoa(unescape(encodeURIComponent(str))); }
+  function payDone() {
+    ghPay[P.folder] = 1;
+    var url = GH_SITE + '/' + encodeURIComponent(P.folder) + '/payment';
+    var wa = 'https://wa.me/?text=' + encodeURIComponent('Payment details - ' + P.name + '\n' + url);
+    payStatus('Published. The page updates in a minute or so.');
+    $('#payShare').innerHTML = '<a class="wa" href="' + esc(wa) + '" target="_blank" rel="noopener">Send on WhatsApp</a> <a class="pbtn" style="display:inline-block;text-decoration:none" href="' + esc(url) + '" target="_blank" rel="noopener">Open page</a>';
+    if (cur && lastQ) renderDetail(cur, (dCache[wkey(cur)] || {}).d || {}, (dCache[wkey(cur)] || {}).gh || { q: [] });
+  }
   function payPublish() {
-    var key = ''; try { key = localStorage.getItem('ivoryGhKey') || ''; } catch (e) {}
-    var ki = $('#payKey');
-    if (!key && ki) key = ki.value.trim();
-    if (!key) { payStatus('Paste the GitHub key first.', true); return; }
     if (!P.items.length) { payStatus('Add at least one item.', true); return; }
-    var c = payCalc();
-    if (!c.total) { payStatus('Total is zero - check the rates.', true); return; }
-    var btn = $('#paySave'); btn.disabled = true; payStatus('Publishing...');
+    if (!payCalc().total) { payStatus('Total is zero - check the rates.', true); return; }
+    var ki = $('#payKey'), typed = ki ? ki.value.trim() : '', tok = P, btn = $('#paySave');
+    var server = paySrv === 'key' || paySrv === 'nokey';
+    if (server && paySrv === 'nokey' && !typed) { payStatus('Paste the GitHub key first.', true); return; }
+    if (!server && !localKey() && !typed) { payStatus('Paste the GitHub key first.', true); return; }
+    btn.disabled = true; payStatus('Publishing...');
+    var html = payHtml();
+    if (server) {
+      call('api_pay_publish', pin, { folder: P.folder, html: html, message: 'Payment details - ' + P.name + ' ' + (P.date || ''), key: typed })
+        .then(function () { paySrv = 'key'; if (ki) ki.value = ''; payKeyUpdate(); if (P === tok) payDone(); })
+        .catch(function (e) {
+          if (/key not accepted/i.test(e.message)) paySrv = 'nokey';
+          payKeyUpdate();
+          if (P === tok) payStatus('Not published: ' + esc(e.message), true);
+        })
+        .then(function () { btn.disabled = false; });
+      return;
+    }
+    var key = localKey() || typed;
     var path = encodeURIComponent(P.folder) + '/payment.html', api = 'https://api.github.com/repos/' + GH_REPO + '/contents/' + path;
     var hd = { 'Authorization': 'Bearer ' + key, 'Accept': 'application/vnd.github+json' };
-    var tok = P;
     fetch(api + '?ref=' + GH_BRANCH + '&t=' + Date.now(), { headers: hd })
       .then(function (r) { if (r.status === 404) return null; if (!r.ok) throw new Error(r.status === 401 ? 'GitHub key not accepted' : 'GitHub answered ' + r.status); return r.json(); })
       .then(function (cur0) {
-        var body = { message: 'Payment details - ' + P.name + ' ' + (P.date || ''), content: utf8b64(payHtml()), branch: GH_BRANCH };
+        var body = { message: 'Payment details - ' + P.name + ' ' + (P.date || ''), content: utf8b64(html), branch: GH_BRANCH };
         if (cur0 && cur0.sha) body.sha = cur0.sha;
         return fetch(api, { method: 'PUT', headers: hd, body: JSON.stringify(body) });
       })
       .then(function (r) { if (!r.ok) throw new Error(r.status === 401 || r.status === 403 ? 'GitHub key not accepted' : 'GitHub answered ' + r.status); return r.json(); })
-      .then(function () {
-        try { localStorage.setItem('ivoryGhKey', key); } catch (e) {}
-        ghPay[P.folder] = 1;
-        var url = GH_SITE + '/' + encodeURIComponent(P.folder) + '/payment';
-        var wa = 'https://wa.me/?text=' + encodeURIComponent('Payment details - ' + P.name + '\n' + url);
-        payStatus('Published. The page updates in a minute or so.');
-        $('#payShare').innerHTML = '<a class="wa" href="' + esc(wa) + '" target="_blank" rel="noopener">Send on WhatsApp</a> <a class="pbtn" style="display:inline-block;text-decoration:none" href="' + esc(url) + '" target="_blank" rel="noopener">Open page</a>';
-        if (cur && lastQ) renderDetail(cur, (dCache[wkey(cur)] || {}).d || {}, (dCache[wkey(cur)] || {}).gh || { q: [] });
-      })
+      .then(function () { try { localStorage.setItem('ivoryGhKey', key); } catch (e) {} payKeyUpdate(); if (P === tok) payDone(); })
       .catch(function (e) { if (P === tok) payStatus('Not published: ' + esc(e.message), true); })
       .then(function () { btn.disabled = false; });
   }
