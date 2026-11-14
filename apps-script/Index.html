@@ -134,6 +134,23 @@
   .una.done{opacity:.55}
   .una.done .un::after{content:" \2713 saved";color:var(--conf);font-size:12px;font-weight:600}
   @media(min-width:520px){.una{grid-template-columns:1fr 1fr;align-items:center}}
+
+  /* payment details sheet */
+  .payrow{width:100%;text-align:left;font:inherit;cursor:pointer;border-color:var(--gold);background:#fffaf0}
+  .payrow b{font-size:16px}
+  #pay h4{font-size:12px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin:18px 0 8px}
+  .prow{display:grid;grid-template-columns:1fr 112px 34px;gap:6px;margin-bottom:8px;align-items:center}
+  .prow.two{grid-template-columns:1fr 112px}
+  .prow input{padding:10px 10px;font-size:15px}
+  .prow .amt{text-align:right;font-variant-numeric:tabular-nums}
+  .prow .x{border:1px solid var(--line);background:#fff;border-radius:8px;height:40px;font-size:18px;color:var(--danger)}
+  .plab{font-size:15px;font-weight:600}
+  .psum{background:var(--cream);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-top:12px;font-size:15px}
+  .psum div{display:flex;justify-content:space-between;padding:3px 0}
+  .psum .bal{border-top:1px solid var(--line);margin-top:4px;padding-top:7px;font-weight:700;color:var(--burgundy);font-size:17px}
+  .pbtn{border:1px solid var(--line);background:#fff;border-radius:10px;padding:9px 14px;font-size:14px;font-weight:600;color:var(--burgundy);margin:2px 6px 0 0}
+  .pst{font-size:13px;min-height:18px;margin-top:8px;color:var(--muted)}
+  .pst.err{color:var(--danger);font-weight:600}
 </style>
 </head>
 <body>
@@ -188,6 +205,13 @@
   <div id="dVend"></div>
   <div id="dActs"></div>
   <button class="link" id="dClose">Close</button>
+</div>
+
+<div class="sheet" id="pay">
+  <h2>Payment details</h2>
+  <div class="meta" id="payMeta"></div>
+  <div id="payBody"></div>
+  <button class="link" id="payClose">Back</button>
 </div>
 
 <div class="sheet" id="vl">
@@ -443,6 +467,7 @@
     $('#detail').classList.remove('show');
     $('#form').classList.remove('show');
     $('#vl').classList.remove('show');
+    $('#pay').classList.remove('show');
     cur = null;
     $('#dActs').innerHTML = '';
   }
@@ -542,7 +567,7 @@
 
 
   /* ---------- quotes sent + outside vendors ---------- */
-  var APP_VERSION = 'v13-Nov-c';   // shown under Outside vendors, so you can tell which Index.html is running
+  var APP_VERSION = 'v14-Nov-a';   // shown under Outside vendors, so you can tell which Index.html is running
   var GH_REPO = 'ivoryeventz-ops/Ivory-Packages', GH_BRANCH = 'main', GH_SITE = 'https://ivory-packages.pages.dev';
   // The 12 standard outside vendors (same list as VENDOR_NAMES in Code.gs).
   var VNAMES = ['Garland and Bouquet', 'Wedding cake', 'Confetti', 'Cold Spark', 'Dry Ice', 'Ambiance lighting',
@@ -578,7 +603,7 @@
       .toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
   }
 
-  var ghTree = null, ghTreeAt = 0, ghCache = {};
+  var ghTree = null, ghTreeAt = 0, ghCache = {}, ghPay = {};
   function ghTreeGet(maxAge) {
     if (ghTree && Date.now() - ghTreeAt < (maxAge || 300000)) return Promise.resolve(ghTree);
     return fetch('https://api.github.com/repos/' + GH_REPO + '/git/trees/' + GH_BRANCH + '?recursive=1')
@@ -588,6 +613,8 @@
         (j.tree || []).forEach(function (x) {
           var m = /^([^\/]+)\/(\d{6})\.html$/.exec(x.path);
           if (m) (t[m[1]] = t[m[1]] || []).push(m[2]);
+          var pm = /^([^\/]+)\/payment\.html$/.exec(x.path);
+          if (pm) ghPay[pm[1]] = 1;
         });
         ghTree = t; ghTreeAt = Date.now();
         return t;
@@ -610,6 +637,22 @@
           if (l === 'date') date = isoFromText(v);
           if (l === 'venue') venue = v;
         });
+        var items = [];   // priced lines (decor package + each additional service), used to pre-fill the payment details
+        Array.prototype.forEach.call(doc.querySelectorAll('.section-card'), function (sc) {
+          var st = ((sc.querySelector('.section-title') || {}).textContent || '');
+          if (/complimentary|payment\s*terms/i.test(st)) return;
+          var sp = sc.querySelector('.section-price'), sm = sp && /([\d,]{3,})/.exec(sp.textContent || '');
+          if (sm) items.push({ name: 'Decor Package', amount: parseInt(sm[1].replace(/,/g, ''), 10) });
+          Array.prototype.forEach.call(sc.querySelectorAll('.line-item-box'), function (b) {
+            var nm = ((b.querySelector('.line-item-name') || {}).textContent || '').replace(/\s+/g, ' ').trim();
+            var pe = b.querySelector('.line-item-price');
+            if (!nm || !pe) return;
+            var pc = pe.cloneNode(true);
+            Array.prototype.forEach.call(pc.querySelectorAll('.strike'), function (z) { z.parentNode.removeChild(z); });   // old struck-through price
+            var pm = /([\d,]{3,})/.exec(pc.textContent || '');
+            if (pm) items.push({ name: nm, amount: parseInt(pm[1].replace(/,/g, ''), 10) });
+          });
+        });
         var outside = [];   // items the quote itself lists under "Outside Vendors"
         Array.prototype.forEach.call(doc.querySelectorAll('.section-card'), function (sc) {
           if (!/outside\s*vendors/i.test((sc.querySelector('.section-title') || {}).textContent || '')) return;
@@ -622,7 +665,7 @@
         var text = ((doc.body && doc.body.textContent) || '').replace(/\s+/g, ' ');
         var cut = text.search(/Complimentary Wedding Management/i);   // the free services are not outside vendors
         if (cut > 0) text = text.slice(0, cut);
-        return { no: no, src: 'cloud', url: GH_SITE + '/' + encodeURIComponent(folder) + '/' + no, date: date, venue: venue, text: text, outside: outside };
+        return { no: no, src: 'cloud', folder: folder, url: GH_SITE + '/' + encodeURIComponent(folder) + '/' + no, date: date, venue: venue, text: text, outside: outside, items: items };
       })
       .catch(function (e) { if (ghCache[k] === entry) delete ghCache[k]; throw e; });
     return entry.p;
@@ -725,6 +768,7 @@
     });
   }
 
+  var lastQ = [];
   function renderDetail(it, d, gh) {
     var list = [], seen = {};
     gh.q.forEach(function (q) { list.push(q); seen[q.no] = 1; });
@@ -735,6 +779,9 @@
 
     var h = '<h3>Quotes sent <span class="vcount">' + list.length + '</span></h3>';
     if (gh.err) h += '<div class="note warn">Newer quote pages could not be loaded (' + esc(gh.err) + ').<button class="retryb" data-act="reload">Try again</button></div>';
+    lastQ = list;
+    h += '<button type="button" class="qrow payrow" data-act="pay"><span><b>Payment details</b>' + (ghPay[payFolder(it, list)] ? '<span class="tag">Sent</span>' : '') +
+      '<span class="qs">Rates, discount and advance - send to client</span></span><span class="go">Edit &amp; send &rsaquo;</span></button>';
     if (!list.length) {
       h += '<div class="note">No quote has been sent to ' + esc(it.name) + ' for this date yet.</div>';
     } else {
@@ -826,7 +873,10 @@
     vSend();
   }
 
-  $('#dQuotes').addEventListener('click', function (e) { if (e.target.closest('[data-act="reload"]') && cur) loadDetail(cur); });
+  $('#dQuotes').addEventListener('click', function (e) {
+    if (e.target.closest('[data-act="pay"]') && cur) { openPay(cur, lastQ); return; }
+    if (e.target.closest('[data-act="reload"]') && cur) loadDetail(cur);
+  });
   $('#dVend').addEventListener('click', function (e) {
     var b = e.target.closest('[data-act]'); if (!b) return;
     if (b.getAttribute('data-act') === 'vretry') vSend();
@@ -850,6 +900,236 @@
     var name = row.getAttribute('data-v'), val = e.target.value, it = vItem;
     clearTimeout(row['_t' + f]);
     row['_t' + f] = setTimeout(function () { var o = {}; o[f] = val; vQueue(it, name, o); }, 900);
+  });
+
+
+  /* ---------- payment details: published to <Client>/payment.html in the packages repo ---------- */
+  var P = null;
+  function payFolder(it, list) {
+    var q = (list || []).filter(function (x) { return x.src === 'cloud' && x.folder; })[0];
+    if (q) return q.folder;
+    var w = (it.name || '').trim().split(/\s+/)[0].replace(/[^A-Za-z0-9-]/g, '');
+    return w ? w.charAt(0).toUpperCase() + w.slice(1) : 'Client';
+  }
+  function num(v) { var n = parseInt(String(v == null ? '' : v).replace(/[^\d]/g, ''), 10); return isNaN(n) ? 0 : n; }
+  function inr(n) { return '₹' + Number(n).toLocaleString('en-IN'); }
+  function itemsSum() { return P.items.reduce(function (a, r) { return a + num(r.amount); }, 0); }
+  function payTotal() { return P.totalAuto ? itemsSum() : num(P.total); }
+  function payCalc() {
+    var t = payTotal(), d = Math.min(num(P.discount), t), net = t - d;
+    var paid = P.adv.reduce(function (a, r) { return a + num(r.amount); }, 0);
+    return { total: t, discount: d, net: net, paid: paid, balance: net - paid };
+  }
+  function payStatus(msg, err) { var el = $('#payState'); if (el) { el.className = 'pst' + (err ? ' err' : ''); el.innerHTML = msg; } }
+
+  function parseSavedPayment(html) {
+    var m = /<script type="application\/json" id="ivory-payment-data">([\s\S]*?)<\/script>/.exec(html);
+    if (m) { try { return JSON.parse(m[1]); } catch (e) {} }
+    // payments written by hand before this app existed
+    var doc = new DOMParser().parseFromString(html, 'text/html'), o = { items: [], adv: [], total: null, discount: 0 };
+    Array.prototype.forEach.call(doc.querySelectorAll('.line-item-box'), function (b) {
+      o.items.push({ name: ((b.querySelector('.line-item-name') || {}).textContent || '').trim(), amount: num((b.querySelector('.line-item-amount') || {}).textContent) });
+    });
+    Array.prototype.forEach.call(doc.querySelectorAll('.sum-row'), function (r) {
+      var sp = r.querySelectorAll('span'), l = ((sp[0] || {}).textContent || '').trim(), a = num((sp[1] || {}).textContent), k = l.toLowerCase();
+      if (k === 'total') o.total = a;
+      else if (k === 'discount') o.discount = a;
+      else if (k === 'discounted total' || k === 'paid so far') return;
+      else o.adv.push({ label: l, amount: a });
+    });
+    return o;
+  }
+
+  function payRows() {
+    return P.items.map(function (r, i) {
+      return '<div class="prow" data-i="' + i + '"><input data-f="name" value="' + esc(r.name) + '" aria-label="Item">' +
+        '<input class="amt" data-f="amount" inputmode="numeric" value="' + (num(r.amount) ? num(r.amount).toLocaleString('en-IN') : '') + '" aria-label="Rate">' +
+        '<button type="button" class="x" data-act="pdel" aria-label="Remove">&times;</button></div>';
+    }).join('');
+  }
+  function advRows() {
+    return P.adv.map(function (r, i) {
+      return '<div class="prow" data-a="' + i + '"><input data-f="label" value="' + esc(r.label) + '" aria-label="Advance label">' +
+        '<input class="amt" data-f="amount" inputmode="numeric" value="' + (num(r.amount) ? num(r.amount).toLocaleString('en-IN') : '') + '" aria-label="Advance amount">' +
+        '<button type="button" class="x" data-act="adel" aria-label="Remove">&times;</button></div>';
+    }).join('');
+  }
+  function payRender() {
+    var key = ''; try { key = localStorage.getItem('ivoryGhKey') || ''; } catch (e) {}
+    $('#payBody').innerHTML =
+      '<h4>Package &amp; add-ons</h4><div id="payItems">' + payRows() + '</div>' +
+      '<button type="button" class="pbtn" data-act="padd">+ Add item</button><button type="button" class="pbtn" data-act="preload">Pick rates again from quote</button>' +
+      '<h4>Payment summary</h4>' +
+      '<div class="prow two"><span class="plab">Total</span><input class="amt" id="payTotal" inputmode="numeric"></div>' +
+      '<div class="prow two"><span class="plab">Discount</span><input class="amt" id="payDisc" inputmode="numeric" placeholder="0"></div>' +
+      '<div id="payAdv">' + advRows() + '</div>' +
+      '<button type="button" class="pbtn" data-act="aadd">+ Additional advance received</button>' +
+      '<div class="psum" id="paySum"></div>' +
+      (key ? '' : '<h4>GitHub key</h4><div class="note">Needed once on this phone (Contents read/write on Ivory-Packages).</div><input id="payKey" type="password" autocomplete="off" placeholder="Paste GitHub key">') +
+      '<button class="primary" id="paySave" type="button" data-act="psave">Save &amp; publish</button>' +
+      '<div class="pst" id="payState"></div><div id="payShare"></div>';
+    $('#payTotal').value = payTotal() ? payTotal().toLocaleString('en-IN') : '';
+    $('#payDisc').value = num(P.discount) ? num(P.discount).toLocaleString('en-IN') : '';
+    paySum();
+  }
+  function paySum() {
+    var c = payCalc(), h = '';
+    h += '<div><span>Total</span><span>' + inr(c.total) + '</span></div>';
+    if (c.discount) h += '<div><span>Discount</span><span>&minus; ' + inr(c.discount) + '</span></div><div><span>Discounted total</span><span>' + inr(c.net) + '</span></div>';
+    h += '<div><span>Paid so far</span><span>' + inr(c.paid) + '</span></div><div class="bal"><span>Balance</span><span>' + inr(c.balance) + '</span></div>';
+    $('#paySum').innerHTML = h;
+  }
+
+  function payFromQuote(list) {
+    var q = (list || []).filter(function (x) { return x.src === 'cloud' && x.items; })[0];
+    return q ? q.items.map(function (r) { return { name: r.name, amount: r.amount }; }) : [];
+  }
+  function openPay(it, list) {
+    var folder = payFolder(it, list), q = (list || []).filter(function (x) { return x.src === 'cloud'; })[0];
+    P = { it: it, list: list, folder: folder, name: it.name, date: it.date, venue: (q && q.venue) || it.venue || '',
+      items: payFromQuote(list), total: null, totalAuto: true, discount: 0, adv: [{ label: 'Advance Received', amount: 0 }] };
+    $('#payMeta').textContent = it.name + ' - ' + fmt(it.date) + (P.venue ? ' - ' + P.venue : '') + '  (saves to ' + folder + '/payment)';
+    payRender();
+    openSheet('#pay');
+    payStatus('Checking for saved payment details...');
+    var tok = P;
+    fetch('https://raw.githubusercontent.com/' + GH_REPO + '/' + GH_BRANCH + '/' + encodeURIComponent(folder) + '/payment.html?t=' + Date.now())
+      .then(function (r) { if (!r.ok) throw new Error('none'); return r.text(); })
+      .then(function (html) {
+        if (P !== tok) return;
+        var o = parseSavedPayment(html);
+        if (o.items && o.items.length) P.items = o.items;
+        P.discount = num(o.discount);
+        if (o.adv && o.adv.length) P.adv = o.adv;
+        if (o.total != null) { P.total = o.total; P.totalAuto = (o.total === itemsSum()); }
+        payRender();
+        payStatus('Loaded the saved payment details.');
+      })
+      .catch(function () { if (P === tok) payStatus(P.items.length ? 'Rates picked up from the latest quote.' : 'No priced items found in the quote - add them below.'); });
+  }
+
+  function payHtml() {
+    var c = payCalc(), d = P.date ? toDate(P.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : '';
+    var ymd = P.date ? P.date.slice(8, 10) + P.date.slice(5, 7) + P.date.slice(2, 4) : '';
+    var R = function (n) { return '&#8377;' + Number(n).toLocaleString('en-IN'); };
+    var items = P.items.filter(function (r) { return (r.name || '').trim() || num(r.amount); }).map(function (r) {
+      return '      <div class="line-item-box"><span class="line-item-name">' + esc(r.name) + '</span><span class="line-item-amount">' + R(num(r.amount)) + '</span></div>';
+    }).join('\n');
+    var sum = '';
+    if (c.discount) {
+      sum += '    <div class="sum-row struck"><span>Total</span><span class="amount">' + R(c.total) + '</span></div>\n' +
+        '    <div class="sum-row discount"><span>Discount</span><span class="amount">&minus; ' + R(c.discount) + '</span></div>\n' +
+        '    <div class="sum-row strong"><span>Discounted Total</span><span class="amount">' + R(c.net) + '</span></div>\n';
+    } else {
+      sum += '    <div class="sum-row strong"><span>Total</span><span class="amount">' + R(c.total) + '</span></div>\n';
+    }
+    sum += '    <div class="sum-gap"></div>\n';
+    var advs = P.adv.filter(function (r) { return num(r.amount); });
+    advs.forEach(function (r) { sum += '    <div class="sum-row"><span>' + esc((r.label || '').trim() || 'Advance Received') + '</span><span class="amount">' + R(num(r.amount)) + '</span></div>\n'; });
+    if (advs.length > 1) sum += '    <div class="sum-row strong"><span>Paid So Far</span><span class="amount">' + R(c.paid) + '</span></div>\n';
+    var data = JSON.stringify({ items: P.items, total: c.total, discount: c.discount, adv: P.adv }).replace(/</g, '\\u003c');
+    var desc = 'Ivory Events payment details' + (d ? ' - ' + d : '') + (P.venue ? ', ' + P.venue : '');
+    return '<!DOCTYPE html>\n<html lang="en">\n<head>\n<meta charset="UTF-8" />\n<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />\n' +
+      '<title>Payment Details - ' + esc(P.name) + '</title>\n' +
+      '<meta property="og:type" content="website" />\n<meta property="og:site_name" content="Ivory Events" />\n' +
+      '<meta property="og:title" content="Payment Details - ' + esc(P.name) + '" />\n<meta property="og:description" content="' + esc(desc) + '" />\n' +
+      '<meta property="og:image" content="https://ivory-packages.pages.dev/ivory-logo.jpg" />\n<meta property="og:image:alt" content="Ivory Events logo" />\n' +
+      '<meta name="twitter:card" content="summary" />\n<meta name="twitter:image" content="https://ivory-packages.pages.dev/ivory-logo.jpg" />\n' +
+      '<link rel="preconnect" href="https://fonts.googleapis.com">\n<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>\n' +
+      '<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">\n' +
+      '<style>\n' + PAY_CSS + '\n</style>\n</head>\n<body>\n\n<div class="container">\n  <div class="header-card">\n    <h1 class="brand-title">Payment Details</h1>\n    <p class="sub-title">Ivory Events</p>\n' +
+      '    <div class="draft-note">Payment Details - ' + ymd + '</div>\n\n    <div class="info-grid">\n' +
+      '      <div class="info-item"><div class="info-label">Client Name</div><div class="info-value">' + esc(P.name) + '</div></div>\n' +
+      '      <div class="info-item"><div class="info-label">Date</div><div class="info-value">' + esc(d) + '</div></div>\n' +
+      '      <div class="info-item"><div class="info-label">Venue</div><div class="info-value">' + esc(P.venue) + '</div></div>\n    </div>\n  </div>\n\n' +
+      '  <div class="section-card">\n    <div class="section-header">\n      <span class="section-title">Package &amp; Add-ons</span>\n    </div>\n    <div class="line-item-group">\n' + items + '\n    </div>\n  </div>\n\n' +
+      '  <div class="section-card">\n    <div class="section-header">\n      <span class="section-title">Payment Summary</span>\n    </div>\n' + sum +
+      '    <div class="total-row-card">\n      <div class="total-row-title">Balance</div>\n      <div class="total-row-amount">' + R(c.balance) + '</div>\n    </div>\n  </div>\n</div>\n\n' +
+      '<script type="application/json" id="ivory-payment-data">' + data + '<\/script>\n</body>\n</html>\n';
+  }
+  var PAY_CSS = ':root{--primary-gold:#c5a059;--gold-dark:#9e7b39;--charcoal:#222;--text-muted:#555;--card-bg:#fff;--page-bg:#fdfbf7;--border-color:#ebdcc4;--subtle-bg:#faf7f2;--label:#777;--ok:#3f6a49}' +
+    '*{box-sizing:border-box;margin:0;padding:0}html{background-color:var(--page-bg);-webkit-text-size-adjust:100%}' +
+    'body{background-color:var(--page-bg);font-family:"Montserrat",sans-serif;color:var(--charcoal);line-height:1.5;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:12px}' +
+    '.container{max-width:860px;margin:0 auto;padding-bottom:24px}' +
+    '.header-card{background:var(--card-bg);border:1px solid var(--border-color);border-radius:8px;padding:20px 16px;text-align:center;margin-bottom:14px}' +
+    '.brand-title{font-family:"Cormorant Garamond",serif;font-size:1.9rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:2px}' +
+    '.sub-title{font-size:.82rem;color:var(--primary-gold);text-transform:uppercase;letter-spacing:2px;font-weight:600;margin-bottom:14px}' +
+    '.draft-note{display:inline-block;margin-top:2px;padding:4px 12px;border:1px solid var(--primary-gold);border-radius:20px;font-size:.72rem;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--gold-dark);background:var(--subtle-bg);margin-bottom:14px}' +
+    '.info-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;text-align:left;border-top:1px solid var(--border-color);padding-top:12px}' +
+    '.info-item{background:var(--subtle-bg);padding:10px 14px;border-radius:6px;border-left:3px solid var(--primary-gold);min-width:0}' +
+    '.info-label{font-size:.68rem;text-transform:uppercase;font-weight:600;color:var(--label)}.info-value{font-size:.92rem;font-weight:600;color:var(--charcoal);overflow-wrap:anywhere}' +
+    '.section-card{background:var(--card-bg);border:1px solid var(--border-color);border-radius:8px;padding:18px 16px;margin-bottom:14px}' +
+    '.section-header{display:flex;justify-content:space-between;align-items:baseline;border-bottom:1px solid var(--border-color);padding-bottom:8px;margin-bottom:12px;flex-wrap:wrap;gap:8px}' +
+    '.section-title{font-family:"Cormorant Garamond",serif;font-size:1.35rem;font-weight:700;color:var(--charcoal)}' +
+    '.line-item-group{display:flex;flex-direction:column;gap:10px}' +
+    '.line-item-box{background:var(--subtle-bg);border:1px solid var(--border-color);border-radius:6px;padding:12px 14px;display:flex;justify-content:space-between;align-items:center;gap:12px}' +
+    '.line-item-name{font-size:.92rem;font-weight:600;color:var(--charcoal);overflow-wrap:anywhere;min-width:0}' +
+    '.line-item-amount{font-size:.92rem;font-weight:700;color:var(--gold-dark);font-variant-numeric:tabular-nums;white-space:nowrap}' +
+    '.sum-row{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:9px 0;border-bottom:1px solid var(--border-color);font-size:.92rem;color:var(--text-muted)}' +
+    '.sum-row .amount{font-weight:600;color:var(--charcoal);font-variant-numeric:tabular-nums;text-align:right}' +
+    '.sum-row.strong{color:var(--charcoal);font-weight:600;border-bottom:0}.sum-row.strong .amount{color:var(--gold-dark);font-weight:700}' +
+    '.sum-row.discount .amount{color:var(--ok)}.sum-row.struck .amount{text-decoration:line-through;color:var(--label);font-weight:500}.sum-gap{height:14px}' +
+    '.total-row-card{background:var(--subtle-bg);border:1px solid var(--primary-gold);border-radius:8px;padding:14px 16px;display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:14px}' +
+    '.total-row-title{font-size:.95rem;font-weight:600;color:var(--charcoal)}.total-row-amount{font-size:1.25rem;font-weight:700;color:var(--gold-dark);text-align:right;font-variant-numeric:tabular-nums}';
+
+  function utf8b64(str) { return btoa(unescape(encodeURIComponent(str))); }
+  function payPublish() {
+    var key = ''; try { key = localStorage.getItem('ivoryGhKey') || ''; } catch (e) {}
+    var ki = $('#payKey');
+    if (!key && ki) key = ki.value.trim();
+    if (!key) { payStatus('Paste the GitHub key first.', true); return; }
+    if (!P.items.length) { payStatus('Add at least one item.', true); return; }
+    var c = payCalc();
+    if (!c.total) { payStatus('Total is zero - check the rates.', true); return; }
+    var btn = $('#paySave'); btn.disabled = true; payStatus('Publishing...');
+    var path = encodeURIComponent(P.folder) + '/payment.html', api = 'https://api.github.com/repos/' + GH_REPO + '/contents/' + path;
+    var hd = { 'Authorization': 'Bearer ' + key, 'Accept': 'application/vnd.github+json' };
+    var tok = P;
+    fetch(api + '?ref=' + GH_BRANCH + '&t=' + Date.now(), { headers: hd })
+      .then(function (r) { if (r.status === 404) return null; if (!r.ok) throw new Error(r.status === 401 ? 'GitHub key not accepted' : 'GitHub answered ' + r.status); return r.json(); })
+      .then(function (cur0) {
+        var body = { message: 'Payment details - ' + P.name + ' ' + (P.date || ''), content: utf8b64(payHtml()), branch: GH_BRANCH };
+        if (cur0 && cur0.sha) body.sha = cur0.sha;
+        return fetch(api, { method: 'PUT', headers: hd, body: JSON.stringify(body) });
+      })
+      .then(function (r) { if (!r.ok) throw new Error(r.status === 401 || r.status === 403 ? 'GitHub key not accepted' : 'GitHub answered ' + r.status); return r.json(); })
+      .then(function () {
+        try { localStorage.setItem('ivoryGhKey', key); } catch (e) {}
+        ghPay[P.folder] = 1;
+        var url = GH_SITE + '/' + encodeURIComponent(P.folder) + '/payment';
+        var wa = 'https://wa.me/?text=' + encodeURIComponent('Payment details - ' + P.name + '\n' + url);
+        payStatus('Published. The page updates in a minute or so.');
+        $('#payShare').innerHTML = '<a class="wa" href="' + esc(wa) + '" target="_blank" rel="noopener">Send on WhatsApp</a> <a class="pbtn" style="display:inline-block;text-decoration:none" href="' + esc(url) + '" target="_blank" rel="noopener">Open page</a>';
+        if (cur && lastQ) renderDetail(cur, (dCache[wkey(cur)] || {}).d || {}, (dCache[wkey(cur)] || {}).gh || { q: [] });
+      })
+      .catch(function (e) { if (P === tok) payStatus('Not published: ' + esc(e.message), true); })
+      .then(function () { btn.disabled = false; });
+  }
+
+  $('#payClose').addEventListener('click', function () { $('#pay').classList.remove('show'); });
+  $('#pay').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-act]'); if (!b || !P) return;
+    var a = b.getAttribute('data-act'), row = b.closest('.prow');
+    if (a === 'pdel') { P.items.splice(+row.getAttribute('data-i'), 1); payRender(); }
+    else if (a === 'padd') { P.items.push({ name: '', amount: 0 }); payRender(); }
+    else if (a === 'preload') { P.items = payFromQuote(P.list); P.totalAuto = true; payRender(); payStatus('Rates picked up again from the latest quote.'); }
+    else if (a === 'adel') { P.adv.splice(+row.getAttribute('data-a'), 1); payRender(); }
+    else if (a === 'aadd') { P.adv.push({ label: 'Advance Received on ', amount: 0 }); payRender(); }
+    else if (a === 'psave') payPublish();
+  });
+  $('#pay').addEventListener('input', function (e) {
+    var t = e.target; if (!P) return;
+    var row = t.closest && t.closest('.prow'), f = t.getAttribute && t.getAttribute('data-f');
+    if (t.id === 'payTotal') { P.total = num(t.value); P.totalAuto = false; paySum(); return; }
+    if (t.id === 'payDisc') { P.discount = num(t.value); paySum(); return; }
+    if (!row || !f) return;
+    if (row.hasAttribute('data-i')) {
+      P.items[+row.getAttribute('data-i')][f] = t.value;
+      if (f === 'amount' && P.totalAuto) $('#payTotal').value = itemsSum() ? itemsSum().toLocaleString('en-IN') : '';
+    } else if (row.hasAttribute('data-a')) {
+      P.adv[+row.getAttribute('data-a')][f] = t.value;
+    }
+    paySum();
   });
 
   /* ---------- Vendor list: every vendor, their dates and what is booked ---------- */
