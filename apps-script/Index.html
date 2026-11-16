@@ -200,6 +200,17 @@
   .qci{display:flex;justify-content:space-between;gap:10px;width:100%;text-align:left;font:inherit;background:#fff;border:1px solid var(--line);border-radius:10px;padding:9px 12px;margin-bottom:6px;color:var(--ink)}
   .qci small{display:block;font-size:12px;color:var(--muted);margin-top:2px;font-weight:400}
   .qci b{white-space:nowrap;color:var(--burgundy);font-size:14px}
+  .qcat-top{grid-template-columns:1fr}
+  .qtotbox{margin-top:14px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:#fff}
+  .qtotbox input[type=text],.qtotbox #qeTotLabel{margin-top:8px}
+  .qgh{display:flex;justify-content:space-between;align-items:center;width:100%;font:inherit;font-weight:600;font-size:14px;background:#fff;border:1px solid var(--line);border-radius:10px;padding:11px 12px;margin-top:6px;color:var(--ink);text-align:left}
+  .qgh.on{border-color:var(--gold);background:#fffaf0}
+  .qgh em{font-style:normal;font-weight:600;font-size:12px;color:var(--burgundy);margin-right:8px}
+  .qci{align-items:center}
+  .qci.on{border-color:var(--burgundy);background:#fff6f6}
+  .qtick{flex:0 0 22px;height:22px;border:2px solid var(--line);border-radius:6px;display:inline-flex;align-items:center;justify-content:center;font-style:normal;font-size:14px;color:#fff;background:#fff}
+  .qci.on .qtick{background:var(--burgundy);border-color:var(--burgundy)}
+  .qci>span:nth-child(2){flex:1}
   .qstg{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px}
   .qstg button{flex:0 0 auto;border:2px solid var(--line);border-radius:8px;padding:0;background:#fff;width:96px;height:72px;overflow:hidden}
   .qstg img{width:100%;height:100%;object-fit:cover;display:block}
@@ -1553,7 +1564,7 @@
 
   // Reads an existing quote page into an editable model: header, stage photo, and every section with its inclusions, priced lines and rate cards.
   function qeParse(raw) {
-    var doc = new DOMParser().parseFromString(raw, 'text/html'), M = { name: '', date: '', venue: '', img: '', secs: [], dropped: [] };
+    var doc = new DOMParser().parseFromString(raw, 'text/html'), M = { name: '', date: '', venue: '', img: '', secs: [], dropped: [], showTotal: false, totalLabel: 'Total' };
     var cont = doc.querySelector('.container') || doc.body;
     var tx = function (el) { return ((el && el.textContent) || '').replace(/\s+/g, ' ').trim(); };
     var each = function (list, fn) { Array.prototype.forEach.call(list, fn); };
@@ -1565,7 +1576,9 @@
       return m ? parseInt(m[1].replace(/,/g, ''), 10) : null;
     };
     var addTotal = function (sec, el) {
+      if (el.classList.contains('quote-total')) { M.showTotal = true; M.totalLabel = tx(el.querySelector('.total-row-title')) || 'Total'; return; }   // our own add-ons total: recalculated on save
       var a = el.querySelector('.total-row-amount'), t = tx(el.querySelector('.total-row-title'));
+      if (/^discounted\s+package/i.test(t)) t = 'Decor Package';   // it is the package rate, not a total
       if (!a || a.classList.contains('struck') || a.querySelector('.strike')) return;
       if (QE_DROP.test(t)) { M.dropped.push(t); return; }
       var v = amt(a);
@@ -1609,6 +1622,16 @@
   function qeLineAmount(l) {
     if (l.rate == null || l.rate === '') return null;
     return num(l.rate) * Math.max(1, num(l.qty) || 1);
+  }
+  // Decor Package rate card(s) + add-ons. A section that has a rate card counts once at that rate (its lines are what the rate covers); a section without one counts its priced lines.
+  function qeTotal(Q) {
+    var pkg = 0, add = 0;
+    Q.secs.concat([Q.custom]).forEach(function (s) {
+      var t = 0, has = false;
+      s.totals.forEach(function (x) { if (num(x.amount)) { t += num(x.amount); has = true; } });
+      if (has) pkg += t; else s.lines.forEach(function (l) { add += qeLineAmount(l) || 0; });
+    });
+    return { pkg: pkg, add: add, sum: pkg + add };
   }
   function qeLineName(l) {
     var q = Math.max(1, num(l.qty) || 1), n = String(l.name || '').trim();
@@ -1690,6 +1713,10 @@
       c.push('    </div>');
       h.push(c.join('\n'));
     });
+    if (Q.showTotal) {
+      var TT = qeTotal(Q);
+      if (TT.sum) h.push('    <div class="section-card">\n      <div class="total-row-card quote-total">\n        <span class="total-row-title">' + esc(String(Q.totalLabel || '').trim() || 'Total') + '</span>\n        <span class="total-row-amount">' + qeMoney(TT.sum) + '</span>\n      </div>\n    </div>');
+    }
     h.push(qeComplimentary(isPkg1, hasAnchor));
     h.push('  </div>\n\n</body>\n</html>\n');
     return h.join('\n');
@@ -1708,6 +1735,12 @@
     var M = src && src.raw ? qeParse(src.raw) : { name: '', date: '', venue: '', img: '', secs: [], dropped: [] };
     Q = { it: it, list: list, folder: folder, base: src ? src.no : '', name: M.name || it.name || '', date: M.date || it.date || '', venue: M.venue || (src && src.venue) || it.venue || '',
       img: M.img, imgChoice: 'keep', upload: null, secs: M.secs, dropped: M.dropped, custom: qeBlankSec('Additional Items'), pkg: null, no: qeTodayNo(), replace: false };
+    Q.showTotal = !!M.showTotal; Q.totalLabel = M.totalLabel || 'Total';
+    Q.secs = Q.secs.filter(function (x) {   // an old "Additional Items" section becomes the add-ons area, so ticked services and typed ones sit together after the package
+      if (!/^additional items$/i.test(x.title) || x.totals.length || x.bullets.length) return true;
+      x.lines.forEach(function (l) { QE_CAT.forEach(function (c, i) { if (c.g !== 'Choose your package' && c.n === l.name) l.ci = i; }); Q.custom.lines.push(l); });
+      return false;
+    });
     if (!Q.secs.length) Q.secs.push(qeBlankSec('Decor Package'));
     Q.custom.lines.push({ name: '', subs: [], note: '', rate: null, qty: 1 });
     $('#qeMeta').textContent = it.name + ' - ' + fmt(it.date) + (src ? '  (started from quote #' + src.no + ' - that quote stays as it is)' : '  (new quote)');
@@ -1740,7 +1773,7 @@
   function qeSecHtml(s, si, custom) {
     var h = '<div class="qsec' + (custom ? ' qcustom' : '') + '" data-s="' + (custom ? 'c' : si) + '">';
     if (custom) {
-      h += '<h4>Other services <span class="qhint">not in the package list - type the service and its rate</span></h4>';
+      h += '<h4>Add-on services <span class="qhint">shown after the Decor Package - ticked from the list above, or typed here with a rate</span></h4>';
     } else {
       h += '<div class="qsh"><input data-f="title" value="' + esc(s.title) + '" placeholder="Section title (optional)" aria-label="Section title">' +
         '<button type="button" class="x" data-act="smove" data-d="-1" aria-label="Move section up">&uarr;</button><button type="button" class="x" data-act="smove" data-d="1" aria-label="Move section down">&darr;</button>' +
@@ -1765,9 +1798,9 @@
     return h + '</div></div>';
   }
   function qeSum() {
-    var n = 0;
-    Q.secs.concat([Q.custom]).forEach(function (s) { s.lines.forEach(function (l) { n += qeLineAmount(l) || 0; }); s.totals.forEach(function (t) { if (/package/i.test(t.title)) n += num(t.amount); }); });
-    var el = $('#qeSum'); if (el) el.textContent = n ? 'Package and lines add up to ' + inr(n) + ' (for your reference - not shown on the quote)' : '';
+    var T = qeTotal(Q), el = $('#qeSum');
+    if (!el) return;
+    el.textContent = T.sum ? 'Decor Package ' + inr(T.pkg) + ' + add-ons ' + inr(T.add) + ' = ' + inr(T.sum) + (Q.showTotal ? ' (this total is shown on the quote)' : ' (not shown on the quote - tick the box above to show it)') : '';
   }
   function qeImgOptions() {
     var files = (ghImgs && ghImgs[Q.folder]) || [], o = '';
@@ -1787,11 +1820,13 @@
       '<div class="qtaken" id="qeTaken"' + (tk ? '' : ' style="display:none"') + '><label class="tlchk"><input type="checkbox" id="qeRep"' + (Q.replace ? ' checked' : '') + '> Quote #' + esc(Q.no) +
       ' already exists for this client - tick to replace it (the old page is overwritten)</label></div>' +
       '<h4>Stage design</h4><button type="button" class="pbtn" data-act="stg" style="margin:0 0 8px">Choose a stage design</button><div id="qeStg" style="display:none"></div><select id="qeImg" data-d="img">' + qeImgOptions() + '</select><input type="file" id="qeFile" accept="image/*" style="display:' + (Q.imgChoice === 'up' ? 'block' : 'none') + ';margin-top:8px">' +
-      '<h4>Stage, services and rates</h4><div class="note">Link a package or any add-on from the quote builder, change anything, or type your own services.</div>' +
-      '<button type="button" class="pbtn" data-act="cat">Add from packages</button><button type="button" class="pbtn" data-act="sadd">+ New section</button>' +
-      '<div id="qeCat" style="display:none"></div>' +
+      '<h4>Services from the quote builder</h4><div class="note">Open a group and tick what the client wants - church decoration, pathway stands, cake, band, cars and the rest. Tick again to remove. Everything can be edited below.</div>' +
+      '<div id="qeCat">' + qeCatPanel() + '</div>' +
+      '<h4>Stage, services and rates</h4><button type="button" class="pbtn" data-act="sadd" style="margin:0 0 8px">+ New section</button>' +
       '<div id="qeSecs">' + Q.secs.map(function (s, i) { return qeSecHtml(s, i, false); }).join('') + '</div>' +
       qeSecHtml(Q.custom, 'c', true) +
+      '<div class="qtotbox"><label class="tlchk"><input type="checkbox" id="qeShowTot"' + (Q.showTotal ? ' checked' : '') + '> Show a total after the add-ons</label>' +
+      '<input id="qeTotLabel" data-d="totalLabel" value="' + esc(Q.totalLabel || 'Total') + '" aria-label="Total label"' + (Q.showTotal ? '' : ' style="display:none"') + '></div>' +
       '<div class="qsum" id="qeSum"></div>' +
       '<div id="qeKeyBox" style="display:none"><h4>GitHub key</h4><div class="note">Needed once only - saved for both phones (Contents read/write on Ivory-Packages).</div><input id="qeKey" type="password" autocomplete="off" placeholder="Paste GitHub key"></div>' +
       '<button class="pbtn" type="button" data-act="qprev" style="margin-top:14px">Preview</button>' +
@@ -1805,17 +1840,27 @@
   }
   function qeSection(si) { return si === 'c' ? Q.custom : Q.secs[+si]; }
 
+  function qeAdded(ci) { return Q.secs.concat([Q.custom]).some(function (s) { return s.lines.some(function (l) { return l.ci === ci; }); }); }
   function qeCatPanel() {
-    var q = (($('#qeCatQ') || {}).value || '').toLowerCase(), g = '', h = '', dflt = 0;
-    Q.secs.forEach(function (s, i) { if (s.lines.length) dflt = i; });   // add-ons go to the last section that already has priced lines
-    var opts = Q.secs.map(function (s, i) { return '<option value="' + i + '"' + (i === dflt ? ' selected' : '') + '>' + esc(s.title || 'Section ' + (i + 1)) + '</option>'; }).join('') + '<option value="n">A new section</option>';
+    var q = (($('#qeCatQ') || {}).value || '').toLowerCase(), groups = [], by = {};
     QE_CAT.forEach(function (c, i) {
       if (q && (c.n + ' ' + c.g + ' ' + (c.d || '')).toLowerCase().indexOf(q) < 0) return;
-      if (c.g !== g) { g = c.g; h += '<div class="qcg">' + esc(g) + '</div>'; }
-      h += '<button type="button" class="qci" data-act="cadd" data-ci="' + i + '"><span>' + esc(c.n) + (c.d ? '<small>' + esc(c.d) + '</small>' : '') + '</span><b>' + (c.p ? inr(c.p) : 'enter rate') + '</b></button>';
+      if (!by[c.g]) { by[c.g] = []; groups.push(c.g); }
+      by[c.g].push(i);
     });
-    return '<div class="qcat"><div class="qcat-top"><input id="qeCatQ" type="search" placeholder="Search packages and add-ons" value="' + esc(($('#qeCatQ') || {}).value || '') + '">' +
-      '<label class="qlab">Add to<select id="qeCatTo">' + opts + '</select></label></div><div class="qcl" id="qeCatL">' + (h || '<div class="note">Nothing matches.</div>') + '</div></div>';
+    var h = '';
+    groups.forEach(function (g) {
+      var isPkg = g === 'Choose your package', idx = by[g], open = q || (Q.catOpen && Q.catOpen[g]), n = 0;
+      idx.forEach(function (i) { if (isPkg ? QE_CAT[i].n === Q.pkg : qeAdded(i)) n++; });
+      h += '<button type="button" class="qgh' + (open ? ' on' : '') + '" data-act="cgrp" data-g="' + esc(g) + '"><span>' + esc(isPkg ? 'Packages (stage decoration)' : g) + '</span><span>' + (n ? '<em>' + n + ' ticked</em>' : '') + (open ? '&#9662;' : '&#9656;') + '</span></button>';
+      if (!open) return;
+      idx.forEach(function (i) {
+        var c = QE_CAT[i], on = isPkg ? c.n === Q.pkg : qeAdded(i);
+        h += '<button type="button" class="qci' + (on ? ' on' : '') + '" data-act="cadd" data-ci="' + i + '"><i class="qtick">' + (on ? '&#10003;' : '') + '</i><span>' + esc(c.n) + (c.d ? '<small>' + esc(c.d) + '</small>' : '') + '</span><b>' + (c.p ? inr(c.p) : 'enter rate') + '</b></button>';
+      });
+    });
+    return '<div class="qcat"><div class="qcat-top"><input id="qeCatQ" type="search" placeholder="Search services, e.g. church, pathway, cake" value="' + esc(($('#qeCatQ') || {}).value || '') + '">' +
+      '</div><div id="qeCatL">' + (h || '<div class="note">Nothing matches.</div>') + '</div></div>';
   }
   function qeStagePanel() {
     var h = '<div class="qcat"><div class="note">Tap a photo to use it as the stage design. That package is linked too (its rate goes in the Decor Package rate card).</div><div class="qcl">';
@@ -1836,18 +1881,23 @@
       var t = s.totals.filter(function (x) { return /package/i.test(x.title); })[0];
       if (t) t.amount = c.p; else s.totals.push({ title: 'Decor Package', amount: c.p });
       if (!s.bullets.length) s.bullets = qeInclusions(c.n);
-      qeRender();
+      qeKeepScroll();
       qeStatus((c.n + ' linked at ' + inr(c.p) + '. Change the rate in the rate card if the stage design is priced differently.'));
       return;
     }
-    var to = ($('#qeCatTo') || {}).value, sec = (to === 'n' || to == null || !Q.secs[+to]) ? null : Q.secs[+to];
-    if (!sec) { sec = qeBlankSec(to === 'n' ? '' : 'Additional Items'); Q.secs.push(sec); }
-    sec.lines.push({ name: c.n, subs: c.d ? [c.d] : [], note: '', rate: c.p || null, qty: c.q ? c.q[1] : 1, ql: c.q ? c.q[0] : '' });
-    var open = $('#qeCat').style.display !== 'none', qv = ($('#qeCatQ') || {}).value || '';
-    qeRender();
-    if (open) { $('#qeCat').style.display = ''; $('#qeCat').innerHTML = qeCatPanel(); if (qv) $('#qeCatQ').value = qv; }
-    qeStatus(esc(c.n) + ' added' + (c.p ? '' : ' - type its rate') + '.');
+    if (qeAdded(ci)) {   // ticking again removes the service
+      Q.secs.concat([Q.custom]).forEach(function (s2) { s2.lines = s2.lines.filter(function (l) { return l.ci !== ci; }); });
+      if (!Q.custom.lines.length) Q.custom.lines.push({ name: '', subs: [], note: '', rate: null, qty: 1 });
+      qeKeepScroll(); qeStatus(esc(c.n) + ' removed.'); return;
+    }
+    var blank = function (l) { return !String(l.name || '').trim() && !num(l.rate) && !(l.subs || []).join('').trim(); };
+    Q.custom.lines = Q.custom.lines.filter(function (l) { return !blank(l); });
+    Q.custom.lines.push({ name: c.n, subs: c.d ? [c.d] : [], note: '', rate: c.p || null, qty: c.q ? c.q[1] : 1, ql: c.q ? c.q[0] : '', ci: ci });
+    Q.custom.lines.push({ name: '', subs: [], note: '', rate: null, qty: 1 });
+    qeKeepScroll();
+    qeStatus(esc(c.n) + ' added after the Decor Package' + (c.p ? '' : ' - type its rate below') + '.');
   }
+  function qeKeepScroll() { var sh = $('#qe'), y = sh ? sh.scrollTop : 0; qeRender(); if (sh) sh.scrollTop = y; }
 
   function qeCheck() {
     if (!String(Q.name).trim()) return 'Type the name.';
@@ -1933,6 +1983,7 @@
     var move = function (arr, i, d) { var j = i + d; if (j < 0 || j >= arr.length) return false; var t = arr[i]; arr[i] = arr[j]; arr[j] = t; return true; };
     if (a === 'cat') { var p = $('#qeCat'), on = p.style.display === 'none'; p.style.display = on ? '' : 'none'; if (on) p.innerHTML = qeCatPanel(); }
     else if (a === 'cadd') qeAddCat(+b.getAttribute('data-ci'));
+    else if (a === 'cgrp') { Q.catOpen = Q.catOpen || {}; var gn = b.getAttribute('data-g'); Q.catOpen[gn] = !Q.catOpen[gn]; $('#qeCat').innerHTML = qeCatPanel(); }
     else if (a === 'stg') { var sp = $('#qeStg'), so = sp.style.display === 'none'; sp.style.display = so ? '' : 'none'; if (so) sp.innerHTML = qeStagePanel(); }
     else if (a === 'stgpick') {
       var pn = b.getAttribute('data-p'), pm = b.getAttribute('data-m'), ci2 = -1;
@@ -1993,6 +2044,7 @@
   $('#qe').addEventListener('change', function (e) {
     var t = e.target; if (!Q) return;
     if (t.id === 'qeRep') { Q.replace = t.checked; return; }
+    if (t.id === 'qeShowTot') { Q.showTotal = t.checked; $('#qeTotLabel').style.display = t.checked ? '' : 'none'; qeSum(); return; }
     if (t.id === 'qeImg') { Q.imgChoice = t.value; $('#qeFile').style.display = t.value === 'up' ? 'block' : 'none'; return; }
     if (t.id === 'qeDate') { Q.date = t.value; }
   });
