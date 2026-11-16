@@ -397,6 +397,50 @@ function api_pay_publish(pin, p) {
   return { ok: true };
 }
 
+/* ---------- edit as new quote: published to <Client>/<YYMMDD>.html in the Ivory-Packages repo ---------- */
+// Uses the same GH_KEY as the payment pages. A quote that already exists is only overwritten when the app says replace:true
+// (same-day re-issue, ticked by the person); a new stage photo is written first so the page never points at a missing image.
+function api_quote_publish(pin, p) {
+  check_(pin);
+  const props = PropertiesService.getScriptProperties();
+  if (p.key) props.setProperty('GH_KEY', String(p.key).trim());
+  const key = props.getProperty('GH_KEY');
+  if (!key) throw new Error('GitHub key needed');
+  const folder = String(p.folder || '').trim();
+  if (!/^[A-Za-z0-9][A-Za-z0-9 _-]{0,60}$/.test(folder)) throw new Error('Bad client folder name');
+  const no = String(p.no || '');
+  if (!/^\d{6}$/.test(no)) throw new Error('Bad quote number');
+  if (!p.html || String(p.html).indexOf('Decor Quote') < 0) throw new Error('Nothing to publish');
+  const hd = { Authorization: 'Bearer ' + key, Accept: 'application/vnd.github+json' };
+  const base = 'https://api.github.com/repos/' + PAY_REPO + '/contents/' + encodeURIComponent(folder) + '/';
+  const bad = function (code) {
+    if (code === 401 || code === 403) { props.deleteProperty('GH_KEY'); return new Error('GitHub key not accepted - paste it again'); }
+    return new Error('GitHub answered ' + code);
+  };
+  const put = function (file, b64, message, overwrite) {
+    const url = base + encodeURIComponent(file);
+    const g = UrlFetchApp.fetch(url + '?ref=' + PAY_BRANCH, { headers: hd, muteHttpExceptions: true });
+    let sha = null;
+    if (g.getResponseCode() === 200) {
+      if (!overwrite) throw new Error(file + ' already exists - tick replace to overwrite it');
+      sha = JSON.parse(g.getContentText()).sha;
+    } else if (g.getResponseCode() !== 404) throw bad(g.getResponseCode());
+    const body = { message: String(message || 'Quote').slice(0, 200), content: b64, branch: PAY_BRANCH };
+    if (sha) body.sha = sha;
+    const r = UrlFetchApp.fetch(url, { method: 'put', headers: hd, contentType: 'application/json', payload: JSON.stringify(body), muteHttpExceptions: true });
+    if (r.getResponseCode() !== 200 && r.getResponseCode() !== 201) throw bad(r.getResponseCode());
+  };
+  const msg = String(p.message || ('Quote ' + folder + '/' + no));
+  if (p.img) {
+    const name = String(p.img.name || '');
+    const b64 = String(p.img.b64 || '');
+    if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,60}\.(jpg|jpeg|png)$/i.test(name) || !b64 || b64.length > 9000000) throw new Error('Bad stage photo');
+    put(name, b64, msg + ' - stage photo', true);
+  }
+  put(no + '.html', Utilities.base64Encode(Utilities.newBlob(String(p.html)).getBytes()), msg, p.replace === true);
+  return { ok: true };
+}
+
 /* ---------- wedding timeline: published to <Client>/timeline.html in the Ivory-Wedding-Timeline repo ---------- */
 // Uses its own key (TL_KEY) when one was pasted, otherwise the same key as the payment pages (GH_KEY).
 // A fine-grained key can cover both repositories: add Ivory-Wedding-Timeline with Contents read/write.

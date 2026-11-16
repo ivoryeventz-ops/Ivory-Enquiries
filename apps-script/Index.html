@@ -161,6 +161,46 @@
   .tlch .x{border:1px solid var(--line);background:#fff;border-radius:8px;width:34px;height:34px;font-size:18px;color:var(--danger)}
   .tlchk{display:flex;align-items:center;gap:8px;color:var(--ink);font-size:14px;margin-top:12px}
   #tlPrev{display:none;width:100%;height:70vh;border:1px solid var(--line);border-radius:12px;margin-top:10px;background:#fff}
+
+  /* edit as new quote */
+  .qwrap{display:flex;gap:6px;margin-bottom:8px;align-items:stretch}
+  .qwrap .qrow{flex:1;margin-bottom:0;min-width:0}
+  .qedit{flex:0 0 auto;width:92px;border:1px solid var(--gold);background:#fffaf0;border-radius:12px;font:inherit;font-size:13px;font-weight:600;color:var(--burgundy);padding:6px}
+  #qe h4{font-size:12px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin:18px 0 8px}
+  #qe textarea{width:100%;border:1px solid var(--line);border-radius:10px;padding:10px 12px;font:inherit;font-size:15px;background:#fff;color:var(--ink);resize:vertical}
+  #qe input,#qe select{padding:10px 10px;font-size:15px}
+  .qdt{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .qtaken{background:#fff4e0;border:1px solid var(--cost);border-radius:10px;padding:2px 10px 8px;margin-top:8px}
+  .qtaken input{width:auto}
+  .qsec{border:1px solid var(--line);background:#fff;border-radius:12px;padding:10px 10px 12px;margin:12px 0}
+  .qsec h4{margin-top:4px}
+  .qhint{text-transform:none;letter-spacing:0;font-weight:400;font-size:12px;margin-left:4px}
+  .qsh,.qlh,.qtot{display:grid;gap:6px;align-items:center;margin-bottom:8px}
+  .qsh{grid-template-columns:1fr 34px 34px 34px}
+  .qlh{grid-template-columns:1fr 34px 34px 34px}
+  .qtot{grid-template-columns:1fr 110px 34px}
+  .qtot .amt{text-align:right;font-variant-numeric:tabular-nums}
+  #qe .x{border:1px solid var(--line);background:#fff;border-radius:8px;height:38px;font-size:17px;color:var(--ink);padding:0}
+  #qe .x.del{color:var(--danger);font-size:19px}
+  .qlab{font-size:12px;color:var(--muted);margin:6px 0 4px}
+  .qline{border-top:1px dashed var(--line);padding-top:8px;margin-top:8px}
+  .qnum{display:grid;grid-template-columns:1fr 90px auto;gap:8px;align-items:end;margin:2px 0 6px}
+  .qnum label{margin:0;font-size:12px}
+  .qamt{font-weight:700;color:var(--burgundy);padding-bottom:10px;text-align:right;min-width:72px;font-variant-numeric:tabular-nums}
+  .qshown{font-size:12px;color:var(--cost);margin:0 0 6px;min-height:0}
+  .qshown:empty{display:none}
+  .qline input[data-f=note]{margin-top:6px}
+  .qbtns{margin-top:10px}
+  .qsum{font-size:13px;color:var(--muted);margin-top:12px}
+  .qcat{border:1px solid var(--gold);background:#fffaf0;border-radius:12px;padding:10px;margin:10px 0}
+  .qcat-top{display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:end;margin-bottom:8px}
+  .qcat-top .qlab{margin:0}
+  .qcl{max-height:46vh;overflow:auto}
+  .qcg{font-size:12px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin:12px 0 4px}
+  .qci{display:flex;justify-content:space-between;gap:10px;width:100%;text-align:left;font:inherit;background:#fff;border:1px solid var(--line);border-radius:10px;padding:9px 12px;margin-bottom:6px;color:var(--ink)}
+  .qci small{display:block;font-size:12px;color:var(--muted);margin-top:2px;font-weight:400}
+  .qci b{white-space:nowrap;color:var(--burgundy);font-size:14px}
+  #qePrev{display:none;width:100%;height:70vh;border:1px solid var(--line);border-radius:12px;margin-top:10px;background:#fff}
 </style>
 </head>
 <body>
@@ -235,6 +275,13 @@
   <button class="link" id="tlClose">Back</button>
 </div>
 
+<div class="sheet" id="qe">
+  <h2>New quote</h2>
+  <div class="meta" id="qeMeta"></div>
+  <div id="qeBody"></div>
+  <button class="link" id="qeClose">Back</button>
+</div>
+
 <div class="sheet" id="vl">
   <h2>Vendor list</h2>
   <div class="meta" id="vlMeta">Each vendor, the dates and what is booked</div>
@@ -281,6 +328,275 @@
 
 <div class="toast" id="toast"></div>
 
+<script type="text/plain" id="qeCss">
+    :root {
+      --primary-gold: #c5a059;
+      --gold-dark: #9e7b39;
+      --charcoal: #222222;
+      --text-muted: #555555;
+      --card-bg: #ffffff;
+      --page-bg: #fdfbf7;
+      --border-color: #ebdcc4;
+      --subtle-bg: #faf7f2;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html { background-color: var(--page-bg); -webkit-text-size-adjust: 100%; }
+
+    body {
+      background-color: var(--page-bg);
+      font-family: 'Montserrat', sans-serif;
+      color: var(--charcoal);
+      line-height: 1.5;
+      padding: 12px;
+      margin: 0;
+    }
+
+    .container { max-width: 860px; margin: 0 auto; padding-bottom: 24px; }
+
+    .header-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 20px 16px;
+      text-align: center;
+      margin-bottom: 14px;
+    }
+
+    .brand-title {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.9rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 2px;
+    }
+
+    .sub-title {
+      font-size: 0.82rem;
+      color: var(--primary-gold);
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      font-weight: 600;
+      margin-bottom: 14px;
+    }
+
+    .info-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 10px;
+      text-align: left;
+      border-top: 1px solid var(--border-color);
+      padding-top: 12px;
+    }
+
+    .info-item {
+      background: var(--subtle-bg);
+      padding: 10px 14px;
+      border-radius: 6px;
+      border-left: 3px solid var(--primary-gold);
+    }
+
+    .info-label { font-size: 0.68rem; text-transform: uppercase; font-weight: 600; color: #777; }
+    .info-value { font-size: 0.92rem; font-weight: 600; color: var(--charcoal); }
+
+    .image-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 14px;
+      margin-bottom: 14px;
+    }
+
+    .image-title {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.25rem;
+      font-weight: 700;
+      margin-bottom: 10px;
+      color: var(--charcoal);
+    }
+
+    .image-wrapper {
+      width: 100%;
+      border-radius: 6px;
+      overflow: hidden;
+      border: 1px solid #eee;
+    }
+
+    .image-wrapper img { width: 100%; height: auto; display: block; }
+
+    .timeline-title {
+      font-weight: 600;
+      font-size: 0.88rem;
+      color: var(--gold-dark);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-top: 14px;
+      margin-bottom: 6px;
+    }
+
+    .timeline-title:first-of-type { margin-top: 0; }
+
+    .services-intro {
+      font-family: 'Cormorant Garamond', serif;
+      font-style: italic;
+      font-size: 1.05rem;
+      color: var(--gold-dark);
+      margin-bottom: 12px;
+    }
+
+    .item-list li strong { font-weight: 600; color: var(--charcoal); }
+
+    .sub-bullets { list-style: none; margin-top: 4px; }
+    .sub-bullets li { padding-left: 16px; font-size: 0.84rem; color: var(--text-muted); margin-bottom: 2px; }
+    .sub-bullets li::before { content: "-"; font-size: 0.9rem; font-weight: normal; }
+
+    .service-note {
+      background: var(--subtle-bg);
+      border-left: 3px solid var(--primary-gold);
+      border-radius: 6px;
+      padding: 10px 14px;
+      font-size: 0.84rem;
+      color: #4a433c;
+      margin-top: 8px;
+    }
+
+    .section-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 18px 16px;
+      margin-bottom: 14px;
+    }
+
+    .section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 8px;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .section-title {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.35rem;
+      font-weight: 700;
+      color: var(--charcoal);
+    }
+
+    .section-price { font-size: 1.05rem; font-weight: 700; color: var(--gold-dark); }
+
+    .item-list { list-style: none; }
+
+    .item-list li {
+      position: relative;
+      padding-left: 18px;
+      font-size: 0.88rem;
+      color: #333;
+      margin-bottom: 7px;
+    }
+
+    .item-list li::before {
+      content: "\2022";
+      position: absolute;
+      left: 0;
+      color: var(--primary-gold);
+      font-weight: bold;
+      font-size: 1.1rem;
+      line-height: 1;
+    }
+
+    .line-item-group { display: flex; flex-direction: column; gap: 10px; }
+
+    .line-item-box {
+      background: var(--subtle-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      padding: 12px 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+    }
+
+    .line-item-info { flex: 1; }
+
+    .line-item-name { font-size: 0.92rem; font-weight: 600; color: var(--charcoal); margin-bottom: 4px; }
+
+    .line-item-sublist {
+      list-style: none;
+      padding-left: 14px;
+      font-size: 0.82rem;
+      color: var(--text-muted);
+    }
+
+    .line-item-sublist li { position: relative; margin-bottom: 3px; }
+    .line-item-sublist li::before { content: "-"; position: absolute; left: -12px; }
+
+    .line-item-note {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      font-style: italic;
+      margin-top: 2px;
+    }
+
+    .line-item-price {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--gold-dark);
+      white-space: nowrap;
+    }
+
+    .inline-price { font-weight: 400; }
+
+    .total-row-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 12px 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 12px;
+    }
+
+    .total-row-card.grand {
+      border: 2px solid var(--primary-gold);
+      background: var(--subtle-bg);
+    }
+
+    .total-row-title { font-size: 0.92rem; font-weight: 600; color: var(--charcoal); }
+    .total-row-amount { font-size: 1.05rem; font-weight: 700; color: var(--gold-dark); text-align: right; }
+    .grand .total-row-title { font-size: 1rem; font-weight: 700; }
+    .grand .total-row-amount { font-size: 1.2rem; }
+
+    .draft-note {
+      display: inline-block;
+      margin-top: 2px;
+      padding: 4px 12px;
+      border: 1px solid var(--primary-gold);
+      border-radius: 20px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--gold-dark);
+      background: var(--subtle-bg);
+      margin-bottom: 14px;
+    }
+
+    @media print {
+      html, body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .header-card, .section-card, .total-row-card, .line-item-box {
+        break-inside: avoid;
+        page-break-inside: avoid;
+      }
+    }
+  </script>
 <script>
 (function () {
   var $ = function (s) { return document.querySelector(s); };
@@ -490,6 +806,7 @@
     $('#vl').classList.remove('show');
     $('#pay').classList.remove('show');
     $('#tl').classList.remove('show');
+    $('#qe').classList.remove('show');
     cur = null;
     $('#dActs').innerHTML = '';
   }
@@ -589,7 +906,7 @@
 
 
   /* ---------- quotes sent + outside vendors ---------- */
-  var APP_VERSION = 'v14-Nov-e';   // shown under Outside vendors, so you can tell which Index.html is running
+  var APP_VERSION = 'v16-Nov-a';   // shown under Outside vendors, so you can tell which Index.html is running
   var GH_REPO = 'ivoryeventz-ops/Ivory-Packages', GH_BRANCH = 'main', GH_SITE = 'https://ivory-packages.pages.dev';
   // The 12 standard outside vendors (same list as VENDOR_NAMES in Code.gs).
   var VNAMES = ['Garland and Bouquet', 'Wedding cake', 'Confetti', 'Cold Spark', 'Dry Ice', 'Ambiance lighting',
@@ -625,7 +942,7 @@
       .toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
   }
 
-  var ghTree = null, ghTreeAt = 0, ghCache = {}, ghPay = {};
+  var ghTree = null, ghTreeAt = 0, ghCache = {}, ghPay = {}, ghImgs = {};
   function ghTreeGet(maxAge) {
     if (ghTree && Date.now() - ghTreeAt < (maxAge || 300000)) return Promise.resolve(ghTree);
     return fetch('https://api.github.com/repos/' + GH_REPO + '/git/trees/' + GH_BRANCH + '?recursive=1')
@@ -637,6 +954,8 @@
           if (m) (t[m[1]] = t[m[1]] || []).push(m[2]);
           var pm = /^([^\/]+)\/payment\.html$/.exec(x.path);
           if (pm) ghPay[pm[1]] = 1;
+          var im = /^([^\/]+)\/([^\/]+\.(?:jpe?g|png|webp|gif))$/i.exec(x.path);
+          if (im) (ghImgs[im[1]] = ghImgs[im[1]] || []).indexOf(im[2]) < 0 && ghImgs[im[1]].push(im[2]);
         });
         ghTree = t; ghTreeAt = Date.now();
         return t;
@@ -651,6 +970,7 @@
     entry.p = fetch('https://raw.githubusercontent.com/' + GH_REPO + '/' + GH_BRANCH + '/' + encodeURIComponent(folder) + '/' + no + '.html' + (fresh ? '?t=' + Date.now() : ''))
       .then(function (r) { if (!r.ok) throw new Error('quote ' + no + ' not readable'); return r.text(); })
       .then(function (html) {
+        var rawHtml = html;   // kept untouched, so "Edit as new quote" can rebuild the page from it
         html = html.replace(/></g, '> <');   // keeps neighbouring items apart in the page text, so "₹ 15,000" + "Anchor / MC" never glue into one word
         var doc = new DOMParser().parseFromString(html, 'text/html'), date = null, venue = '';
         Array.prototype.forEach.call(doc.querySelectorAll('.info-item'), function (it) {
@@ -701,7 +1021,7 @@
         var text = ((doc.body && doc.body.textContent) || '').replace(/\s+/g, ' ');
         var cut = text.search(/Complimentary Wedding Management/i);   // the free services are not outside vendors
         if (cut > 0) text = text.slice(0, cut);
-        return { no: no, src: 'cloud', folder: folder, url: GH_SITE + '/' + encodeURIComponent(folder) + '/' + no, date: date, venue: venue, text: text, outside: outside, items: items, scan: scan };
+        return { no: no, src: 'cloud', folder: folder, url: GH_SITE + '/' + encodeURIComponent(folder) + '/' + no, date: date, venue: venue, text: text, outside: outside, items: items, scan: scan, raw: rawHtml };
       })
       .catch(function (e) { if (ghCache[k] === entry) delete ghCache[k]; throw e; });
     return entry.p;
@@ -820,6 +1140,9 @@
       '<span class="qs">Rates, discount and advance - send to client</span></span><span class="go">Edit &amp; send &rsaquo;</span></button>';
     h += '<button type="button" class="qrow payrow" data-act="tl"><span><b>Wedding timeline</b>' + (FL.tl[wkey(it)] ? '<span class="tag">Sent</span>' : '') +
       '<span class="qs">Wedding day guide - filled in from the latest quote</span></span><span class="go">Edit &amp; send &rsaquo;</span></button>';
+    if (!list.some(function (q) { return q.src === 'cloud' && q.raw; })) {
+      h += '<button type="button" class="qrow payrow" data-act="qnew"><span><b>New quote</b><span class="qs">Build a quote from the packages and add-ons</span></span><span class="go">Start &rsaquo;</span></button>';
+    }
     if (!list.length) {
       h += '<div class="note">No quote has been sent to ' + esc(it.name) + ' for this date yet.</div>';
     } else {
@@ -827,6 +1150,10 @@
         var inner = '<span><b>Quote #' + esc(q.no || '-') + '</b>' + (i === 0 ? '<span class="tag">Latest</span>' : '') +
           '<span class="qs">' + (sentLabel(q.no) ? 'Sent ' + sentLabel(q.no) : 'Date not recorded') +
           (q.src === 'site' ? ' &middot; Google Site' : (q.venue ? ' &middot; ' + esc(q.venue) : '')) + '</span></span>';
+        if (q.src === 'cloud' && q.raw) {
+          return '<div class="qwrap"><a class="qrow" href="' + esc(q.url) + '" target="_blank" rel="noopener">' + inner + '<span class="go">Open &rsaquo;</span></a>' +
+            '<button type="button" class="qedit" data-act="qedit" data-no="' + esc(q.no) + '">Edit as new quote</button></div>';
+        }
         return q.url
           ? '<a class="qrow" href="' + esc(q.url) + '" target="_blank" rel="noopener">' + inner + '<span class="go">Open &rsaquo;</span></a>'
           : '<div class="qrow">' + inner + '</div>';
@@ -914,6 +1241,9 @@
   $('#dQuotes').addEventListener('click', function (e) {
     if (e.target.closest('[data-act="pay"]') && cur) { openPay(cur, lastQ); return; }
     if (e.target.closest('[data-act="tl"]') && cur) { tlOpen(cur, lastQ); return; }
+    var qe = e.target.closest('[data-act="qedit"]');
+    if (qe && cur) { var no = qe.getAttribute('data-no'); qeOpen(cur, lastQ, lastQ.filter(function (x) { return x.no === no && x.src === 'cloud'; })[0] || null); return; }
+    if (e.target.closest('[data-act="qnew"]') && cur) { qeOpen(cur, lastQ, null); return; }
     if (e.target.closest('[data-act="reload"]') && cur) loadDetail(cur);
   });
   $('#dVend').addEventListener('click', function (e) {
@@ -1200,6 +1530,451 @@
       P.adv[+row.getAttribute('data-a')][f] = t.value;
     }
     paySum();
+  });
+
+
+
+  /* ---------- edit as new quote: saves a new <Client>/<YYMMDD>.html in the packages repo, the old quote is never touched ---------- */
+  /* QE-PURE-BEGIN */
+  var QE_CAT = [{"g":"Choose your package","n":"Package 1","p":75000},{"g":"Choose your package","n":"Package 2","p":105000},{"g":"Choose your package","n":"Package 3","p":115000},{"g":"Choose your package","n":"Package 4","p":135000},{"g":"Choose your package","n":"Package 5","p":145000},{"g":"Choose your package","n":"Package 6","p":160000},{"g":"Choose your package","n":"Package 7","p":170000},{"g":"Choose your package","n":"Package 8","p":180000},{"g":"Choose your package","n":"Package 9","p":200000},{"g":"Choose your package","n":"Package 10","p":220000},{"g":"Choose your package","n":"Package 11","p":240000},{"g":"Choose your package","n":"Package 12","p":280000},{"g":"Choose your package","n":"Package 13","p":300000},{"g":"Church decoration","n":"Church — Artificial flowers","p":15000,"d":"Entrance arch (Artificial ) and 2 fresh flower stands beside couple"},{"g":"Church decoration","n":"Church — Artificial arch + Fresh flower stands","p":25000,"d":"Entrance arch (artificial), aisle stands (fresh roses & gypsophila), and 2 stands beside couple (fresh)"},{"g":"Church decoration","n":"Church — Fresh flowers","p":40000,"d":"Entrance arch, aisle stands (roses & gypsophila), and 2 couple stands — all in fresh flowers"},{"g":"Church extras","n":"Wedding chairs for couple","p":1500,"d":"2 decorated chairs for church"},{"g":"Church extras","n":"Altar flowers","p":1500,"d":"2 fresh flower sets for the altar"},{"g":"Church extras","n":"Premium Garland & Bouquet","p":5000,"d":"2 greeting garlands + 2 bouquets (fresh baby's breath)"},{"g":"Cake","n":"Two tier cake","p":4500,"d":"Top tier real cake, bottom dummy tier, fondant icing"},{"g":"Cake","n":"Three tier cake","p":6000,"d":"Top tier real cake, bottom two dummy layers, fondant icing"},{"g":"Special effects","n":"Flower Confetti","p":10000,"d":"Fresh rose petals shot from a cannon during entry or cake cutting"},{"g":"Special effects","n":"Cold spark fountain","p":15000,"d":"Indoor-safe fire sparkler fountains (no heat, no smoke)"},{"g":"Special effects","n":"Confetti + Cold spark combo","p":25000,"d":"Combined flower confetti cannon and cold spark fountains"},{"g":"Special effects","n":"Extra cold spark shots","p":500,"d":"Per extra shot, per machine","q":["Qty",1]},{"g":"Special effects","n":"Cool fire","p":5000,"d":"Low-heat flame effects (not recommended; may produce minor smoke and odour, and require prior hall approval)."},{"g":"Special effects","n":"Dry ice fog — stage","p":15000,"d":"Low-lying white cloud fog from both sides of the stage"},{"g":"Special effects","n":"Dry ice fog — ramp","p":15000,"d":"Low-lying cloud fog along the ramp onto stage"},{"g":"Hall décor","n":"Standard pathway stands","p":15000,"d":"Flower stands along the walkway aisle"},{"g":"Hall décor","n":"Premium pathway light stands","p":30000,"d":"Pillar stands with flowers along the aisle with lights or candles"},{"g":"Hall décor","n":"Premium entrance arch","p":15000,"d":"Bigger, heavy-decorated entrance arch at the hall door"},{"g":"Hall décor","n":"Side curtain for main hall","p":30000,"d":"Full wall-drapes for plain hall walls"},{"g":"Hall décor","n":"Ambient lighting in hall","p":35000,"d":"Color mood ambiance lights in hall with additional power support as required."},{"g":"Hall décor","n":"Premium signage board","p":7500,"d":"Large custom-designed welcome board featuring the couple names/photo"},{"g":"Hall décor","n":"Ramp onto stage with flowers","p":30000,"d":"20 ft x 8 ft walkway ramp onto stage with flowers along both sides"},{"g":"Family table","n":"Premium family table","p":25000,"d":"Curved or round VIP table, 12 gold chairs, dinnerware, and table centrepieces"},{"g":"Family table","n":"Family table on hall tables","p":10000,"d":"Setup on hall tables, 12 acrylic chairs, dinnerware, and table centrepieces"},{"g":"Guest tables","n":"Tiffany chairs – Theatre style","p":75,"d":"Tiffany chairs in rows, theatre-style seating","q":["Chairs",100]},{"g":"Parking security","n":"Normal security","p":1200,"d":"Security guards in uniform for parking and entrance (minimum 2)","q":["Qty",2]},{"g":"Parking security","n":"Tall men security / Bouncers","p":1500,"d":"Security in black suits, above 6 ft tall (minimum 2)","q":["Qty",2]},{"g":"Live band and anchor","n":"Standard band","p":25000,"d":"Fixed song list: keyboard, rhythm pad, violin (instrumental) plus sound system"},{"g":"Live band and anchor","n":"Premium band","p":40000,"d":"Interactive performance: keyboard, rhythm pad, violin (instrumental) plus sound system"},{"g":"Live band and anchor","n":"Band with vocalist","p":40000,"d":"Keyboard, violin, and 4 singers (English devotional & worship) plus sound system"},{"g":"Live band and anchor","n":"Professional anchor / MC","p":10000,"d":"Stage host for reception, entries, and guest announcements"},{"g":"Wedding cars","n":"Mercedes Benz E","p":10500,"d":"White luxury sedan","q":["Cars",1]},{"g":"Wedding cars","n":"Audi A6","p":10500,"d":"White luxury sedan","q":["Cars",1]},{"g":"Wedding cars","n":"BMW 5","p":10500,"d":"White luxury sedan (also available in dark green)","q":["Cars",1]},{"g":"Wedding cars","n":"Jaguar XF","p":12500,"d":"White luxury sedan","q":["Cars",1]},{"g":"Wedding cars","n":"BMW 5 Series (New model)","p":18500,"d":"White latest model sedan","q":["Cars",1]},{"g":"Wedding cars","n":"Mercedes S Class","p":20500,"d":"White flagship VIP sedan","q":["Cars",1]},{"g":"Wedding cars","n":"Land Rover Defender","p":45000,"d":"Black or white luxury SUV","q":["Cars",1]},{"g":"Generator","n":"Generator","p":8000,"d":"Dedicated generator for stage sound and lighting (included by default – untick if not required)"},{"g":"Covers for venue's existing furniture","n":"Table covers","p":0,"d":"Covers for the venue's existing tables","q":["Tables",1]},{"g":"Covers for venue's existing furniture","n":"Chair covers","p":16,"d":"Covers for the venue's existing chairs","q":["Chairs",1]},{"g":"Pagoda / tent","n":"Pagoda / tent","p":7000,"d":"Pagoda or tent for the welcome juice / mocktail counter","q":["Pagodas",1]},{"g":"Live band platform","n":"Custom raised wooden stage platform","p":5000,"d":"Raised wooden platform for the live band"},{"g":"Bride's wedding car decoration","n":"Bride's wedding car decoration","p":3000,"d":"Decoration for the bride's wedding car"}];
+  var QE_INC = ['White flex or carpet on stage', 'Sofa', 'Welcome drink for couple', 'Single layer fresh cream cake', '3 candles', 'Fresh leaves on stage',
+    'Stage floral settings artificial', 'Stage lights and facelights', 'Stage sound system', 'Centre carpet along aisle', 'Hall entrance arch artificial',
+    'Wedding car decoration fresh', 'Greeting garland and bouquet fresh', 'Wedding signage board', '2 welcome hostesses', 'Manthrakodi basket and ring box returnable'];
+  var QE_DROP = /grand\s*total|discounted\s*total|^discount\b|^total\b/i;   // sums that would go stale the moment a rate changes
+
+  function qeInclusions(pkg) {
+    var a = QE_INC.slice();
+    if (pkg === 'Package 1') {
+      a = a.filter(function (t) { return t !== 'White flex or carpet on stage' && t !== '2 welcome hostesses'; })
+        .map(function (t) { return t === 'Stage lights and facelights' ? 'Stage lights' : t; });
+    }
+    return ['Stage Decoration including'].concat(a);
+  }
+
+  // Reads an existing quote page into an editable model: header, stage photo, and every section with its inclusions, priced lines and rate cards.
+  function qeParse(raw) {
+    var doc = new DOMParser().parseFromString(raw, 'text/html'), M = { name: '', date: '', venue: '', img: '', secs: [], dropped: [] };
+    var cont = doc.querySelector('.container') || doc.body;
+    var tx = function (el) { return ((el && el.textContent) || '').replace(/\s+/g, ' ').trim(); };
+    var each = function (list, fn) { Array.prototype.forEach.call(list, fn); };
+    var amt = function (el) {
+      if (!el) return null;
+      var c = el.cloneNode(true);
+      each(c.querySelectorAll('.strike'), function (z) { z.parentNode.removeChild(z); });   // an old, struck-through price
+      var m = /(\d[\d,]*)/.exec(c.textContent || '');
+      return m ? parseInt(m[1].replace(/,/g, ''), 10) : null;
+    };
+    var addTotal = function (sec, el) {
+      var a = el.querySelector('.total-row-amount'), t = tx(el.querySelector('.total-row-title'));
+      if (!a || a.classList.contains('struck') || a.querySelector('.strike')) return;
+      if (QE_DROP.test(t)) { M.dropped.push(t); return; }
+      var v = amt(a);
+      if (v != null) sec.totals.push({ title: t, amount: v });
+    };
+    var last = function () {
+      if (!M.secs.length) M.secs.push({ title: '', bullets: [], lines: [], totals: [] });
+      return M.secs[M.secs.length - 1];
+    };
+    each(cont.children, function (el) {
+      var cl = el.classList;
+      if (cl.contains('header-card')) {
+        each(el.querySelectorAll('.info-item'), function (it) {
+          var l = tx(it.querySelector('.info-label')).toLowerCase(), v = tx(it.querySelector('.info-value'));
+          if (l === 'name') M.name = v; else if (l === 'date') M.date = isoFromText(v) || ''; else if (l === 'venue') M.venue = v;
+        });
+      } else if (cl.contains('image-card')) {
+        var im = el.querySelector('img'); if (im) M.img = im.getAttribute('src') || '';
+      } else if (cl.contains('total-row-card')) {
+        addTotal(last(), el);
+      } else if (cl.contains('section-card')) {
+        var title = tx(el.querySelector('.section-title'));
+        if (/complimentary|payment\s*terms/i.test(title)) return;   // the free services are regenerated for every quote
+        var s = { title: title, bullets: [], lines: [], totals: [] };
+        each(el.querySelectorAll('ul.item-list > li'), function (li) { var t = tx(li); if (t) s.bullets.push(t); });
+        each(el.querySelectorAll('.line-item-box'), function (b) {
+          var nm = tx(b.querySelector('.line-item-name')); if (!nm) return;
+          var subs = []; each(b.querySelectorAll('.line-item-sublist li'), function (li) { subs.push(tx(li)); });
+          var pe = b.querySelector('.line-item-price'), pv = amt(pe);
+          s.lines.push({ name: nm, subs: subs, note: tx(b.querySelector('.line-item-note')), rate: pv, qty: 1, ptext: pv == null ? tx(pe) : '' });   // a price that is a word, e.g. "Complimentary", is kept as text
+        });
+        var sp = el.querySelector('.section-price');
+        if (sp && amt(sp) != null) s.totals.push({ title: 'Decor Package', amount: amt(sp) });
+        each(el.querySelectorAll('.total-row-card'), function (tc) { addTotal(s, tc); });
+        if (s.title || s.bullets.length || s.lines.length || s.totals.length) M.secs.push(s);
+      }
+    });
+    return M;
+  }
+
+  function qeLineAmount(l) {
+    if (l.rate == null || l.rate === '') return null;
+    return num(l.rate) * Math.max(1, num(l.qty) || 1);
+  }
+  function qeLineName(l) {
+    var q = Math.max(1, num(l.qty) || 1), n = String(l.name || '').trim();
+    return (q > 1 && !new RegExp('(^|\\D)' + q + '(\\D|$)').test(n)) ? n + ' - ' + q + ' No.s' : n;
+  }
+  function qeMoney(n) { return '&#8377; ' + Number(n).toLocaleString('en-IN'); }
+
+  function qeComplimentary(isPkg1, hasAnchor) {
+    var hostess = '<li><strong>Two welcome hostesses:</strong> assisting with the welcome drink, candle lighting and cake cutting, and with guests during the photo session.</li>';
+    var note = '<div class="service-note"><strong>A note on the welcome hostesses:</strong> they support the ceremonies and guests listed above, but they do not anchor or host the reception. If you would like a professional Anchor / MC to host, announce, engage with guests and run the reception programme, one can be arranged at an additional cost.</div>';
+    return '<div class="section-card">\n<div class="section-header"><span class="section-title">Ivory Events Complimentary Wedding Management</span></div>\n'
+      + '<p class="services-intro">Elegantly coordinated. Thoughtfully executed. Seamlessly delivered.</p>\n'
+      + '<div class="timeline-title">Two days before the wedding &ndash; Planning &amp; Preparation</div><ul class="item-list">\n'
+      + '<li><strong>Wedding day timeline:</strong> a detailed schedule of key activities, timings and transitions.</li>\n'
+      + '<li><strong>Anchor / MC event flow:</strong> a sample script and structured programme flow for the reception.</li></ul>\n'
+      + '<div class="timeline-title">Day before the wedding &ndash; Final Coordination</div><ul class="item-list">\n'
+      + '<li><strong>Complete service supervision:</strong> coordination and supervision of all services booked through Ivory Events.</li>\n'
+      + '<li><strong>Final readiness check:</strong> confirming every arrangement is in place for the celebrations.</li></ul>\n'
+      + '<div class="timeline-title">Wedding Day &ndash; Church Ceremony</div><ul class="item-list">\n'
+      + '<li><strong>Manthrakodi &amp; ring box:</strong> arranged and handed over at the church entrance.</li>\n'
+      + '<li><strong>Bridal procession boards:</strong> elegant &ldquo;Here Comes the Groom&rdquo; and &ldquo;Here Comes the Bride&rdquo; boards.</li>\n'
+      + '<li><strong>Bridal entry assistance:</strong> guidance and coordination for a graceful entry into the church.</li>\n'
+      + '<li><strong>Garland &amp; bouquet assistance:</strong> support with arrangements following the ceremony.</li></ul>\n'
+      + '<div class="timeline-title">Wedding Day &ndash; Reception</div><ul class="item-list">\n'
+      + '<li><strong>Bridal party entry:</strong> guidance and coordination for the reception entrance.</li>\n'
+      + '<li><strong>Stage music coordination:</strong> dedicated music cues for<ul class="sub-bullets"><li>Bridal entry</li><li>Welcome drink</li><li>Candle lighting</li><li>Cake cutting</li></ul></li>\n'
+      + (isPkg1 ? '' : hostess + '\n')
+      + '<li><strong>Stage photography assistance:</strong> coordination to keep the photography flowing smoothly.</li></ul>\n'
+      + ((isPkg1 || hasAnchor) ? '' : note + '\n')
+      + '</div>';
+  }
+
+  // The new quote page: same theme and layout as the Abraham quote pages, never a grand total.
+  function qeHtml(Q, css) {
+    var dateStr = Q.date ? toDate(Q.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : '';
+    var title = 'Decor Quote - ' + Q.name;
+    var pageUrl = GH_SITE + '/' + encodeURIComponent(Q.folder) + '/' + Q.no;
+    var isPkg1 = Q.pkg === 'Package 1' || Q.secs.some(function (s) { return /^package 1$/i.test(s.title); });
+    var all = Q.secs.concat([Q.custom]);
+    var hasAnchor = all.some(function (s) { return s.lines.some(function (l) { return /\banchor\b|\bmc\b/i.test(l.name); }); });
+    var h = [];
+    h.push('<!DOCTYPE html>\n<html lang="en">\n<head>\n  <meta charset="UTF-8" />\n  <meta name="viewport" content="width=device-width, initial-scale=1.0" />\n  <meta name="robots" content="noindex" />');
+    h.push('  <title>' + esc(title) + '</title>');
+    h.push('  <meta property="og:type" content="website" />\n  <meta property="og:site_name" content="Ivory Events" />\n  <meta property="og:title" content="' + esc(title) + '" />');
+    h.push('  <meta property="og:description" content="' + esc('Ivory Events wedding decor quote - ' + dateStr + (Q.venue ? ', ' + Q.venue : '')) + '" />');
+    h.push('  <meta property="og:url" content="' + esc(pageUrl) + '" />\n  <meta property="og:image" content="' + GH_SITE + '/ivory-logo.jpg" />\n  <meta property="og:image:alt" content="Ivory Events logo" />');
+    h.push('  <meta name="twitter:card" content="summary" />\n  <meta name="twitter:image" content="' + GH_SITE + '/ivory-logo.jpg" />');
+    h.push('  <link rel="preconnect" href="https://fonts.googleapis.com">\n  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>');
+    h.push('  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">');
+    h.push('  <style>' + css + '</style>\n</head>\n<body>\n\n  <div class="container">');
+    h.push('    <div class="header-card">\n      <h1 class="brand-title">Decor Quote</h1>\n      <p class="sub-title">Wedding Decor</p>\n      <div class="draft-note">Decor Quote - ' + esc(Q.no) + '</div>\n\n      <div class="info-grid">');
+    h.push('        <div class="info-item"><div class="info-label">Name</div><div class="info-value">' + esc(Q.name) + '</div></div>');
+    h.push('        <div class="info-item"><div class="info-label">Date</div><div class="info-value">' + esc(dateStr) + '</div></div>');
+    h.push('        <div class="info-item"><div class="info-label">Venue</div><div class="info-value">' + esc(Q.venue) + '</div></div>\n      </div>\n    </div>');
+    if (Q.img) {
+      h.push('    <div class="image-card">\n      <div class="image-title">Stage Design Concept &amp; Reference</div>\n      <div class="image-wrapper">\n        <img src="' + esc(Q.img) +
+        '" alt="' + esc('Reference photograph of the proposed wedding stage design - ' + Q.name) + '" loading="lazy" decoding="async" />\n      </div>\n    </div>');
+    }
+    all.forEach(function (s) {
+      var lines = s.lines.filter(function (l) { return String(l.name || '').trim(); });
+      var totals = s.totals.filter(function (t) { return String(t.title || '').trim() && t.amount !== '' && t.amount != null; });
+      var bullets = s.bullets.filter(function (b) { return String(b || '').trim(); });
+      if (!String(s.title || '').trim() && !bullets.length && !lines.length && !totals.length) return;
+      var c = ['    <div class="section-card">'];
+      if (String(s.title || '').trim()) c.push('      <div class="section-header">\n        <span class="section-title">' + esc(s.title.trim()) + '</span>\n      </div>');
+      if (bullets.length) c.push('      <ul class="item-list">\n' + bullets.map(function (b) { return '        <li>' + esc(b.trim()) + '</li>'; }).join('\n') + '\n      </ul>');
+      if (lines.length) {
+        c.push('      <div class="line-item-group">\n' + lines.map(function (l) {
+          var a = qeLineAmount(l), subs = (l.subs || []).filter(function (x) { return String(x || '').trim(); });
+          return '        <div class="line-item-box">\n          <div class="line-item-info">\n            <div class="line-item-name">' + esc(qeLineName(l)) + '</div>' +
+            (subs.length ? '\n            <ul class="line-item-sublist">\n' + subs.map(function (x) { return '              <li>' + esc(x.trim()) + '</li>'; }).join('\n') + '\n            </ul>' : '') +
+            (String(l.note || '').trim() ? '\n            <div class="line-item-note">' + esc(l.note.trim()) + '</div>' : '') +
+            '\n          </div>' + (a != null ? '\n          <div class="line-item-price">' + qeMoney(a) + '</div>' : (String(l.ptext || '').trim() ? '\n          <div class="line-item-price">' + esc(l.ptext.trim()) + '</div>' : '')) + '\n        </div>';
+        }).join('\n') + '\n      </div>');
+      }
+      totals.forEach(function (t) {
+        c.push('      <div class="total-row-card">\n        <span class="total-row-title">' + esc(t.title.trim()) + '</span>\n        <span class="total-row-amount">' + qeMoney(num(t.amount)) + '</span>\n      </div>');
+      });
+      c.push('    </div>');
+      h.push(c.join('\n'));
+    });
+    h.push(qeComplimentary(isPkg1, hasAnchor));
+    h.push('  </div>\n\n</body>\n</html>\n');
+    return h.join('\n');
+  }
+  /* QE-PURE-END */
+
+  var Q = null, qeSrv = null, qeCssText = '';
+  function qeCss() { if (!qeCssText) qeCssText = ($('#qeCss') || {}).textContent || ''; return qeCssText; }
+  function qeStatus(msg, err) { var el = $('#qeState'); if (el) { el.className = 'pst' + (err ? ' err' : ''); el.innerHTML = msg; } }
+  function qeTodayNo() { var t = (typeof today === 'string' && today) || ''; return t ? t.slice(2, 4) + t.slice(5, 7) + t.slice(8, 10) : ''; }
+  function qeTaken(no) { return !!(ghTree && ghTree[Q.folder] && ghTree[Q.folder].indexOf(no) >= 0); }
+  function qeBlankSec(title) { return { title: title || '', bullets: [], lines: [], totals: [] }; }
+
+  function qeOpen(it, list, src) {
+    var folder = payFolder(it, list);
+    var M = src && src.raw ? qeParse(src.raw) : { name: '', date: '', venue: '', img: '', secs: [], dropped: [] };
+    Q = { it: it, list: list, folder: folder, base: src ? src.no : '', name: M.name || it.name || '', date: M.date || it.date || '', venue: M.venue || (src && src.venue) || it.venue || '',
+      img: M.img, imgChoice: 'keep', upload: null, secs: M.secs, dropped: M.dropped, custom: qeBlankSec('Additional Items'), pkg: null, no: qeTodayNo(), replace: false };
+    if (!Q.secs.length) Q.secs.push(qeBlankSec('Decor Package'));
+    Q.custom.lines.push({ name: '', subs: [], note: '', rate: null, qty: 1 });
+    $('#qeMeta').textContent = it.name + ' - ' + fmt(it.date) + (src ? '  (started from quote #' + src.no + ' - that quote stays as it is)' : '  (new quote)');
+    qeRender();
+    qeAskKey();
+    openSheet('#qe');
+    var note = Q.dropped.length ? 'Left out of the new quote: ' + esc(Q.dropped.join(', ')) + ' (they would no longer add up once rates change).' : '';
+    if (src && !M.secs.length) note = 'This older quote page has a different layout, so nothing could be carried over. Build the new quote below.';
+    qeStatus(note, false);
+    if (ghTree === null) ghTreeGet(0).then(function () { if (Q) qeRender(); }, function () {});
+  }
+
+  function qeNum(v) { return num(v) ? num(v).toLocaleString('en-IN') : ''; }
+  function qeLineRows(s, si) {
+    return s.lines.map(function (l, li) {
+      var a = qeLineAmount(l), shown = qeLineName(l);
+      return '<div class="qline" data-s="' + si + '" data-l="' + li + '">' +
+        '<div class="qlh"><input data-f="name" value="' + esc(l.name) + '" placeholder="Service name" aria-label="Service name">' +
+        '<button type="button" class="x" data-act="lmove" data-d="-1" aria-label="Move up">&uarr;</button><button type="button" class="x" data-act="lmove" data-d="1" aria-label="Move down">&darr;</button>' +
+        '<button type="button" class="x del" data-act="ldel" aria-label="Remove">&times;</button></div>' +
+        '<div class="qnum"><label>Rate &#8377;<input data-f="rate" inputmode="numeric" value="' + qeNum(l.rate) + '" placeholder="blank = no price"></label>' +
+        '<label>' + esc(l.ql || 'Qty') + '<input data-f="qty" inputmode="numeric" value="' + (num(l.qty) > 1 ? num(l.qty) : '') + '" placeholder="1"></label>' +
+        '<span class="qamt">' + (a != null ? inr(a) : '') + '</span></div>' +
+        (l.ptext ? '<input data-f="ptext" value="' + esc(l.ptext) + '" placeholder="Price shown as text" aria-label="Price shown as text">' : '') +
+        '<div class="qshown">' + (shown !== String(l.name || '').trim() ? 'Shown on the quote as: ' + esc(shown) : '') + '</div>' +
+        '<textarea data-f="subs" rows="' + Math.max(2, (l.subs || []).length) + '" placeholder="Details under the name - one per line (optional)">' + esc((l.subs || []).join('\n')) + '</textarea>' +
+        '<input data-f="note" value="' + esc(l.note || '') + '" placeholder="Small note under the details (optional)" aria-label="Note"></div>';
+    }).join('');
+  }
+  function qeSecHtml(s, si, custom) {
+    var h = '<div class="qsec' + (custom ? ' qcustom' : '') + '" data-s="' + (custom ? 'c' : si) + '">';
+    if (custom) {
+      h += '<h4>Other services <span class="qhint">not in the package list - type the service and its rate</span></h4>';
+    } else {
+      h += '<div class="qsh"><input data-f="title" value="' + esc(s.title) + '" placeholder="Section title (optional)" aria-label="Section title">' +
+        '<button type="button" class="x" data-act="smove" data-d="-1" aria-label="Move section up">&uarr;</button><button type="button" class="x" data-act="smove" data-d="1" aria-label="Move section down">&darr;</button>' +
+        '<button type="button" class="x del" data-act="sdel" aria-label="Remove section">&times;</button></div>';
+    }
+    if (!custom && (s.bullets.length || s.showB)) {
+      h += '<div class="qlab">Inclusions - one per line</div><textarea data-f="bullets" rows="' + Math.min(14, Math.max(3, s.bullets.length + 1)) + '">' + esc(s.bullets.join('\n')) + '</textarea>';
+    }
+    h += qeLineRows(s, custom ? 'c' : si);
+    if (!custom) {
+      s.totals.forEach(function (t, ti) {
+        h += '<div class="qtot" data-s="' + si + '" data-t="' + ti + '"><input data-f="ttitle" value="' + esc(t.title) + '" aria-label="Rate card title"><input class="amt" data-f="tamount" inputmode="numeric" value="' + qeNum(t.amount) + '" aria-label="Rate card amount">' +
+          '<button type="button" class="x del" data-act="tdel" aria-label="Remove">&times;</button></div>';
+      });
+    }
+    h += '<div class="qbtns"><button type="button" class="pbtn" data-act="ladd" data-s="' + (custom ? 'c' : si) + '">+ Add line</button>';
+    if (!custom) {
+      if (!s.bullets.length && !s.showB) h += '<button type="button" class="pbtn" data-act="badd" data-s="' + si + '">+ Inclusions list</button>';
+      h += '<button type="button" class="pbtn" data-act="tadd" data-s="' + si + '">+ Rate card</button>';
+      if (/decor package|^package/i.test(s.title) || s.totals.some(function (t) { return /decor package/i.test(t.title); })) h += '<button type="button" class="pbtn" data-act="sinc" data-s="' + si + '">Use standard inclusions</button>';
+    }
+    return h + '</div></div>';
+  }
+  function qeSum() {
+    var n = 0;
+    Q.secs.concat([Q.custom]).forEach(function (s) { s.lines.forEach(function (l) { n += qeLineAmount(l) || 0; }); s.totals.forEach(function (t) { if (/package/i.test(t.title)) n += num(t.amount); }); });
+    var el = $('#qeSum'); if (el) el.textContent = n ? 'Package and lines add up to ' + inr(n) + ' (for your reference - not shown on the quote)' : '';
+  }
+  function qeImgOptions() {
+    var files = (ghImgs && ghImgs[Q.folder]) || [], o = '';
+    if (Q.img) o += '<option value="keep"' + (Q.imgChoice === 'keep' ? ' selected' : '') + '>Keep current: ' + esc(Q.img.split('/').pop()) + '</option>';
+    files.forEach(function (f) { if (f !== (Q.img || '').split('/').pop()) o += '<option value="f:' + esc(f) + '"' + (Q.imgChoice === 'f:' + f ? ' selected' : '') + '>' + esc(f) + ' (in this client folder)</option>'; });
+    o += '<option value="up"' + (Q.imgChoice === 'up' ? ' selected' : '') + '>Upload a new photo...</option><option value="none"' + (Q.imgChoice === 'none' ? ' selected' : '') + '>No stage photo</option>';
+    return o;
+  }
+  function qeRender() {
+    var tk = qeTaken(Q.no);
+    var h = '<h4>Quote details</h4>' +
+      '<label for="qeName">Name</label><input id="qeName" data-d="name" value="' + esc(Q.name) + '">' +
+      '<div class="qdt"><div><label for="qeDate">Wedding date</label><input id="qeDate" data-d="date" type="date" value="' + esc(Q.date) + '"></div>' +
+      '<div><label for="qeNo">New quote no.</label><input id="qeNo" data-d="no" inputmode="numeric" maxlength="6" value="' + esc(Q.no) + '"></div></div>' +
+      '<label for="qeVenue">Venue</label><input id="qeVenue" data-d="venue" value="' + esc(Q.venue) + '">' +
+      '<div class="qtaken" id="qeTaken"' + (tk ? '' : ' style="display:none"') + '><label class="tlchk"><input type="checkbox" id="qeRep"' + (Q.replace ? ' checked' : '') + '> Quote #' + esc(Q.no) +
+      ' already exists for this client - tick to replace it (the old page is overwritten)</label></div>' +
+      '<h4>Stage photo</h4><select id="qeImg" data-d="img">' + qeImgOptions() + '</select><input type="file" id="qeFile" accept="image/*" style="display:' + (Q.imgChoice === 'up' ? 'block' : 'none') + ';margin-top:8px">' +
+      '<h4>Stage, services and rates</h4><div class="note">Link a package or any add-on from the quote builder, change anything, or type your own services.</div>' +
+      '<button type="button" class="pbtn" data-act="cat">Add from packages</button><button type="button" class="pbtn" data-act="sadd">+ New section</button>' +
+      '<div id="qeCat" style="display:none"></div>' +
+      '<div id="qeSecs">' + Q.secs.map(function (s, i) { return qeSecHtml(s, i, false); }).join('') + '</div>' +
+      qeSecHtml(Q.custom, 'c', true) +
+      '<div class="qsum" id="qeSum"></div>' +
+      '<div id="qeKeyBox" style="display:none"><h4>GitHub key</h4><div class="note">Needed once only - saved for both phones (Contents read/write on Ivory-Packages).</div><input id="qeKey" type="password" autocomplete="off" placeholder="Paste GitHub key"></div>' +
+      '<button class="pbtn" type="button" data-act="qprev" style="margin-top:14px">Preview</button>' +
+      '<iframe id="qePrev" title="Preview of the new quote"></iframe>' +
+      '<button class="primary" id="qeSave" type="button" data-act="qsave">Save as new quote</button>' +
+      '<div class="pst" id="qeState"></div><div id="qeShare"></div>';
+    var keep = $('#qeState') ? $('#qeState').innerHTML : '', kerr = $('#qeState') ? $('#qeState').className : '';
+    $('#qeBody').innerHTML = h;
+    if (keep) { $('#qeState').innerHTML = keep; $('#qeState').className = kerr; }
+    qeSum();
+  }
+  function qeSection(si) { return si === 'c' ? Q.custom : Q.secs[+si]; }
+
+  function qeCatPanel() {
+    var q = (($('#qeCatQ') || {}).value || '').toLowerCase(), g = '', h = '', dflt = 0;
+    Q.secs.forEach(function (s, i) { if (s.lines.length) dflt = i; });   // add-ons go to the last section that already has priced lines
+    var opts = Q.secs.map(function (s, i) { return '<option value="' + i + '"' + (i === dflt ? ' selected' : '') + '>' + esc(s.title || 'Section ' + (i + 1)) + '</option>'; }).join('') + '<option value="n">A new section</option>';
+    QE_CAT.forEach(function (c, i) {
+      if (q && (c.n + ' ' + c.g + ' ' + (c.d || '')).toLowerCase().indexOf(q) < 0) return;
+      if (c.g !== g) { g = c.g; h += '<div class="qcg">' + esc(g) + '</div>'; }
+      h += '<button type="button" class="qci" data-act="cadd" data-ci="' + i + '"><span>' + esc(c.n) + (c.d ? '<small>' + esc(c.d) + '</small>' : '') + '</span><b>' + (c.p ? inr(c.p) : 'enter rate') + '</b></button>';
+    });
+    return '<div class="qcat"><div class="qcat-top"><input id="qeCatQ" type="search" placeholder="Search packages and add-ons" value="' + esc(($('#qeCatQ') || {}).value || '') + '">' +
+      '<label class="qlab">Add to<select id="qeCatTo">' + opts + '</select></label></div><div class="qcl" id="qeCatL">' + (h || '<div class="note">Nothing matches.</div>') + '</div></div>';
+  }
+  function qeAddCat(ci) {
+    var c = QE_CAT[ci]; if (!c) return;
+    if (c.g === 'Choose your package') {
+      Q.pkg = c.n;
+      var s = Q.secs.filter(function (x) { return /decor package|^package|stage decoration/i.test(x.title) || x.totals.some(function (t) { return /decor package/i.test(t.title); }); })[0];
+      if (!s) { s = qeBlankSec('Decor Package'); Q.secs.unshift(s); }
+      var t = s.totals.filter(function (x) { return /package/i.test(x.title); })[0];
+      if (t) t.amount = c.p; else s.totals.push({ title: 'Decor Package', amount: c.p });
+      if (!s.bullets.length) s.bullets = qeInclusions(c.n);
+      qeRender();
+      qeStatus((c.n + ' linked at ' + inr(c.p) + '. Change the rate in the rate card if the stage design is priced differently.'));
+      return;
+    }
+    var to = ($('#qeCatTo') || {}).value, sec = (to === 'n' || to == null || !Q.secs[+to]) ? null : Q.secs[+to];
+    if (!sec) { sec = qeBlankSec(to === 'n' ? '' : 'Additional Items'); Q.secs.push(sec); }
+    sec.lines.push({ name: c.n, subs: c.d ? [c.d] : [], note: '', rate: c.p || null, qty: c.q ? c.q[1] : 1, ql: c.q ? c.q[0] : '' });
+    var open = $('#qeCat').style.display !== 'none', qv = ($('#qeCatQ') || {}).value || '';
+    qeRender();
+    if (open) { $('#qeCat').style.display = ''; $('#qeCat').innerHTML = qeCatPanel(); if (qv) $('#qeCatQ').value = qv; }
+    qeStatus(esc(c.n) + ' added' + (c.p ? '' : ' - type its rate') + '.');
+  }
+
+  function qeCheck() {
+    if (!String(Q.name).trim()) return 'Type the name.';
+    if (!Q.date) return 'Pick the wedding date.';
+    if (!/^\d{6}$/.test(Q.no)) return 'The quote number is 6 digits (YYMMDD).';
+    if (qeTaken(Q.no) && !Q.replace) return 'Quote #' + Q.no + ' already exists - tick the box to replace it, or pick another number.';
+    var priced = Q.secs.concat([Q.custom]).some(function (s) { return s.lines.some(function (l) { return String(l.name || '').trim() && qeLineAmount(l); }) || s.totals.some(function (t) { return num(t.amount); }); });
+    if (!priced) return 'Add at least one priced service or package.';
+    var blank = []; Q.secs.concat([Q.custom]).forEach(function (s) { s.lines.forEach(function (l) { if (!String(l.name || '').trim() && (num(l.rate) || (l.subs || []).length)) blank.push('a line with a rate but no name'); }); });
+    if (blank.length) return 'There is ' + blank[0] + '.';
+    return '';
+  }
+  function qeAskKey() {
+    if (qeSrv === 'key') return;
+    call('api_pay_status', pin).then(function (r) { qeSrv = r && r.hasKey ? 'key' : 'nokey'; }, function () { qeSrv = 'nokey'; }).then(function () {
+      var b = $('#qeKeyBox'); if (b) b.style.display = qeSrv === 'nokey' ? '' : 'none';
+    });
+  }
+  function qeResize(file) {
+    return new Promise(function (res, rej) {
+      var fr = new FileReader();
+      fr.onerror = function () { rej(new Error('Could not read the photo')); };
+      fr.onload = function () {
+        var im = new Image();
+        im.onerror = function () { rej(new Error('That file is not a photo I can open')); };
+        im.onload = function () {
+          var sc = Math.min(1, 1400 / im.naturalWidth), c = document.createElement('canvas');
+          c.width = Math.round(im.naturalWidth * sc); c.height = Math.round(im.naturalHeight * sc);
+          c.getContext('2d').drawImage(im, 0, 0, c.width, c.height);
+          res(c.toDataURL('image/jpeg', 0.82).split(',')[1]);
+        };
+        im.src = fr.result;
+      };
+      fr.readAsDataURL(file);
+    });
+  }
+  function qeFinalImg() {   // resolves { img: src for the page, up: {name,b64} | null }
+    var ch = Q.imgChoice;
+    if (ch === 'none') return Promise.resolve({ img: '', up: null });
+    if (ch === 'up') {
+      var f = $('#qeFile') && $('#qeFile').files && $('#qeFile').files[0];
+      if (!f) return Promise.reject(new Error('Choose the stage photo, or pick another option.'));
+      var name = 'stage-' + Q.no + '.jpg';
+      return qeResize(f).then(function (b64) { return { img: name, up: { name: name, b64: b64 } }; });
+    }
+    if (ch.indexOf('f:') === 0) return Promise.resolve({ img: ch.slice(2), up: null });
+    return Promise.resolve({ img: Q.img, up: null });
+  }
+  function qeDone() {
+    var url = GH_SITE + '/' + encodeURIComponent(Q.folder) + '/' + Q.no, wa = 'https://wa.me/?text=' + encodeURIComponent('Decor quote - ' + Q.name + '\n' + url);
+    if (ghTree) { ghTree[Q.folder] = ghTree[Q.folder] || []; if (ghTree[Q.folder].indexOf(Q.no) < 0) ghTree[Q.folder].push(Q.no); }
+    qeStatus('Saved as quote #' + esc(Q.no) + '. The page is live in a minute or so.');
+    $('#qeShare').innerHTML = '<a class="wa" href="' + esc(wa) + '" target="_blank" rel="noopener">Send on WhatsApp</a> <a class="pbtn" style="display:inline-block;text-decoration:none" href="' + esc(url) + '" target="_blank" rel="noopener">Open page</a>';
+    if (cur) { delete dCache[wkey(cur)]; Object.keys(ghCache).forEach(function (k) { if (k.indexOf(Q.folder + '/') === 0) delete ghCache[k]; }); loadDetail(cur); }
+  }
+  function qePublish() {
+    var err = qeCheck(); if (err) { qeStatus(err, true); return; }
+    var ki = $('#qeKey'), typed = ki ? ki.value.trim() : '', tok = Q, btn = $('#qeSave');
+    if (qeSrv === 'nokey' && !typed) { qeStatus('Paste the GitHub key first.', true); return; }
+    btn.disabled = true; qeStatus('Saving...');
+    qeFinalImg().then(function (fi) {
+      Q.img = fi.img;
+      var args = { folder: Q.folder, no: Q.no, html: qeHtml(Q, qeCss()), replace: !!Q.replace, key: typed, message: 'Quote ' + Q.folder + '/' + Q.no + (Q.base ? ' (from ' + Q.base + ')' : '') };
+      if (fi.up) args.img = fi.up;
+      return call('api_quote_publish', pin, args);
+    }).then(function () {
+      qeSrv = 'key'; if (ki) ki.value = ''; var b = $('#qeKeyBox'); if (b) b.style.display = 'none';
+      if (Q === tok) qeDone();
+    }).catch(function (e) {
+      var m = e.message || String(e);
+      if (/key not accepted/i.test(m)) { qeSrv = 'nokey'; var b = $('#qeKeyBox'); if (b) b.style.display = ''; }
+      if (/not a function|is not defined/i.test(m)) m = 'Code.gs needs updating in Apps Script (new api_quote_publish), then Deploy a new version.';
+      if (Q === tok) qeStatus('Not saved: ' + esc(m), true);
+    }).then(function () { btn.disabled = false; });
+  }
+
+  $('#qeClose').addEventListener('click', function () { $('#qe').classList.remove('show'); });
+  $('#qe').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-act]'); if (!b || !Q) return;
+    var a = b.getAttribute('data-act'), si = b.getAttribute('data-s'), w = b.closest('[data-s]'), li = b.closest('[data-l]');
+    var sec = function () { return qeSection(si != null ? si : (w && w.getAttribute('data-s'))); };
+    var move = function (arr, i, d) { var j = i + d; if (j < 0 || j >= arr.length) return false; var t = arr[i]; arr[i] = arr[j]; arr[j] = t; return true; };
+    if (a === 'cat') { var p = $('#qeCat'), on = p.style.display === 'none'; p.style.display = on ? '' : 'none'; if (on) p.innerHTML = qeCatPanel(); }
+    else if (a === 'cadd') qeAddCat(+b.getAttribute('data-ci'));
+    else if (a === 'sadd') { Q.secs.push(qeBlankSec('')); qeRender(); }
+    else if (a === 'sdel') { Q.secs.splice(+w.getAttribute('data-s'), 1); qeRender(); }
+    else if (a === 'smove') { if (move(Q.secs, +w.getAttribute('data-s'), +b.getAttribute('data-d'))) qeRender(); }
+    else if (a === 'ladd') { sec().lines.push({ name: '', subs: [], note: '', rate: null, qty: 1 }); qeRender(); }
+    else if (a === 'ldel') { var sc = qeSection(li.getAttribute('data-s')); sc.lines.splice(+li.getAttribute('data-l'), 1); if (sc === Q.custom && !sc.lines.length) sc.lines.push({ name: '', subs: [], note: '', rate: null, qty: 1 }); qeRender(); }
+    else if (a === 'lmove') { if (move(qeSection(li.getAttribute('data-s')).lines, +li.getAttribute('data-l'), +b.getAttribute('data-d'))) qeRender(); }
+    else if (a === 'badd') { Q.secs[+si].showB = true; qeRender(); }
+    else if (a === 'sinc') { Q.secs[+si].bullets = qeInclusions(Q.pkg); qeRender(); qeStatus('Standard inclusions list put in.'); }
+    else if (a === 'tadd') { Q.secs[+si].totals.push({ title: '', amount: '' }); qeRender(); }
+    else if (a === 'tdel') { var tw = b.closest('.qtot'); Q.secs[+tw.getAttribute('data-s')].totals.splice(+tw.getAttribute('data-t'), 1); qeRender(); }
+    else if (a === 'qprev') {
+      var err = qeCheck(), fr = $('#qePrev');
+      if (err && !/already exists/.test(err)) { qeStatus(err, true); return; }
+      var hold = Q.img; var ch = Q.imgChoice; if (ch === 'up') Q.img = ''; else if (ch === 'none') Q.img = ''; else if (ch.indexOf('f:') === 0) Q.img = ch.slice(2);
+      var html = qeHtml(Q, qeCss()); Q.img = hold;
+      html = html.replace('<head>', '<head>\n<base href="' + GH_SITE + '/' + encodeURIComponent(Q.folder) + '/">');
+      fr.srcdoc = html; fr.style.display = 'block'; qeStatus(ch === 'up' ? 'Preview - a new photo is added when you save.' : '');
+    }
+    else if (a === 'qsave') qePublish();
+  });
+  $('#qe').addEventListener('input', function (e) {
+    var t = e.target; if (!Q) return;
+    if (t.id === 'qeCatQ') { var dv = document.createElement('div'); dv.innerHTML = qeCatPanel(); $('#qeCatL').innerHTML = dv.querySelector('#qeCatL').innerHTML; return; }
+    var d = t.getAttribute && t.getAttribute('data-d');
+    if (d) {
+      if (d === 'no') { Q.no = t.value.replace(/\D/g, '').slice(0, 6); t.value = Q.no; var tk = qeTaken(Q.no), tb = $('#qeTaken'); if (tb) { tb.style.display = tk ? '' : 'none'; if (!tk) { Q.replace = false; $('#qeRep').checked = false; } tb.querySelector('label').lastChild.textContent = ' Quote #' + Q.no + ' already exists for this client - tick to replace it (the old page is overwritten)'; } }
+      else if (d !== 'img') Q[d] = t.value;
+      return;
+    }
+    var f = t.getAttribute && t.getAttribute('data-f'); if (!f) return;
+    var line = t.closest('.qline'), tot = t.closest('.qtot'), sec = t.closest('.qsec');
+    if (line) {
+      var l = qeSection(line.getAttribute('data-s')).lines[+line.getAttribute('data-l')];
+      if (f === 'rate') { l.rate = t.value.trim() === '' ? null : num(t.value); }
+      else if (f === 'qty') { l.qty = Math.max(1, num(t.value) || 1); }
+      else if (f === 'subs') { l.subs = t.value.split('\n'); }
+      else l[f] = t.value;
+      var a = qeLineAmount(l), am = line.querySelector('.qamt'), sh = line.querySelector('.qshown');
+      if (am) am.textContent = a != null ? inr(a) : '';
+      if (sh) { var s2 = qeLineName(l); sh.textContent = s2 !== String(l.name || '').trim() ? 'Shown on the quote as: ' + s2 : ''; }
+    } else if (tot) {
+      var tt = Q.secs[+tot.getAttribute('data-s')].totals[+tot.getAttribute('data-t')];
+      if (f === 'ttitle') tt.title = t.value; else tt.amount = t.value.trim() === '' ? '' : num(t.value);
+    } else if (sec && sec.getAttribute('data-s') !== 'c') {
+      var s = Q.secs[+sec.getAttribute('data-s')];
+      if (f === 'title') s.title = t.value; else if (f === 'bullets') s.bullets = t.value.split('\n');
+    }
+    qeSum();
+  });
+  $('#qe').addEventListener('change', function (e) {
+    var t = e.target; if (!Q) return;
+    if (t.id === 'qeRep') { Q.replace = t.checked; return; }
+    if (t.id === 'qeImg') { Q.imgChoice = t.value; $('#qeFile').style.display = t.value === 'up' ? 'block' : 'none'; return; }
+    if (t.id === 'qeDate') { Q.date = t.value; }
   });
 
 
