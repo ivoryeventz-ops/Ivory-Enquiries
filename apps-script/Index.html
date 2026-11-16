@@ -200,6 +200,9 @@
   .qci{display:flex;justify-content:space-between;gap:10px;width:100%;text-align:left;font:inherit;background:#fff;border:1px solid var(--line);border-radius:10px;padding:9px 12px;margin-bottom:6px;color:var(--ink)}
   .qci small{display:block;font-size:12px;color:var(--muted);margin-top:2px;font-weight:400}
   .qci b{white-space:nowrap;color:var(--burgundy);font-size:14px}
+  .qstg{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px}
+  .qstg button{flex:0 0 auto;border:2px solid var(--line);border-radius:8px;padding:0;background:#fff;width:96px;height:72px;overflow:hidden}
+  .qstg img{width:100%;height:100%;object-fit:cover;display:block}
   #qePrev{display:none;width:100%;height:70vh;border:1px solid var(--line);border-radius:12px;margin-top:10px;background:#fff}
 </style>
 </head>
@@ -227,7 +230,6 @@
   <button class="chip" data-f="Blocked">Blocked</button>
   <button class="chip" data-f="Confirmed">Confirmed</button>
   <button class="chip" data-f="NoQuote">No quote given</button>
-  <button class="chip" data-f="SiteOnly">Migrate quote</button>
   <button class="chip" data-f="Action">Action due</button>
 </div>
 <label class="past"><input type="checkbox" id="showPast" style="width:auto"> Include past events</label>
@@ -660,7 +662,6 @@
   function isoAdd(iso, n) { var d = toDate(iso); d.setDate(d.getDate() + n); return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()); }
   function noQuote(i) { return FL.ready && i.status === 'Confirmed' && !!i.date && !FL.sites[wkey(i)] && FL.cloud[wkey(i)] === 0; }
   // quote exists only as a Google Site: counted as quoted, but outside vendors cannot be auto-picked from it until it is re-issued as a GitHub quote
-  function siteOnly(i) { return FL.ready && i.status === 'Confirmed' && !!i.date && FL.sites[wkey(i)] > 0 && FL.cloud[wkey(i)] === 0; }
   // A saved tick (or an explicit un-tick) always wins. With nothing saved, the wedding timeline shows ticked once its page exists in the timeline repo.
   function isDone(i, t) {
     var k = wkey(i) + '|' + t;
@@ -699,7 +700,6 @@
     var list = items.filter(function (i) {
       if (!showPast && i.date && i.date < today && !(i.date >= cutoff && pending(i) > 0)) return false;
       if (filter === 'NoQuote') { if (!noQuote(i)) return false; }
-      else if (filter === 'SiteOnly') { if (!siteOnly(i)) return false; }
       else if (filter === 'Action') { if (pending(i) === 0) return false; }
       else if (filter !== 'All' && i.status !== filter) return false;
       if (ql && (i.name + ' ' + i.venue).toLowerCase().indexOf(ql) < 0) return false;
@@ -709,7 +709,7 @@
     $('#count').textContent = (showPast ? 'Oldest first' : 'Upcoming events, soonest first') +
       (FL.ready ? '' : ' - quote flags and reminders need the updated Code.gs');
     if (!list.length) {
-      $('#list').innerHTML = '<div class="empty">' + (filter === 'NoQuote' ? 'Every confirmed work has a quote.' : filter === 'SiteOnly' ? 'No quotes left on Google Sites.' : filter === 'Action' ? 'No actions pending.' : 'Nothing here yet.') + '</div>';
+      $('#list').innerHTML = '<div class="empty">' + (filter === 'NoQuote' ? 'Every confirmed work has a quote.' : filter === 'Action' ? 'No actions pending.' : 'Nothing here yet.') + '</div>';
       return;
     }
     $('#list').innerHTML = list.map(function (i) {
@@ -719,7 +719,6 @@
         '<div class="r2">' + fmt(i.date) + ' &middot; ' + when(i.date) + '</div>' +
         '<div class="r3">' + esc(i.venue) + '</div>' +
         (noQuote(i) ? '<div class="nq">&#9888; No quote given yet</div>' : '') +
-        (siteOnly(i) ? '<div class="mg">&#9888; Quote is on Google Sites only - re-issue it as a GitHub quote so outside vendors can be picked automatically</div>' : '') +
         (i.status === 'Costing' && i.since ? '<div class="since">Costing since ' + fmt(i.since, true) + ' &middot; reminder every 2 days</div>' : '') +
         actHtml(i, false) +
         '</div>';
@@ -1536,10 +1535,11 @@
 
   /* ---------- edit as new quote: saves a new <Client>/<YYMMDD>.html in the packages repo, the old quote is never touched ---------- */
   /* QE-PURE-BEGIN */
-  var QE_CAT = [{"g":"Choose your package","n":"Package 1","p":75000},{"g":"Choose your package","n":"Package 2","p":105000},{"g":"Choose your package","n":"Package 3","p":115000},{"g":"Choose your package","n":"Package 4","p":135000},{"g":"Choose your package","n":"Package 5","p":145000},{"g":"Choose your package","n":"Package 6","p":160000},{"g":"Choose your package","n":"Package 7","p":170000},{"g":"Choose your package","n":"Package 8","p":180000},{"g":"Choose your package","n":"Package 9","p":200000},{"g":"Choose your package","n":"Package 10","p":220000},{"g":"Choose your package","n":"Package 11","p":240000},{"g":"Choose your package","n":"Package 12","p":280000},{"g":"Choose your package","n":"Package 13","p":300000},{"g":"Church decoration","n":"Church — Artificial flowers","p":15000,"d":"Entrance arch (Artificial ) and 2 fresh flower stands beside couple"},{"g":"Church decoration","n":"Church — Artificial arch + Fresh flower stands","p":25000,"d":"Entrance arch (artificial), aisle stands (fresh roses & gypsophila), and 2 stands beside couple (fresh)"},{"g":"Church decoration","n":"Church — Fresh flowers","p":40000,"d":"Entrance arch, aisle stands (roses & gypsophila), and 2 couple stands — all in fresh flowers"},{"g":"Church extras","n":"Wedding chairs for couple","p":1500,"d":"2 decorated chairs for church"},{"g":"Church extras","n":"Altar flowers","p":1500,"d":"2 fresh flower sets for the altar"},{"g":"Church extras","n":"Premium Garland & Bouquet","p":5000,"d":"2 greeting garlands + 2 bouquets (fresh baby's breath)"},{"g":"Cake","n":"Two tier cake","p":4500,"d":"Top tier real cake, bottom dummy tier, fondant icing"},{"g":"Cake","n":"Three tier cake","p":6000,"d":"Top tier real cake, bottom two dummy layers, fondant icing"},{"g":"Special effects","n":"Flower Confetti","p":10000,"d":"Fresh rose petals shot from a cannon during entry or cake cutting"},{"g":"Special effects","n":"Cold spark fountain","p":15000,"d":"Indoor-safe fire sparkler fountains (no heat, no smoke)"},{"g":"Special effects","n":"Confetti + Cold spark combo","p":25000,"d":"Combined flower confetti cannon and cold spark fountains"},{"g":"Special effects","n":"Extra cold spark shots","p":500,"d":"Per extra shot, per machine","q":["Qty",1]},{"g":"Special effects","n":"Cool fire","p":5000,"d":"Low-heat flame effects (not recommended; may produce minor smoke and odour, and require prior hall approval)."},{"g":"Special effects","n":"Dry ice fog — stage","p":15000,"d":"Low-lying white cloud fog from both sides of the stage"},{"g":"Special effects","n":"Dry ice fog — ramp","p":15000,"d":"Low-lying cloud fog along the ramp onto stage"},{"g":"Hall décor","n":"Standard pathway stands","p":15000,"d":"Flower stands along the walkway aisle"},{"g":"Hall décor","n":"Premium pathway light stands","p":30000,"d":"Pillar stands with flowers along the aisle with lights or candles"},{"g":"Hall décor","n":"Premium entrance arch","p":15000,"d":"Bigger, heavy-decorated entrance arch at the hall door"},{"g":"Hall décor","n":"Side curtain for main hall","p":30000,"d":"Full wall-drapes for plain hall walls"},{"g":"Hall décor","n":"Ambient lighting in hall","p":35000,"d":"Color mood ambiance lights in hall with additional power support as required."},{"g":"Hall décor","n":"Premium signage board","p":7500,"d":"Large custom-designed welcome board featuring the couple names/photo"},{"g":"Hall décor","n":"Ramp onto stage with flowers","p":30000,"d":"20 ft x 8 ft walkway ramp onto stage with flowers along both sides"},{"g":"Family table","n":"Premium family table","p":25000,"d":"Curved or round VIP table, 12 gold chairs, dinnerware, and table centrepieces"},{"g":"Family table","n":"Family table on hall tables","p":10000,"d":"Setup on hall tables, 12 acrylic chairs, dinnerware, and table centrepieces"},{"g":"Guest tables","n":"Tiffany chairs – Theatre style","p":75,"d":"Tiffany chairs in rows, theatre-style seating","q":["Chairs",100]},{"g":"Parking security","n":"Normal security","p":1200,"d":"Security guards in uniform for parking and entrance (minimum 2)","q":["Qty",2]},{"g":"Parking security","n":"Tall men security / Bouncers","p":1500,"d":"Security in black suits, above 6 ft tall (minimum 2)","q":["Qty",2]},{"g":"Live band and anchor","n":"Standard band","p":25000,"d":"Fixed song list: keyboard, rhythm pad, violin (instrumental) plus sound system"},{"g":"Live band and anchor","n":"Premium band","p":40000,"d":"Interactive performance: keyboard, rhythm pad, violin (instrumental) plus sound system"},{"g":"Live band and anchor","n":"Band with vocalist","p":40000,"d":"Keyboard, violin, and 4 singers (English devotional & worship) plus sound system"},{"g":"Live band and anchor","n":"Professional anchor / MC","p":10000,"d":"Stage host for reception, entries, and guest announcements"},{"g":"Wedding cars","n":"Mercedes Benz E","p":10500,"d":"White luxury sedan","q":["Cars",1]},{"g":"Wedding cars","n":"Audi A6","p":10500,"d":"White luxury sedan","q":["Cars",1]},{"g":"Wedding cars","n":"BMW 5","p":10500,"d":"White luxury sedan (also available in dark green)","q":["Cars",1]},{"g":"Wedding cars","n":"Jaguar XF","p":12500,"d":"White luxury sedan","q":["Cars",1]},{"g":"Wedding cars","n":"BMW 5 Series (New model)","p":18500,"d":"White latest model sedan","q":["Cars",1]},{"g":"Wedding cars","n":"Mercedes S Class","p":20500,"d":"White flagship VIP sedan","q":["Cars",1]},{"g":"Wedding cars","n":"Land Rover Defender","p":45000,"d":"Black or white luxury SUV","q":["Cars",1]},{"g":"Generator","n":"Generator","p":8000,"d":"Dedicated generator for stage sound and lighting (included by default – untick if not required)"},{"g":"Covers for venue's existing furniture","n":"Table covers","p":0,"d":"Covers for the venue's existing tables","q":["Tables",1]},{"g":"Covers for venue's existing furniture","n":"Chair covers","p":16,"d":"Covers for the venue's existing chairs","q":["Chairs",1]},{"g":"Pagoda / tent","n":"Pagoda / tent","p":7000,"d":"Pagoda or tent for the welcome juice / mocktail counter","q":["Pagodas",1]},{"g":"Live band platform","n":"Custom raised wooden stage platform","p":5000,"d":"Raised wooden platform for the live band"},{"g":"Bride's wedding car decoration","n":"Bride's wedding car decoration","p":3000,"d":"Decoration for the bride's wedding car"}];
+  var QE_CAT = [{"g":"Choose your package","n":"Package 1","p":75000},{"g":"Choose your package","n":"Package 2","p":105000},{"g":"Choose your package","n":"Package 3","p":115000},{"g":"Choose your package","n":"Package 4","p":135000},{"g":"Choose your package","n":"Package 5","p":145000},{"g":"Choose your package","n":"Package 6","p":160000},{"g":"Choose your package","n":"Package 7","p":170000},{"g":"Choose your package","n":"Package 8","p":180000},{"g":"Choose your package","n":"Package 9","p":200000},{"g":"Choose your package","n":"Package 10","p":220000},{"g":"Choose your package","n":"Package 11","p":240000},{"g":"Choose your package","n":"Package 12","p":280000},{"g":"Choose your package","n":"Package 13","p":300000},{"g":"Church decoration","n":"Church — Artificial flowers","p":15000,"d":"Entrance arch (Artificial ) and 2 fresh flower stands beside couple"},{"g":"Church decoration","n":"Church — Artificial arch + Fresh flower stands","p":25000,"d":"Entrance arch (artificial), aisle stands (fresh roses & gypsophila), and 2 stands beside couple (fresh)"},{"g":"Church decoration","n":"Church — Fresh flowers","p":40000,"d":"Entrance arch, aisle stands (roses & gypsophila), and 2 couple stands — all in fresh flowers"},{"g":"Church extras","n":"Wedding chairs for couple","p":1500,"d":"2 decorated chairs for church"},{"g":"Church extras","n":"Altar flowers","p":1500,"d":"2 fresh flower sets for the altar"},{"g":"Church extras","n":"Premium Garland & Bouquet","p":5000,"d":"2 greeting garlands + 2 bouquets (fresh baby's breath)"},{"g":"Cake","n":"Two tier cake","p":4500,"d":"Top tier real cake, bottom dummy tier, fondant icing"},{"g":"Cake","n":"Three tier cake","p":6000,"d":"Top tier real cake, bottom two dummy layers, fondant icing"},{"g":"Special effects","n":"Flower Confetti","p":10000,"d":"Fresh rose petals shot from a cannon during entry or cake cutting"},{"g":"Special effects","n":"Cold spark fountain","p":15000,"d":"Indoor-safe fire sparkler fountains (no heat, no smoke)"},{"g":"Special effects","n":"Confetti + Cold spark combo","p":25000,"d":"Combined flower confetti cannon and cold spark fountains"},{"g":"Special effects","n":"Extra cold spark shots","p":500,"d":"Per extra shot, per machine","q":["Qty",1]},{"g":"Special effects","n":"Cool fire","p":5000,"d":"Low-heat flame effects (not recommended; may produce minor smoke and odour, and require prior hall approval)."},{"g":"Special effects","n":"Dry ice fog — stage","p":15000,"d":"Low-lying white cloud fog from both sides of the stage"},{"g":"Special effects","n":"Dry ice fog — ramp","p":15000,"d":"Low-lying cloud fog along the ramp onto stage"},{"g":"Hall décor","n":"Standard pathway stands","p":15000,"d":"Flower stands along the walkway aisle"},{"g":"Hall décor","n":"Premium pathway light stands","p":30000,"d":"Pillar stands with flowers along the aisle with lights or candles"},{"g":"Hall décor","n":"Premium entrance arch","p":15000,"d":"Bigger, heavy-decorated entrance arch at the hall door"},{"g":"Hall décor","n":"Side curtain for main hall","p":30000,"d":"Full wall-drapes for plain hall walls"},{"g":"Hall décor","n":"Ambient lighting in hall","p":35000,"d":"Color mood ambiance lights in hall with additional power support as required."},{"g":"Hall décor","n":"Premium signage board","p":7500,"d":"Large custom-designed welcome board featuring the couple names/photo"},{"g":"Hall décor","n":"Ramp onto stage with flowers","p":30000,"d":"20 ft x 8 ft walkway ramp onto stage with flowers along both sides"},{"g":"Family table","n":"Premium family table","p":25000,"d":"Curved or round VIP table, 12 gold chairs, dinnerware, and table centrepieces"},{"g":"Family table","n":"Family table on hall tables","p":10000,"d":"Setup on hall tables, 12 acrylic chairs, dinnerware, and table centrepieces"},{"g":"Guest tables","n":"Round tables in hall","p":0,"d":"Table covers and centrepieces","q":["Tables",6]},{"g":"Guest tables","n":"Tiffany chairs – Theatre style","p":75,"d":"Tiffany chairs in rows, theatre-style seating","q":["Chairs",100]},{"g":"Parking security","n":"Normal security","p":1200,"d":"Security guards in uniform for parking and entrance (minimum 2)","q":["Qty",2]},{"g":"Parking security","n":"Tall men security / Bouncers","p":1500,"d":"Security in black suits, above 6 ft tall (minimum 2)","q":["Qty",2]},{"g":"Live band and anchor","n":"Standard band","p":25000,"d":"Fixed song list: keyboard, rhythm pad, violin (instrumental) plus sound system"},{"g":"Live band and anchor","n":"Premium band","p":40000,"d":"Interactive performance: keyboard, rhythm pad, violin (instrumental) plus sound system"},{"g":"Live band and anchor","n":"Band with vocalist","p":40000,"d":"Keyboard, violin, and 4 singers (English devotional & worship) plus sound system"},{"g":"Live band and anchor","n":"Professional anchor / MC","p":10000,"d":"Stage host for reception, entries, and guest announcements"},{"g":"Wedding cars","n":"Mercedes Benz E","p":10500,"d":"White luxury sedan","q":["Cars",1]},{"g":"Wedding cars","n":"Audi A6","p":10500,"d":"White luxury sedan","q":["Cars",1]},{"g":"Wedding cars","n":"BMW 5","p":10500,"d":"White luxury sedan (also available in dark green)","q":["Cars",1]},{"g":"Wedding cars","n":"Jaguar XF","p":12500,"d":"White luxury sedan","q":["Cars",1]},{"g":"Wedding cars","n":"BMW 5 Series (New model)","p":18500,"d":"White latest model sedan","q":["Cars",1]},{"g":"Wedding cars","n":"Mercedes S Class","p":20500,"d":"White flagship VIP sedan","q":["Cars",1]},{"g":"Wedding cars","n":"Land Rover Defender","p":45000,"d":"Black or white luxury SUV","q":["Cars",1]},{"g":"Generator","n":"Generator","p":8000,"d":"Dedicated generator for stage sound and lighting (included by default – untick if not required)"},{"g":"Covers for venue's existing furniture","n":"Table covers","p":0,"d":"Covers for the venue's existing tables","q":["Tables",1]},{"g":"Covers for venue's existing furniture","n":"Chair covers","p":16,"d":"Covers for the venue's existing chairs","q":["Chairs",1]},{"g":"Pagoda / tent","n":"Pagoda / tent","p":7000,"d":"Pagoda or tent for the welcome juice / mocktail counter","q":["Pagodas",1]},{"g":"Live band platform","n":"Custom raised wooden stage platform","p":5000,"d":"Raised wooden platform for the live band"},{"g":"Bride's wedding car decoration","n":"Bride's wedding car decoration","p":3000,"d":"Decoration for the bride's wedding car"}];
   var QE_INC = ['White flex or carpet on stage', 'Sofa', 'Welcome drink for couple', 'Single layer fresh cream cake', '3 candles', 'Fresh leaves on stage',
     'Stage floral settings artificial', 'Stage lights and facelights', 'Stage sound system', 'Centre carpet along aisle', 'Hall entrance arch artificial',
     'Wedding car decoration fresh', 'Greeting garland and bouquet fresh', 'Wedding signage board', '2 welcome hostesses', 'Manthrakodi basket and ring box returnable'];
+  var QE_STAGES = {"1": 5, "2": 3, "3": 4, "4": 5, "5": 3, "6": 4, "7": 3, "8": 4, "9": 3, "10": 4, "11": 4, "12": 4, "13": 2};   // package number -> number of stage photos (hosted in the packages repo under /stages/)
   var QE_DROP = /grand\s*total|discounted\s*total|^discount\b|^total\b/i;   // sums that would go stale the moment a rate changes
 
   function qeInclusions(pkg) {
@@ -1773,6 +1773,7 @@
     var files = (ghImgs && ghImgs[Q.folder]) || [], o = '';
     if (Q.img) o += '<option value="keep"' + (Q.imgChoice === 'keep' ? ' selected' : '') + '>Keep current: ' + esc(Q.img.split('/').pop()) + '</option>';
     files.forEach(function (f) { if (f !== (Q.img || '').split('/').pop()) o += '<option value="f:' + esc(f) + '"' + (Q.imgChoice === 'f:' + f ? ' selected' : '') + '>' + esc(f) + ' (in this client folder)</option>'; });
+    if (Q.imgChoice.indexOf('s:') === 0) o += '<option value="' + esc(Q.imgChoice) + '" selected>Stage design: ' + esc(Q.imgChoice.slice(2).replace(/^pkg-(\d+)-(\d+)\.jpg$/, 'Package $1, photo $2')) + '</option>';
     o += '<option value="up"' + (Q.imgChoice === 'up' ? ' selected' : '') + '>Upload a new photo...</option><option value="none"' + (Q.imgChoice === 'none' ? ' selected' : '') + '>No stage photo</option>';
     return o;
   }
@@ -1785,7 +1786,7 @@
       '<label for="qeVenue">Venue</label><input id="qeVenue" data-d="venue" value="' + esc(Q.venue) + '">' +
       '<div class="qtaken" id="qeTaken"' + (tk ? '' : ' style="display:none"') + '><label class="tlchk"><input type="checkbox" id="qeRep"' + (Q.replace ? ' checked' : '') + '> Quote #' + esc(Q.no) +
       ' already exists for this client - tick to replace it (the old page is overwritten)</label></div>' +
-      '<h4>Stage photo</h4><select id="qeImg" data-d="img">' + qeImgOptions() + '</select><input type="file" id="qeFile" accept="image/*" style="display:' + (Q.imgChoice === 'up' ? 'block' : 'none') + ';margin-top:8px">' +
+      '<h4>Stage design</h4><button type="button" class="pbtn" data-act="stg" style="margin:0 0 8px">Choose a stage design</button><div id="qeStg" style="display:none"></div><select id="qeImg" data-d="img">' + qeImgOptions() + '</select><input type="file" id="qeFile" accept="image/*" style="display:' + (Q.imgChoice === 'up' ? 'block' : 'none') + ';margin-top:8px">' +
       '<h4>Stage, services and rates</h4><div class="note">Link a package or any add-on from the quote builder, change anything, or type your own services.</div>' +
       '<button type="button" class="pbtn" data-act="cat">Add from packages</button><button type="button" class="pbtn" data-act="sadd">+ New section</button>' +
       '<div id="qeCat" style="display:none"></div>' +
@@ -1815,6 +1816,16 @@
     });
     return '<div class="qcat"><div class="qcat-top"><input id="qeCatQ" type="search" placeholder="Search packages and add-ons" value="' + esc(($('#qeCatQ') || {}).value || '') + '">' +
       '<label class="qlab">Add to<select id="qeCatTo">' + opts + '</select></label></div><div class="qcl" id="qeCatL">' + (h || '<div class="note">Nothing matches.</div>') + '</div></div>';
+  }
+  function qeStagePanel() {
+    var h = '<div class="qcat"><div class="note">Tap a photo to use it as the stage design. That package is linked too (its rate goes in the Decor Package rate card).</div><div class="qcl">';
+    Object.keys(QE_STAGES).forEach(function (n) {
+      var pk = QE_CAT.filter(function (c) { return c.n === 'Package ' + n; })[0];
+      h += '<div class="qcg">Package ' + n + (pk ? ' &middot; ' + inr(pk.p) : '') + '</div><div class="qstg">';
+      for (var m = 1; m <= QE_STAGES[n]; m++) h += '<button type="button" data-act="stgpick" data-p="' + n + '" data-m="' + m + '"><img loading="lazy" src="' + GH_SITE + '/stages/thumbs/pkg-' + n + '-' + m + '.jpg" alt="Package ' + n + ' photo ' + m + '"></button>';
+      h += '</div>';
+    });
+    return h + '</div></div>';
   }
   function qeAddCat(ci) {
     var c = QE_CAT[ci]; if (!c) return;
@@ -1883,6 +1894,7 @@
       return qeResize(f).then(function (b64) { return { img: name, up: { name: name, b64: b64 } }; });
     }
     if (ch.indexOf('f:') === 0) return Promise.resolve({ img: ch.slice(2), up: null });
+    if (ch.indexOf('s:') === 0) return Promise.resolve({ img: '/stages/' + ch.slice(2), up: null });
     return Promise.resolve({ img: Q.img, up: null });
   }
   function qeDone() {
@@ -1921,6 +1933,14 @@
     var move = function (arr, i, d) { var j = i + d; if (j < 0 || j >= arr.length) return false; var t = arr[i]; arr[i] = arr[j]; arr[j] = t; return true; };
     if (a === 'cat') { var p = $('#qeCat'), on = p.style.display === 'none'; p.style.display = on ? '' : 'none'; if (on) p.innerHTML = qeCatPanel(); }
     else if (a === 'cadd') qeAddCat(+b.getAttribute('data-ci'));
+    else if (a === 'stg') { var sp = $('#qeStg'), so = sp.style.display === 'none'; sp.style.display = so ? '' : 'none'; if (so) sp.innerHTML = qeStagePanel(); }
+    else if (a === 'stgpick') {
+      var pn = b.getAttribute('data-p'), pm = b.getAttribute('data-m'), ci2 = -1;
+      QE_CAT.forEach(function (c, i) { if (c.n === 'Package ' + pn) ci2 = i; });
+      Q.imgChoice = 's:pkg-' + pn + '-' + pm + '.jpg';
+      if (ci2 >= 0) qeAddCat(ci2); else qeRender();
+      qeStatus('Package ' + pn + ' stage design chosen.');
+    }
     else if (a === 'sadd') { Q.secs.push(qeBlankSec('')); qeRender(); }
     else if (a === 'sdel') { Q.secs.splice(+w.getAttribute('data-s'), 1); qeRender(); }
     else if (a === 'smove') { if (move(Q.secs, +w.getAttribute('data-s'), +b.getAttribute('data-d'))) qeRender(); }
@@ -1934,7 +1954,7 @@
     else if (a === 'qprev') {
       var err = qeCheck(), fr = $('#qePrev');
       if (err && !/already exists/.test(err)) { qeStatus(err, true); return; }
-      var hold = Q.img; var ch = Q.imgChoice; if (ch === 'up') Q.img = ''; else if (ch === 'none') Q.img = ''; else if (ch.indexOf('f:') === 0) Q.img = ch.slice(2);
+      var hold = Q.img; var ch = Q.imgChoice; if (ch === 'up') Q.img = ''; else if (ch === 'none') Q.img = ''; else if (ch.indexOf('f:') === 0) Q.img = ch.slice(2); else if (ch.indexOf('s:') === 0) Q.img = '/stages/' + ch.slice(2);
       var html = qeHtml(Q, qeCss()); Q.img = hold;
       html = html.replace('<head>', '<head>\n<base href="' + GH_SITE + '/' + encodeURIComponent(Q.folder) + '/">');
       fr.srcdoc = html; fr.style.display = 'block'; qeStatus(ch === 'up' ? 'Preview - a new photo is added when you save.' : '');
