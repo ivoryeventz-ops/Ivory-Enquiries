@@ -292,7 +292,14 @@
   <h2>Stage decoration list</h2>
   <div class="meta" id="sdMeta"></div>
   <div id="sdBody"></div>
-  <a class="wa" id="sdWa" href="#" target="_blank" rel="noopener">Share on WhatsApp</a>
+  <a class="wa" id="sdWa" href="#" target="_blank" rel="noopener">Share list on WhatsApp</a>
+  <div id="sdImgBox" style="display:none;margin-top:14px">
+    <h4>Stage design</h4>
+    <img id="sdImg" alt="Stage design" style="width:100%;height:auto;border-radius:10px;display:block;margin:0 0 8px">
+    <div class="note" id="sdImgNote"></div>
+    <button class="primary" id="sdImgShare" type="button" disabled>Share stage design photo</button>
+    <a class="link" id="sdImgSave" href="#" download="stage-design.jpg" style="display:none;text-align:center;margin-top:8px">Save photo to phone</a>
+  </div>
   <button class="link" id="sdClose">Back</button>
 </div>
 
@@ -925,7 +932,7 @@
 
 
   /* ---------- quotes sent + outside vendors ---------- */
-  var APP_VERSION = 'v18-Nov-c';   // shown under Outside vendors, so you can tell which Index.html is running
+  var APP_VERSION = 'v18-Nov-d';   // shown under Outside vendors, so you can tell which Index.html is running
   var GH_REPO = 'ivoryeventz-ops/Ivory-Packages', GH_BRANCH = 'main', GH_SITE = 'https://ivory-packages.pages.dev';
   // The 12 standard outside vendors (same list as VENDOR_NAMES in Code.gs).
   var VNAMES = ['Garland and Bouquet', 'Wedding cake', 'Confetti', 'Cold Spark', 'Dry Ice', 'Ambiance lighting',
@@ -1201,7 +1208,7 @@
     var sdq = list.filter(function (q) { return q.src === 'cloud' && q.stage && q.stage.length; })[0];
     if (sdq) {
       h += '<button type="button" class="qrow payrow" data-act="sd"><span><b>Stage decoration list</b>' +
-        '<span class="qs">From quote #' + esc(sdq.no) + ' - share on WhatsApp</span></span><span class="go">Share &rsaquo;</span></button>';
+        '<span class="qs">From quote #' + esc(sdq.no) + ' - share list and stage design photo</span></span><span class="go">Share &rsaquo;</span></button>';
     }
     if (!list.some(function (q) { return q.src === 'cloud' && q.raw; })) {
       h += '<button type="button" class="qrow payrow" data-act="qnew"><span><b>New quote</b><span class="qs">Build a quote from the packages and add-ons</span></span><span class="go">Start &rsaquo;</span></button>';
@@ -3486,12 +3493,57 @@
     }).join('');
     $('#sdWa').href = 'https://wa.me/?text=' + encodeURIComponent(sdText());
   }
+  // Stage design photo: the image on the quote page, loaded as a real file so it is shared as a photo (not a link).
+  function sdImgUrl(q) {
+    var m; try { m = q.raw ? qeParse(q.raw) : null; } catch (e) { m = null; }
+    var src = m && m.img; if (!src) return '';
+    if (/^https?:\/\//i.test(src)) return src;
+    var path = src.charAt(0) === '/' ? src.slice(1) : (encodeURIComponent(q.folder) + '/' + src);
+    return 'https://raw.githubusercontent.com/' + GH_REPO + '/' + GH_BRANCH + '/' + path.split('/').map(function (x) { return /%/.test(x) ? x : encodeURIComponent(x); }).join('/');
+  }
+  function sdImgLoad(q) {
+    var box = $('#sdImgBox'), btn = $('#sdImgShare'), sv = $('#sdImgSave');
+    SD.file = null; btn.disabled = true; sv.style.display = 'none';
+    var url = sdImgUrl(q);
+    if (!url) { box.style.display = 'none'; return; }
+    box.style.display = '';
+    $('#sdImg').src = url;
+    $('#sdImgNote').textContent = 'Loading the stage design photo...';
+    var mine = SD;
+    fetch(url).then(function (r) { if (!r.ok) throw new Error('photo not readable'); return r.blob(); }).then(function (b) {
+      if (SD !== mine) return;
+      var ext = /png/i.test(b.type) ? 'png' : (/webp/i.test(b.type) ? 'webp' : 'jpg');
+      var nm = 'Stage design - ' + (mine.it.name || 'Ivory') + '.' + ext;
+      mine.file = new File([b], nm, { type: b.type || 'image/jpeg' });
+      var u = URL.createObjectURL(b);
+      sv.href = u; sv.setAttribute('download', nm); sv.style.display = '';
+      btn.disabled = false;
+      $('#sdImgNote').textContent = 'Opens your share menu - choose WhatsApp to send the photo itself.';
+    }).catch(function () {
+      if (SD !== mine) return;
+      $('#sdImgNote').textContent = 'Could not load the photo (' + url.split('/').pop() + '). Check the connection and reopen this screen.';
+    });
+  }
+  function sdImgShare() {
+    if (!SD || !SD.file) return;
+    var f = SD.file;
+    if (navigator.canShare && navigator.canShare({ files: [f] })) {
+      navigator.share({ files: [f] }).catch(function (e) {
+        if (e && e.name === 'AbortError') return;
+        toast('Sharing is blocked here. Use "Save photo to phone", then attach it in WhatsApp.', true);
+      });
+    } else {
+      toast('This phone/browser cannot share photos from the app. Use "Save photo to phone", then attach it in WhatsApp.', true);
+    }
+  }
+  $('#sdImgShare').addEventListener('click', sdImgShare);
   function sdOpen(it, list) {
     var q = (list || []).filter(function (x) { return x.src === 'cloud' && x.stage && x.stage.length; })[0];
     if (!q) { toast('No stage decoration list found in the quote.', true); return; }
-    SD = { it: it, rows: sdBuild(q.stage, q.extras, q) };
+    SD = { it: it, rows: sdBuild(q.stage, q.extras, q), file: null };
     $('#sdMeta').textContent = 'From quote #' + q.no + (it.venue ? ' - ' + it.venue : '');
     sdRender();
+    sdImgLoad(q);
     openSheet('#sd');
   }
   $('#sdBody').addEventListener('change', function (e) {
