@@ -932,7 +932,7 @@
 
 
   /* ---------- quotes sent + outside vendors ---------- */
-  var APP_VERSION = 'v18-Nov-e';   // shown under Outside vendors, so you can tell which Index.html is running
+  var APP_VERSION = 'v18-Nov-f';   // shown under Outside vendors, so you can tell which Index.html is running
   var GH_REPO = 'ivoryeventz-ops/Ivory-Packages', GH_BRANCH = 'main', GH_SITE = 'https://ivory-packages.pages.dev';
   // The 12 standard outside vendors (same list as VENDOR_NAMES in Code.gs).
   var VNAMES = ['Garland and Bouquet', 'Wedding cake', 'Confetti', 'Cold Spark', 'Dry Ice', 'Ambiance lighting',
@@ -2156,6 +2156,24 @@
     return g && b ? g + ' & ' + b : (g || b || 'Wedding');
   }
 
+  // The short text on the "Groom's Car Decoration" card, rewritten from the decoration line typed in the sheet.
+  // Default line gives "Delivered to the residence in the morning". Falls back to the whole line when nothing can be read from it.
+  function tlDecoCard(line) {
+    var t = String(line || '').replace(/\s+/g, ' ').trim();
+    if (!t) return 'Delivered to the residence in the morning';
+    var verb = /\b(fix|fit|attach|mount)/i.test(t) && !/deliver/i.test(t) ? 'Fixed on the car' : 'Delivered';
+    var where = /church/i.test(t) ? 'the church' : (/\b(hall|venue|auditorium)\b/i.test(t) ? 'the venue' : (/\b(residence|house|home)\b/i.test(t) ? 'the residence' : ''));
+    var when = '', tm = /\b(?:(by|at|before|around)\s+)?(\d{1,2}(?::\d{2})?\s*(?:a\.?m\.?|p\.?m\.?))/i.exec(t);
+    if (tm) when = (tm[1] ? tm[1].toLowerCase() : 'at') + ' ' + tm[2].replace(/\s+/g, ' ').replace(/\./g, '').toUpperCase().replace(/(\d)(AM|PM)/, '$1 $2');
+    else if (/day before|previous day|eve of|evening before|night before/i.test(t)) when = 'the day before';
+    else if (/morning/i.test(t)) when = 'in the morning';
+    else if (/afternoon/i.test(t)) when = 'in the afternoon';
+    else if (/evening/i.test(t)) when = 'in the evening';
+    if (!where && !when) return t;
+    var where2 = verb === 'Delivered' ? (where ? ' to ' + where : '') : (where ? ' at ' + where : '');
+    return verb + where2 + (when ? ' ' + when : '');
+  }
+
   // Everything that changes from one wedding to the next, as ready-to-insert (already escaped) pieces.
   function tlVars(T) {
     var d = tlDate(T.date), orth = T.church === 'orthodox';
@@ -2165,7 +2183,7 @@
     var deco = String(T.decoLine || '').trim(), paras = [], boxes = [];
     if (!hasGroomCar && deco) {
       paras.push(deco);
-      boxes.push(['Groom’s Car Decoration', 'Delivered to the residence in the morning']);
+      boxes.push(['Groom’s Car Decoration', tlDecoCard(deco)]);
     }
     cars.forEach(function (c) {
       var w = c.who, type = String(c.type || '').trim(), time = String(c.time || '').trim();
