@@ -932,7 +932,7 @@
 
 
   /* ---------- quotes sent + outside vendors ---------- */
-  var APP_VERSION = 'v18-Nov-d';   // shown under Outside vendors, so you can tell which Index.html is running
+  var APP_VERSION = 'v18-Nov-e';   // shown under Outside vendors, so you can tell which Index.html is running
   var GH_REPO = 'ivoryeventz-ops/Ivory-Packages', GH_BRANCH = 'main', GH_SITE = 'https://ivory-packages.pages.dev';
   // The 12 standard outside vendors (same list as VENDOR_NAMES in Code.gs).
   var VNAMES = ['Garland and Bouquet', 'Wedding cake', 'Confetti', 'Cold Spark', 'Dry Ice', 'Ambiance lighting',
@@ -3494,19 +3494,32 @@
     $('#sdWa').href = 'https://wa.me/?text=' + encodeURIComponent(sdText());
   }
   // Stage design photo: the image on the quote page, loaded as a real file so it is shared as a photo (not a link).
+  function sdImgSrc(q) {   // the stage image written in the quote page
+    var src = '';
+    try { src = (q.raw ? qeParse(q.raw).img : '') || ''; } catch (e) {}
+    if (!src && q.raw) {   // fall back to the first picture inside the image card, or any non-logo picture
+      var d = new DOMParser().parseFromString(q.raw, 'text/html');
+      var im = d.querySelector('.image-card img, .image-wrapper img');
+      if (!im) Array.prototype.forEach.call(d.querySelectorAll('img'), function (x) { if (!im && !/logo|icon/i.test(x.getAttribute('src') || '')) im = x; });
+      src = im ? (im.getAttribute('src') || im.getAttribute('data-src') || '') : '';
+    }
+    return src.trim();
+  }
   function sdImgUrl(q) {
-    var m; try { m = q.raw ? qeParse(q.raw) : null; } catch (e) { m = null; }
-    var src = m && m.img; if (!src) return '';
-    if (/^https?:\/\//i.test(src)) return src;
-    var path = src.charAt(0) === '/' ? src.slice(1) : (encodeURIComponent(q.folder) + '/' + src);
-    return 'https://raw.githubusercontent.com/' + GH_REPO + '/' + GH_BRANCH + '/' + path.split('/').map(function (x) { return /%/.test(x) ? x : encodeURIComponent(x); }).join('/');
+    var src = sdImgSrc(q);
+    if (!src) return '';
+    if (/^(data:|blob:|https?:)/i.test(src)) return src;
+    var root = 'https://raw.githubusercontent.com/' + GH_REPO + '/' + GH_BRANCH + '/';
+    var base = src.charAt(0) === '/' ? root : root + encodeURIComponent(q.folder) + '/';
+    try { return new URL(src.replace(/^\//, ''), base).href; } catch (e) { return ''; }
   }
   function sdImgLoad(q) {
     var box = $('#sdImgBox'), btn = $('#sdImgShare'), sv = $('#sdImgSave');
     SD.file = null; btn.disabled = true; sv.style.display = 'none';
     var url = sdImgUrl(q);
-    if (!url) { box.style.display = 'none'; return; }
     box.style.display = '';
+    if (!url) { $('#sdImg').removeAttribute('src'); $('#sdImg').style.display = 'none'; $('#sdImgNote').textContent = 'No stage design photo was found on quote #' + q.no + '. Add one with Edit as new quote > Choose a stage design.'; return; }
+    $('#sdImg').style.display = '';
     $('#sdImg').src = url;
     $('#sdImgNote').textContent = 'Loading the stage design photo...';
     var mine = SD;
@@ -3521,7 +3534,7 @@
       $('#sdImgNote').textContent = 'Opens your share menu - choose WhatsApp to send the photo itself.';
     }).catch(function () {
       if (SD !== mine) return;
-      $('#sdImgNote').textContent = 'Could not load the photo (' + url.split('/').pop() + '). Check the connection and reopen this screen.';
+      $('#sdImgNote').textContent = 'Could not load the photo (' + decodeURIComponent(url.slice(0, 120).split('/').slice(-2).join('/')) + '). Check the connection and reopen this screen.';
     });
   }
   function sdImgShare() {
