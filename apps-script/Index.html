@@ -925,7 +925,7 @@
 
 
   /* ---------- quotes sent + outside vendors ---------- */
-  var APP_VERSION = 'v18-Nov-b';   // shown under Outside vendors, so you can tell which Index.html is running
+  var APP_VERSION = 'v18-Nov-c';   // shown under Outside vendors, so you can tell which Index.html is running
   var GH_REPO = 'ivoryeventz-ops/Ivory-Packages', GH_BRANCH = 'main', GH_SITE = 'https://ivory-packages.pages.dev';
   // The 12 standard outside vendors (same list as VENDOR_NAMES in Code.gs).
   var VNAMES = ['Garland and Bouquet', 'Wedding cake', 'Confetti', 'Cold Spark', 'Dry Ice', 'Ambiance lighting',
@@ -3452,8 +3452,9 @@
   var SD_DROP = [/welcome\s*drink/i, /welcome\s*girls?|hostess/i, /manthrakodi/i];   // left out of the shared list
   var SD_OPT = [/face\s*lights?/i, /sound\s*system/i];                                  // optional: only shared when ticked
   // Stage inclusions first, then every additional item that is not an outside vendor (those are booked separately).
-  function sdBuild(stage, extras) {
+  function sdBuild(stage, extras, q) {
     var out = [], seen = {};
+    var noGarland = vHit('Garland and Bouquet', q);   // garland & bouquet is an outside vendor in this quote, so it is not part of the stage list
     var all = (stage || []).slice();
     (extras || []).forEach(function (x) {
       if (VNAMES.some(function (n) { return stdMatch(n, x.name); })) return;
@@ -3461,6 +3462,7 @@
     });
     all.forEach(function (s) {
       s = String(s).replace(/\s+/g, ' ').trim();
+      if (noGarland && VENDOR_RE['Garland and Bouquet'].test(s)) return;
       if (!s || /^stage\s*decoration\s*including/i.test(s)) return;
       if (SD_DROP.some(function (r) { return r.test(s); })) return;
       var opt = SD_OPT.some(function (r) { return r.test(s); });
@@ -3487,7 +3489,7 @@
   function sdOpen(it, list) {
     var q = (list || []).filter(function (x) { return x.src === 'cloud' && x.stage && x.stage.length; })[0];
     if (!q) { toast('No stage decoration list found in the quote.', true); return; }
-    SD = { it: it, rows: sdBuild(q.stage, q.extras) };
+    SD = { it: it, rows: sdBuild(q.stage, q.extras, q) };
     $('#sdMeta').textContent = 'From quote #' + q.no + (it.venue ? ' - ' + it.venue : '');
     sdRender();
     openSheet('#sd');
