@@ -309,6 +309,11 @@ function api_vendor(pin, p) {
         if (r < 0 && String(v[0]) === key && String(v[3]) === vendor) r = i + 2;
       });
     }
+    if (p.remove === true) {          // the latest quote no longer lists this item: delete its row
+      if (r > 0) sh.deleteRow(r);
+      SpreadsheetApp.flush();
+      return { ok: true, removed: r > 0 };
+    }
     if (r < 0) {
       r = last + 1;
       sh.getRange(r, 1, 1, 5).setNumberFormat('@').setValues([[key, String(row[1]), String(p.date), vendor, '']]);
