@@ -932,7 +932,7 @@
 
 
   /* ---------- quotes sent + outside vendors ---------- */
-  var APP_VERSION = 'v18-Nov-f';   // shown under Outside vendors, so you can tell which Index.html is running
+  var APP_VERSION = 'v18-Nov-g';   // shown under Outside vendors, so you can tell which Index.html is running
   var GH_REPO = 'ivoryeventz-ops/Ivory-Packages', GH_BRANCH = 'main', GH_SITE = 'https://ivory-packages.pages.dev';
   // The 12 standard outside vendors (same list as VENDOR_NAMES in Code.gs).
   var VNAMES = ['Garland and Bouquet', 'Wedding cake', 'Confetti', 'Cold Spark', 'Dry Ice', 'Ambiance lighting',
@@ -2157,21 +2157,31 @@
   }
 
   // The short text on the "Groom's Car Decoration" card, rewritten from the decoration line typed in the sheet.
-  // Default line gives "Delivered to the residence in the morning". Falls back to the whole line when nothing can be read from it.
+  // Only the groom's part of the line is read (sentences about the bride alone are skipped). If the line gives two options
+  // ("fixed on the car ... or delivered to the residence") both appear on the card. The default line gives
+  // "Delivered to the residence in the morning". Anything it cannot read falls back to the groom's part of the line as typed.
   function tlDecoCard(line) {
     var t = String(line || '').replace(/\s+/g, ' ').trim();
     if (!t) return 'Delivered to the residence in the morning';
-    var verb = /\b(fix|fit|attach|mount)/i.test(t) && !/deliver/i.test(t) ? 'Fixed on the car' : 'Delivered';
-    var where = /church/i.test(t) ? 'the church' : (/\b(hall|venue|auditorium)\b/i.test(t) ? 'the venue' : (/\b(residence|house|home)\b/i.test(t) ? 'the residence' : ''));
-    var when = '', tm = /\b(?:(by|at|before|around)\s+)?(\d{1,2}(?::\d{2})?\s*(?:a\.?m\.?|p\.?m\.?))/i.exec(t);
-    if (tm) when = (tm[1] ? tm[1].toLowerCase() : 'at') + ' ' + tm[2].replace(/\s+/g, ' ').replace(/\./g, '').toUpperCase().replace(/(\d)(AM|PM)/, '$1 $2');
-    else if (/day before|previous day|eve of|evening before|night before/i.test(t)) when = 'the day before';
-    else if (/morning/i.test(t)) when = 'in the morning';
-    else if (/afternoon/i.test(t)) when = 'in the afternoon';
-    else if (/evening/i.test(t)) when = 'in the evening';
-    if (!where && !when) return t;
-    var where2 = verb === 'Delivered' ? (where ? ' to ' + where : '') : (where ? ' at ' + where : '');
-    return verb + where2 + (when ? ' ' + when : '');
+    var sents = t.split(/(?<=[.!?])\s+/), keep = sents.filter(function (x) { return !/bride/i.test(x) || /groom/i.test(x); });
+    var g = (keep.length ? keep : sents).join(' ');
+    var when = '', tm = /\b(?:(by|at|before|around)\s+)?(\d{1,2}(?::\d{2})?\s*(?:a\.?m\.?|p\.?m\.?))/i.exec(g);
+    if (tm) when = (tm[1] ? tm[1].toLowerCase() : 'at') + ' ' + tm[2].replace(/\./g, '').replace(/\s+/g, '').toUpperCase().replace(/(\d)(AM|PM)/, '$1 $2');
+    else if (/day before|previous day|eve of|evening before|night before/i.test(g)) when = 'the day before';
+    else if (/morning/i.test(g)) when = 'in the morning';
+    else if (/afternoon/i.test(g)) when = 'in the afternoon';
+    else if (/evening/i.test(g)) when = 'in the evening';
+    var parts = [];
+    g.replace(/^\s*on the (?:morning|afternoon|evening)[^,]*,\s*/i, '').split(/,?\s+or\s+/i).forEach(function (c) {
+      var fixed = /\b(fix|fixed|fit|fitted|attach|attached|mount|mounted)\b/i.test(c), deliv = /\b(deliver|delivered|reach|reached|arrive|arrives)\b/i.test(c);
+      if (!fixed && !deliv) return;
+      var where = /church/i.test(c) ? 'the church' : (/\b(hall|venue|auditorium)\b/i.test(c) ? 'the venue' : (/\b(residence|house|home)\b/i.test(c) ? 'the residence' : ''));
+      var x = fixed ? 'fixed on the car' + (where ? ' at ' + where : '') : 'delivered' + (where ? ' to ' + where : '');
+      if (parts.indexOf(x) < 0) parts.push(x);
+    });
+    if (!parts.length) return g;
+    var out = parts.join(' or ') + (when ? ' ' + when : '');
+    return out.charAt(0).toUpperCase() + out.slice(1);
   }
 
   // Everything that changes from one wedding to the next, as ready-to-insert (already escaped) pieces.
@@ -2844,10 +2854,6 @@
           <strong>Reception Hall Setup</strong>
           <span>Previous afternoon or evening</span>
         </div>
-        <div class="timing-box">
-          <strong>Venue Fully Ready</strong>
-          <span>At least 30 mins before the reception</span>
-        </div>
         ${A.timingCars}
         <div class="timing-box">
           <strong>Arrival at Church</strong>
@@ -2864,6 +2870,10 @@
         <div class="timing-box">
           <strong>Church Formalities &amp; Photos</strong>
           <span>About 30 to 45 mins after the service</span>
+        </div>
+        <div class="timing-box">
+          <strong>Venue Fully Ready</strong>
+          <span>At least 30 mins before the reception</span>
         </div>
         <div class="timing-box">
           <strong>Reception</strong>
