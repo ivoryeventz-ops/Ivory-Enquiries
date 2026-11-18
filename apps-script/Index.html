@@ -925,7 +925,7 @@
 
 
   /* ---------- quotes sent + outside vendors ---------- */
-  var APP_VERSION = 'v18-Nov-a';   // shown under Outside vendors, so you can tell which Index.html is running
+  var APP_VERSION = 'v18-Nov-b';   // shown under Outside vendors, so you can tell which Index.html is running
   var GH_REPO = 'ivoryeventz-ops/Ivory-Packages', GH_BRANCH = 'main', GH_SITE = 'https://ivory-packages.pages.dev';
   // The 12 standard outside vendors (same list as VENDOR_NAMES in Code.gs).
   var VNAMES = ['Garland and Bouquet', 'Wedding cake', 'Confetti', 'Cold Spark', 'Dry Ice', 'Ambiance lighting',
@@ -1058,6 +1058,20 @@
           var t = (b.textContent || '').replace(/\s+/g, ' ').trim();
           if (t) stage.push(t);
         });
+        var extras = [];   // additional items that are decor (not outside vendors, not offered options), for the stage decoration list
+        Array.prototype.forEach.call(doc.querySelectorAll('.section-card'), function (sc) {
+          var st = ((sc.querySelector('.section-title') || {}).textContent || '');
+          if (sc === stageSec || /complimentary|payment\s*terms|additional\s*options|outside\s*vendors/i.test(st)) return;
+          Array.prototype.forEach.call(sc.querySelectorAll('.line-item-box'), function (b) {
+            var nm = ((b.querySelector('.line-item-name') || {}).textContent || '').replace(/\s+/g, ' ').trim();
+            if (!nm) return;
+            var subs = [];
+            Array.prototype.forEach.call(b.querySelectorAll('.line-item-sublist li'), function (l) {
+              var t = (l.textContent || '').replace(/\s+/g, ' ').trim(); if (t) subs.push(t);
+            });
+            extras.push({ name: nm, subs: subs });
+          });
+        });
         Array.prototype.forEach.call(doc.querySelectorAll('.section-card'), function (sc) {   // options the client has not chosen are not vendors to book
           if (/additional\s*options/i.test((sc.querySelector('.section-title') || {}).textContent || '')) sc.parentNode.removeChild(sc);
         });
@@ -1065,7 +1079,7 @@
         var text = ((doc.body && doc.body.textContent) || '').replace(/\s+/g, ' ');
         var cut = text.search(/Complimentary Wedding Management/i);   // the free services are not outside vendors
         if (cut > 0) text = text.slice(0, cut);
-        return { no: no, src: 'cloud', folder: folder, url: GH_SITE + '/' + encodeURIComponent(folder) + '/' + no, date: date, venue: venue, text: text, chunks: chunks, stage: stage, outside: outside, items: items, scan: scan, raw: rawHtml };
+        return { no: no, src: 'cloud', folder: folder, url: GH_SITE + '/' + encodeURIComponent(folder) + '/' + no, date: date, venue: venue, text: text, chunks: chunks, stage: stage, extras: extras, outside: outside, items: items, scan: scan, raw: rawHtml };
       })
       .catch(function (e) { if (ghCache[k] === entry) delete ghCache[k]; throw e; });
     return entry.p;
@@ -3437,9 +3451,15 @@
   var SD = null;
   var SD_DROP = [/welcome\s*drink/i, /welcome\s*girls?|hostess/i, /manthrakodi/i];   // left out of the shared list
   var SD_OPT = [/face\s*lights?/i, /sound\s*system/i];                                  // optional: only shared when ticked
-  function sdBuild(stage) {
+  // Stage inclusions first, then every additional item that is not an outside vendor (those are booked separately).
+  function sdBuild(stage, extras) {
     var out = [], seen = {};
-    (stage || []).forEach(function (s) {
+    var all = (stage || []).slice();
+    (extras || []).forEach(function (x) {
+      if (VNAMES.some(function (n) { return stdMatch(n, x.name); })) return;
+      all.push(x.name + ((x.subs || []).length ? ' - ' + x.subs.join(', ') : ''));
+    });
+    all.forEach(function (s) {
       s = String(s).replace(/\s+/g, ' ').trim();
       if (!s || /^stage\s*decoration\s*including/i.test(s)) return;
       if (SD_DROP.some(function (r) { return r.test(s); })) return;
@@ -3467,7 +3487,7 @@
   function sdOpen(it, list) {
     var q = (list || []).filter(function (x) { return x.src === 'cloud' && x.stage && x.stage.length; })[0];
     if (!q) { toast('No stage decoration list found in the quote.', true); return; }
-    SD = { it: it, rows: sdBuild(q.stage) };
+    SD = { it: it, rows: sdBuild(q.stage, q.extras) };
     $('#sdMeta').textContent = 'From quote #' + q.no + (it.venue ? ' - ' + it.venue : '');
     sdRender();
     openSheet('#sd');
