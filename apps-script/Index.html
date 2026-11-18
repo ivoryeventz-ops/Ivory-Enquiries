@@ -932,7 +932,7 @@
 
 
   /* ---------- quotes sent + outside vendors ---------- */
-  var APP_VERSION = 'v18-Nov-g';   // shown under Outside vendors, so you can tell which Index.html is running
+  var APP_VERSION = 'v18-Nov-h';   // shown under Outside vendors, so you can tell which Index.html is running
   var GH_REPO = 'ivoryeventz-ops/Ivory-Packages', GH_BRANCH = 'main', GH_SITE = 'https://ivory-packages.pages.dev';
   // The 12 standard outside vendors (same list as VENDOR_NAMES in Code.gs).
   var VNAMES = ['Garland and Bouquet', 'Wedding cake', 'Confetti', 'Cold Spark', 'Dry Ice', 'Ambiance lighting',
@@ -2156,21 +2156,28 @@
     return g && b ? g + ' & ' + b : (g || b || 'Wedding');
   }
 
-  // The short text on the "Groom's Car Decoration" card, rewritten from the decoration line typed in the sheet.
-  // Only the groom's part of the line is read (sentences about the bride alone are skipped). If the line gives two options
-  // ("fixed on the car ... or delivered to the residence") both appear on the card. The default line gives
-  // "Delivered to the residence in the morning". Anything it cannot read falls back to the groom's part of the line as typed.
-  function tlDecoCard(line) {
-    var t = String(line || '').replace(/\s+/g, ' ').trim();
-    if (!t) return 'Delivered to the residence in the morning';
-    var sents = t.split(/(?<=[.!?])\s+/), keep = sents.filter(function (x) { return !/bride/i.test(x) || /groom/i.test(x); });
+  // The short text on the "Groom's Car Decoration" / "Bride's Car Decoration" cards, rewritten from the decoration line typed in the sheet.
+  // For the groom only his part of the line is read (sentences about the bride alone are skipped); for the bride only sentences that mention her.
+  // If a sentence gives two options ("fixed on the car ... or delivered to the residence") both appear on the card. The default line gives
+  // "Delivered to the residence in the morning". A time of day said once for the whole line ("On the morning of the wedding, ...") applies to both cards.
+  // Returns '' when the line says nothing about the bride's decoration. Anything it cannot read falls back to the matching part of the line as typed.
+  function tlDecoCard(line, who) {
+    var t = String(line || '').replace(/\s+/g, ' ').trim(), bride = who === 'bride';
+    if (!t) return bride ? '' : 'Delivered to the residence in the morning';
+    var sents = t.split(/(?<=[.!?])\s+/);
+    var keep = sents.filter(function (x) { return bride ? /bride/i.test(x) : (!/bride/i.test(x) || /groom/i.test(x)); });
+    if (bride && !keep.length) return '';
     var g = (keep.length ? keep : sents).join(' ');
-    var when = '', tm = /\b(?:(by|at|before|around)\s+)?(\d{1,2}(?::\d{2})?\s*(?:a\.?m\.?|p\.?m\.?))/i.exec(g);
-    if (tm) when = (tm[1] ? tm[1].toLowerCase() : 'at') + ' ' + tm[2].replace(/\./g, '').replace(/\s+/g, '').toUpperCase().replace(/(\d)(AM|PM)/, '$1 $2');
-    else if (/day before|previous day|eve of|evening before|night before/i.test(g)) when = 'the day before';
-    else if (/morning/i.test(g)) when = 'in the morning';
-    else if (/afternoon/i.test(g)) when = 'in the afternoon';
-    else if (/evening/i.test(g)) when = 'in the evening';
+    var timeOf = function (x) {
+      var tm = /\b(?:(by|at|before|around)\s+)?(\d{1,2}(?::\d{2})?\s*(?:a\.?m\.?|p\.?m\.?))/i.exec(x);
+      if (tm) return (tm[1] ? tm[1].toLowerCase() : 'at') + ' ' + tm[2].replace(/\./g, '').replace(/\s+/g, '').toUpperCase().replace(/(\d)(AM|PM)/, '$1 $2');
+      if (/day before|previous day|eve of|evening before|night before/i.test(x)) return 'the day before';
+      if (/morning/i.test(x)) return 'in the morning';
+      if (/afternoon/i.test(x)) return 'in the afternoon';
+      if (/evening/i.test(x)) return 'in the evening';
+      return '';
+    };
+    var when = timeOf(g) || timeOf(t);
     var parts = [];
     g.replace(/^\s*on the (?:morning|afternoon|evening)[^,]*,\s*/i, '').split(/,?\s+or\s+/i).forEach(function (c) {
       var fixed = /\b(fix|fixed|fit|fitted|attach|attached|mount|mounted)\b/i.test(c), deliv = /\b(deliver|delivered|reach|reached|arrive|arrives)\b/i.test(c);
@@ -2194,6 +2201,8 @@
     if (!hasGroomCar && deco) {
       paras.push(deco);
       boxes.push(['Groom’s Car Decoration', tlDecoCard(deco)]);
+      var brideDeco = tlDecoCard(deco, 'bride');   // the bride's car decoration, when the line mentions it and she has no car of her own listed
+      if (brideDeco && !cars.some(function (c) { return c.who === 'bride'; })) boxes.push(['Bride’s Car Decoration', brideDeco]);
     }
     cars.forEach(function (c) {
       var w = c.who, type = String(c.type || '').trim(), time = String(c.time || '').trim();
