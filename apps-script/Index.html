@@ -6,126 +6,217 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#6e1f2f">
 <title>Ivory Enquiries</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&display=swap" rel="stylesheet">
 <style>
+  /* ===== Ivory Enquiries - design tokens ===== */
   :root{
-    --burgundy:#6e1f2f; --burgundy-d:#521622; --gold:#c8a24a; --cream:#faf5ea; --paper:#ffffff;
-    --ink:#2a1a1d; --muted:#7a6a6c; --line:#e8dfcd;
+    --burgundy:#6e1f2f; --burgundy-d:#521622; --gold:#b8934a; --gold-soft:#efe3c8; --cream:#faf6ee; --paper:#ffffff;
+    --ink:#2b1d20; --muted:#807374; --line:#ece4d4; --wash:#f4ede0;
     --enq:#4a6a8a; --cost:#b7791f; --blk:#7b5ea7; --conf:#2f7d4f; --other:#8a8a8a; --danger:#a63232;
+    --serif:"Cormorant Garamond",Georgia,"Times New Roman",serif;
+    --r:16px; --shadow:0 1px 2px rgba(60,30,20,.06),0 6px 18px rgba(60,30,20,.05);
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-  html,body{margin:0;background:var(--cream);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:16px}
-  header{position:sticky;top:0;z-index:5;background:var(--burgundy);color:#fff;padding:calc(10px + env(safe-area-inset-top)) 16px 10px;border-bottom:3px solid var(--gold)}
+  html,body{margin:0;background:var(--cream);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:16px;line-height:1.35}
+  button{font-family:inherit}
+
+  /* ----- header ----- */
+  header{position:sticky;top:0;z-index:5;background:linear-gradient(180deg,var(--burgundy),var(--burgundy-d));color:#fff;padding:calc(10px + env(safe-area-inset-top)) 16px 12px;box-shadow:0 2px 14px rgba(82,22,34,.25)}
   .top{display:flex;align-items:center;justify-content:space-between;gap:10px}
-  .brand{display:flex;align-items:center;gap:10px;min-width:0}
-  .logo{width:38px;height:38px;border-radius:50%;object-fit:cover;flex:0 0 auto;background:#fff}
-  .pin .logo{width:84px;height:84px;margin-bottom:14px}
-  h1{font-size:19px;margin:0;letter-spacing:.3px;font-weight:650}
-  .sub{font-size:12px;opacity:.8;margin-top:2px}
-  .icon{background:rgba(255,255,255,.14);border:0;color:#fff;border-radius:10px;width:40px;height:40px;font-size:20px}
-  .search{margin-top:10px;width:100%;border:0;border-radius:10px;padding:10px 12px;font-size:16px;background:rgba(255,255,255,.95)}
-  .chips{display:flex;gap:8px;overflow-x:auto;padding:10px 16px 4px;scrollbar-width:none}
+  .brand{display:flex;align-items:center;gap:11px;min-width:0}
+  .logo{width:40px;height:40px;border-radius:50%;object-fit:cover;flex:0 0 auto;background:#fff;box-shadow:0 0 0 2px rgba(255,255,255,.35)}
+  .pin .logo{width:88px;height:88px;margin-bottom:16px}
+  h1{white-space:nowrap;font-family:var(--serif);font-size:25px;margin:0;letter-spacing:.2px;font-weight:700;line-height:1}
+  .sub{font-size:12px;opacity:.75;margin-top:3px}
+  .hbtns{display:flex;gap:8px;align-items:center;flex:0 0 auto}
+  .icon{background:rgba(255,255,255,.14);border:0;color:#fff;border-radius:12px;width:40px;height:40px;font-size:20px;cursor:pointer}
+  .vbtn{background:rgba(255,255,255,.14);border:0;color:#fff;border-radius:12px;height:40px;padding:0 14px;font-size:14px;font-weight:600;cursor:pointer}
+  .search{margin-top:12px;width:100%;border:0;border-radius:12px;padding:11px 14px;font-size:16px;background:rgba(255,255,255,.96);color:var(--ink)}
+
+  /* ----- filters ----- */
+  .chips{display:flex;gap:8px;overflow-x:auto;padding:14px 16px 4px;scrollbar-width:none}
   .chips::-webkit-scrollbar{display:none}
-  .chip{flex:0 0 auto;border:1px solid var(--line);background:var(--paper);color:var(--ink);border-radius:999px;padding:7px 14px;font-size:14px}
+  .chip{flex:0 0 auto;border:1px solid var(--line);background:var(--paper);color:var(--ink);border-radius:999px;padding:7px 15px;font-size:14px;cursor:pointer}
   .chip.on{background:var(--burgundy);border-color:var(--burgundy);color:#fff}
-  .past{display:flex;align-items:center;gap:8px;padding:6px 16px 0;font-size:13px;color:var(--muted)}
-  main{padding:8px 16px calc(100px + env(safe-area-inset-bottom))}
-  .count{font-size:12px;color:var(--muted);margin:6px 2px 8px}
-  .card{cursor:pointer;display:block;width:100%;text-align:left;background:var(--paper);border:1px solid var(--line);border-left:5px solid var(--other);border-radius:12px;padding:12px 14px;margin-bottom:10px;font:inherit;color:inherit}
-  .card.s-Enquiry{border-left-color:var(--enq)} .card.s-Costing{border-left-color:var(--cost)} .card.s-Blocked{border-left-color:var(--blk)} .card.s-Confirmed{border-left-color:var(--conf)}
-  .r1{display:flex;justify-content:space-between;align-items:center;gap:8px}
-  .name{font-weight:650;font-size:17px}
-  .badge{font-size:12px;color:#fff;border-radius:999px;padding:3px 10px;background:var(--other);white-space:nowrap}
+  .past{display:flex;align-items:center;gap:8px;padding:8px 18px 0;font-size:13px;color:var(--muted)}
+  main{padding:6px 16px calc(110px + env(safe-area-inset-bottom))}
+  .count{font-size:12px;color:var(--muted);margin:8px 2px 10px;letter-spacing:.02em}
+
+  /* ----- work cards ----- */
+  .card{cursor:pointer;display:grid;grid-template-columns:56px 1fr auto;gap:2px 14px;align-items:center;width:100%;text-align:left;background:var(--paper);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;margin-bottom:10px;font:inherit;color:inherit;box-shadow:var(--shadow)}
+  .card:active{background:#fffdf8}
+  .tile{grid-row:1 / span 3;width:56px;text-align:center;border-radius:12px;background:var(--wash);padding:7px 0 6px;border-top:3px solid var(--other)}
+  .tile b{display:block;font-family:var(--serif);font-size:26px;line-height:1;font-weight:700;color:var(--ink)}
+  .tile span{display:block;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-top:3px}
+  .card.s-Enquiry .tile{border-top-color:var(--enq)} .card.s-Costing .tile{border-top-color:var(--cost)} .card.s-Blocked .tile{border-top-color:var(--blk)} .card.s-Confirmed .tile{border-top-color:var(--conf)}
+  .r1{display:flex;justify-content:space-between;align-items:center;gap:8px;grid-column:2 / 4}
+  .name{font-family:var(--serif);font-weight:700;font-size:21px;line-height:1.1}
+  .badge{font-size:11px;font-weight:600;letter-spacing:.04em;color:#fff;border-radius:999px;padding:3px 10px;background:var(--other);white-space:nowrap}
   .badge.s-Enquiry{background:var(--enq)} .badge.s-Costing{background:var(--cost)} .badge.s-Blocked{background:var(--blk)} .badge.s-Confirmed{background:var(--conf)}
-  .r2{margin-top:4px;font-size:14px}
-  .r3{margin-top:2px;font-size:14px;color:var(--muted)}
-  .since{margin-top:6px;font-size:12px;color:var(--cost)}
-  .empty{text-align:center;color:var(--muted);padding:40px 10px}
-  .fabs{position:fixed;right:14px;bottom:calc(18px + env(safe-area-inset-bottom));display:flex;gap:10px;align-items:center;z-index:6}
-  .fab{background:var(--burgundy);color:#fff;border:0;border-radius:999px;padding:15px 20px;font-size:16px;font-weight:600;box-shadow:0 6px 18px rgba(82,22,34,.35);white-space:nowrap}
-  .fab.alt{background:#fff;color:var(--burgundy);border:2px solid var(--burgundy);padding:13px 18px}
-  .fab span{color:var(--gold);font-size:20px;vertical-align:-1px;margin-right:6px}
+  .r2{grid-column:2 / 4;font-size:14px;color:var(--ink)}
+  .r3{grid-column:2 / 4;font-size:13px;color:var(--muted)}
+  .since{grid-column:1 / 4;margin-top:6px;font-size:12px;color:var(--cost)}
+  .nq{grid-column:1 / 4;margin-top:6px;font-size:13px;font-weight:700;color:var(--danger)}
+  .mg{margin-top:6px;font-size:13px;font-weight:600;color:var(--cost)}
+  .empty{text-align:center;color:var(--muted);padding:48px 10px;font-family:var(--serif);font-size:20px}
+  .acts{grid-column:1 / 4;margin-top:8px;border-top:1px dashed var(--line);padding-top:6px}
+  .acts .sg{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--cost);margin:6px 0 2px;display:flex;gap:8px;flex-wrap:wrap}
+  .acts .sg em{font-style:normal;text-transform:none;letter-spacing:0;font-weight:600;color:var(--muted)}
+  .acts .sg em.late{color:var(--danger)}
+  .acts .sg.later{color:var(--muted)}
+  .act{display:flex;align-items:flex-start;gap:10px;margin:1px 0;padding:6px 0;font-size:15px;color:var(--ink)}
+  .act input{width:22px;height:22px;padding:0;flex:none;accent-color:var(--conf);margin-top:1px}
+  .act.done span{text-decoration:line-through;color:var(--muted)}
+
+  /* ----- buttons ----- */
+  .fabs{position:fixed;right:16px;bottom:calc(18px + env(safe-area-inset-bottom));display:flex;gap:10px;align-items:center;z-index:6}
+  .fab{background:var(--burgundy);color:#fff;border:0;border-radius:999px;padding:15px 22px;font-size:16px;font-weight:600;box-shadow:0 8px 22px rgba(82,22,34,.38);white-space:nowrap;cursor:pointer}
+  .fab span{color:var(--gold-soft);font-size:21px;vertical-align:-2px;margin-right:6px}
+  .primary{width:100%;margin-top:18px;background:var(--burgundy);color:#fff;border:0;border-radius:14px;padding:15px;font-size:17px;font-weight:600;cursor:pointer}
+  .primary:disabled{opacity:.55}
+  .ghost{border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:14px;padding:13px 16px;font-size:16px;font-weight:600;cursor:pointer}
+  .link{display:block;margin:14px auto 0;background:none;border:0;color:var(--muted);font-size:15px;padding:8px 14px;cursor:pointer}
+  .retryb{margin-left:6px;border:1px solid var(--line);background:#fff;border-radius:10px;padding:6px 12px;font-size:14px;color:var(--ink)}
+  .wa{display:inline-flex;align-items:center;margin-top:10px;background:#1f9d55;color:#fff;border-radius:12px;padding:10px 18px;font-size:14px;font-weight:600;text-decoration:none}
+
+  /* ----- sheets ----- */
   .scrim{position:fixed;inset:0;background:rgba(30,10,14,.5);display:none;z-index:20}
   .scrim.show{display:block}
-  .sheet{position:fixed;left:0;right:0;bottom:0;background:var(--paper);border-radius:18px 18px 0 0;padding:18px 16px calc(18px + env(safe-area-inset-bottom));z-index:21;display:none;max-height:92vh;overflow:auto}
+  .sheet{position:fixed;left:0;right:0;bottom:0;background:var(--cream);border-radius:24px 24px 0 0;padding:10px 16px calc(20px + env(safe-area-inset-bottom));z-index:21;display:none;max-height:94vh;overflow:auto;box-shadow:0 -10px 40px rgba(30,10,14,.25)}
   .sheet.show{display:block}
-  .sheet h2{margin:0 0 4px;font-size:19px}
+  @media(min-width:760px){.sheet{left:50%;right:auto;width:720px;transform:translateX(-50%)}}
+  .grab{width:44px;height:5px;border-radius:3px;background:#d9cfbb;margin:2px auto 12px}
+  .sheet h2{margin:0 0 2px;font-family:var(--serif);font-size:27px;font-weight:700;line-height:1.1}
   .sheet .meta{color:var(--muted);font-size:14px;margin-bottom:14px}
   label{display:block;font-size:13px;color:var(--muted);margin:12px 0 4px}
-  input,select{width:100%;border:1px solid var(--line);border-radius:10px;padding:12px;font-size:16px;background:#fff;color:var(--ink)}
-  .stbtns{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-  .st{border:2px solid var(--line);background:#fff;border-radius:12px;padding:14px 8px;font-size:16px;font-weight:600;color:var(--ink)}
-  .st.cur{border-color:var(--burgundy);background:#f6e9ec}
-  .st.lost{color:var(--danger);grid-column:1 / -1;font-weight:500}
-  .primary{width:100%;margin-top:18px;background:var(--burgundy);color:#fff;border:0;border-radius:12px;padding:15px;font-size:17px;font-weight:600}
-  .primary:disabled{opacity:.6}
-  .link{display:block;margin:12px auto 0;background:none;border:0;color:var(--muted);font-size:15px}
-  .bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--gold);z-index:50;transition:width .3s}
+  input,select{width:100%;border:1px solid var(--line);border-radius:12px;padding:12px;font-size:16px;background:#fff;color:var(--ink)}
+  input:focus,select:focus,textarea:focus{outline:2px solid var(--gold);outline-offset:0;border-color:var(--gold)}
+  .sheet h3{font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin:20px 0 10px;display:flex;justify-content:space-between;align-items:center;gap:8px;font-weight:700}
+  .sheet h3 .vcount{text-transform:none;letter-spacing:0;font-size:13px;color:var(--ink);font-weight:600}
+  .note{font-size:14px;color:var(--muted);margin:0 0 10px}
+  .note.warn{color:var(--ink);border:1px dashed var(--cost);border-radius:12px;padding:9px 12px;background:#fffaf0}
+  .bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--gold);z-index:80;transition:width .3s}
   .bar.on{width:70%}
-  .toast{position:fixed;left:50%;bottom:calc(86px + env(safe-area-inset-bottom));transform:translateX(-50%);background:#2a1a1d;color:#fff;padding:10px 16px;border-radius:10px;font-size:14px;z-index:60;display:none;max-width:88%;text-align:center}
+  .toast{position:fixed;left:50%;bottom:calc(90px + env(safe-area-inset-bottom));transform:translateX(-50%);background:#2b1d20;color:#fff;padding:11px 18px;border-radius:12px;font-size:14px;z-index:90;display:none;max-width:88%;text-align:center;box-shadow:0 8px 24px rgba(0,0,0,.25)}
   .toast.err{background:var(--danger)}
   .pin{position:fixed;inset:0;background:var(--cream);z-index:40;display:none;flex-direction:column;align-items:center;justify-content:center;padding:30px}
   .pin.show{display:flex}
-  .pin h2{color:var(--burgundy);margin:0 0 6px}
+  .pin h2{color:var(--burgundy);margin:0 0 6px;font-size:32px}
   .pin p{color:var(--muted);margin:0 0 18px;text-align:center}
   .pin input{max-width:260px;text-align:center;letter-spacing:6px;font-size:22px}
-  /* quotes sent + outside vendors (inside the detail sheet) */
-  .sheet h3{font-size:12px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin:22px 0 10px;display:flex;justify-content:space-between;align-items:center;gap:8px}
-  .sheet h3 .vcount{text-transform:none;letter-spacing:0;font-size:13px;color:var(--ink);font-weight:600}
-  .note{font-size:14px;color:var(--muted);margin:0 0 10px}
-  .note.warn{color:var(--ink);border:1px dashed var(--cost);border-radius:10px;padding:9px 11px}
-  .retryb{margin-left:6px;border:1px solid var(--line);background:#fff;border-radius:8px;padding:5px 12px;font-size:14px;color:var(--ink)}
-  .qrow{display:flex;justify-content:space-between;align-items:center;gap:10px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:8px;text-decoration:none;color:var(--ink)}
+
+  /* ----- work screen: head, status, tabs ----- */
+  .dhead{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+  .dhead .badge{margin-top:6px;font-size:12px;padding:4px 12px}
+  .stlab{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:2px 0 6px}
+  .stbtns{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;background:var(--wash);padding:4px;border-radius:14px}
+  .st{border:0;background:transparent;border-radius:11px;padding:10px 2px;font-size:14px;font-weight:600;color:var(--muted);cursor:pointer}
+  .st.cur{background:#fff;color:var(--burgundy);box-shadow:0 1px 4px rgba(60,30,20,.15)}
+  .st.lost{grid-column:1 / -1;background:none;color:var(--danger);font-weight:500;font-size:13px;padding:6px;box-shadow:none}
+  .dtabs{display:flex;gap:4px;margin:16px 0 4px;border-bottom:1px solid var(--line);overflow-x:auto;scrollbar-width:none}
+  .dtabs::-webkit-scrollbar{display:none}
+  .dtab{flex:1 1 auto;border:0;background:none;padding:11px 6px 10px;font-size:14px;font-weight:600;color:var(--muted);border-bottom:3px solid transparent;margin-bottom:-1px;cursor:pointer;white-space:nowrap}
+  .dtab.on{color:var(--burgundy);border-bottom-color:var(--burgundy)}
+  .dtab em{font-style:normal;font-size:11px;font-weight:700;background:var(--wash);color:var(--muted);border-radius:999px;padding:2px 7px;margin-left:6px}
+  .dtab.alert em{background:var(--burgundy);color:#fff}
+  .dtab[hidden]{display:none}
+  .dtab em:empty{display:none}
+  .pane{display:none}
+  .pane.on{display:block}
+  .pane h3:first-child{margin-top:16px}
+  .group{background:#fff;border:1px solid var(--line);border-radius:var(--r);padding:4px 14px;margin-bottom:14px;box-shadow:var(--shadow)}
+  .group .qrow{border:0;border-bottom:1px solid var(--line);border-radius:0;padding:12px 0;margin:0;background:none}
+  .group .qrow:last-child,.group>*:last-child{border-bottom:0}
+
+  /* ----- quote rows ----- */
+  .qrow{display:flex;justify-content:space-between;align-items:center;gap:10px;background:#fff;border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin-bottom:8px;text-decoration:none;color:var(--ink);box-shadow:var(--shadow)}
   .qrow b{font-size:16px;font-variant-numeric:tabular-nums}
   .qrow .qs{display:block;font-size:13px;color:var(--muted);margin-top:2px}
   .qrow .go{color:var(--burgundy);font-weight:600;font-size:14px;white-space:nowrap}
-  .tag{font-size:11px;background:var(--gold);color:#fff;border-radius:999px;padding:2px 8px;margin-left:6px;vertical-align:middle;font-weight:600}
-  .vrow{border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:10px;background:#fff}
-  .vrow.on{border-color:var(--conf);background:#f0f8f3}
+  .tag{font-size:11px;background:var(--gold);color:#fff;border-radius:999px;padding:2px 9px;margin-left:8px;vertical-align:middle;font-weight:600}
+  .tag.ok{background:var(--conf)}
+  .payrow{width:100%;text-align:left;font:inherit;cursor:pointer;border-color:var(--gold-soft);background:#fffcf5}
+  .payrow b{font-size:16px}
+  .qwrap{display:flex;gap:6px;margin-bottom:8px;align-items:stretch}
+  .qwrap .qrow{flex:1;margin-bottom:0;min-width:0}
+  .qedit{flex:0 0 auto;width:92px;border:1px solid var(--gold-soft);background:#fffcf5;border-radius:14px;font:inherit;font-size:13px;font-weight:600;color:var(--burgundy);padding:6px;cursor:pointer}
+
+  /* ----- client link tab ----- */
+  .lnk{display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--wash);border-radius:14px;padding:10px 12px;margin:0 0 14px;font-size:13px;color:var(--muted);word-break:break-all}
+  .lnk a{color:var(--burgundy);font-weight:600;text-decoration:none;white-space:nowrap}
+  .steps{position:relative}
+  .srow{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:13px 0;border-bottom:1px solid var(--line)}
+  .srow:last-child{border-bottom:0}
+  .srow b{display:block;font-size:16px}
+  .srow .qs{display:block;font-size:13px;color:var(--muted);margin-top:2px}
+  .srow .qs.ok{color:var(--conf);font-weight:600}
+  .srow .rb{display:flex;gap:6px;align-items:center;flex:0 0 auto}
+  .sbtn{border:1px solid var(--burgundy);background:var(--burgundy);color:#fff;border-radius:11px;padding:9px 13px;font-size:14px;font-weight:600;cursor:pointer;white-space:nowrap}
+  .sbtn.alt{background:#fff;color:var(--burgundy)}
+  a.sbtn{display:inline-block;text-decoration:none;text-align:center}
+  .sbtn:disabled{opacity:.45}
+  .onlink{color:var(--conf);font-weight:700;font-size:14px;white-space:nowrap}
+  .stepn{display:flex;gap:10px;align-items:center;font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:16px 0 4px}
+  .stepn i{font-style:normal;width:20px;height:20px;border-radius:50%;background:var(--burgundy);color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:11px;letter-spacing:0}
+  .optrow{display:flex;align-items:center;gap:10px;font-size:15px;font-weight:600;color:var(--ink);margin:0;padding:6px 0 2px}
+  .optrow input{width:22px;height:22px;padding:0;flex:none;accent-color:var(--conf)}
+
+  /* ----- confirm dialog ----- */
+  .modal{position:fixed;inset:0;background:rgba(30,10,14,.55);display:none;align-items:flex-end;justify-content:center;z-index:70;padding:16px}
+  .modal.show{display:flex}
+  @media(min-width:760px){.modal{align-items:center}}
+  .mbox{background:#fff;border-radius:22px;padding:22px 20px 18px;width:100%;max-width:440px;box-shadow:0 20px 60px rgba(0,0,0,.35)}
+  .mbox h4{font-family:var(--serif);font-size:25px;margin:0 0 8px;color:var(--burgundy);line-height:1.1;text-transform:none;letter-spacing:0}
+  .mbox p{margin:0 0 12px;font-size:15px;color:var(--ink)}
+  .mbtns{display:grid;grid-template-columns:1fr 1.4fr;gap:10px;margin-top:14px}
+  .mbtns .primary{margin:0}
+
+  /* ----- staff checklist ----- */
+  .ckcard{background:#fff;border:1px solid var(--gold-soft);border-radius:var(--r);padding:14px;margin:16px 0 4px;box-shadow:var(--shadow)}
+  .ckcard b{font-size:16px}
+  .ckcard .qs{display:block;font-size:13px;color:var(--muted);margin:2px 0 10px}
+  .ckcard .rb{display:flex;gap:8px;flex-wrap:wrap}
+  .ckg{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:16px 0 4px}
+  .ckrow{display:flex;align-items:flex-start;gap:12px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin:0 0 6px;font-size:15px;color:var(--ink)}
+  .ckrow input{width:22px;height:22px;padding:0;flex:none;accent-color:var(--burgundy);margin-top:1px}
+  .ckrow small{display:block;font-size:12px;color:var(--muted);margin-top:2px;font-weight:400}
+  .ckadd{display:grid;grid-template-columns:1fr auto;gap:8px;margin-top:10px}
+
+  /* ----- outside vendors ----- */
+  .vrow{border:1px solid var(--line);border-radius:14px;padding:10px 12px;margin-bottom:10px;background:#fff;box-shadow:var(--shadow)}
+  .vrow.on{border-color:var(--conf);background:#f3faf5}
   .vtick{display:flex;align-items:center;gap:12px;font-size:16px;font-weight:600;color:var(--ink);margin:0 0 8px}
   .vtick input{width:24px;height:24px;flex:none;padding:0;accent-color:var(--conf)}
-  .vrow textarea{width:100%;border:1px solid var(--line);border-radius:10px;padding:10px;font:inherit;font-size:16px;min-height:56px;resize:vertical;background:#fff;color:var(--ink)}
+  .vrow textarea{width:100%;border:1px solid var(--line);border-radius:12px;padding:10px;font:inherit;font-size:16px;min-height:56px;resize:vertical;background:#fff;color:var(--ink)}
   @media(min-width:520px){.vrow{display:grid;grid-template-columns:210px 1fr;gap:10px;align-items:start}.vtick{margin:0;min-height:40px}}
   .vstate{font-size:12px;color:var(--muted);min-height:16px;margin-top:4px}
   .vstate.err{color:var(--danger);font-weight:600}
   details.vmore{margin-top:6px}
   details.vmore summary{font-size:14px;color:var(--burgundy);font-weight:600;padding:6px 0}
-  .hbtns{display:flex;gap:8px;align-items:center;flex:0 0 auto}
-  .vbtn{background:rgba(255,255,255,.14);border:0;color:#fff;border-radius:10px;height:40px;padding:0 14px;font-size:14px;font-weight:600}
   .vfields{display:grid;gap:8px;min-width:0}
   .vfields input{padding:10px 12px}
   .vfilters{display:flex;gap:18px;flex-wrap:wrap;margin:12px 0 14px}
   .vfilters label{display:flex;align-items:center;gap:8px;margin:0;font-size:14px;color:var(--ink)}
   .vfilters input{width:auto}
-  .vg{background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:12px}
-  .vg h4{margin:0 0 4px;font-size:18px;display:flex;justify-content:space-between;align-items:baseline;gap:8px;color:var(--burgundy)}
-  .vg h4 span{font-size:12px;color:var(--muted);font-weight:500;white-space:nowrap}
+  .vg{background:#fff;border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;margin-bottom:12px;box-shadow:var(--shadow)}
+  .vg h4{margin:0 0 4px;font-family:var(--serif);font-size:22px;display:flex;justify-content:space-between;align-items:baseline;gap:8px;color:var(--burgundy)}
+  .vg h4 span{font-family:system-ui,sans-serif;font-size:12px;color:var(--muted);font-weight:500;white-space:nowrap}
   .vi{border-top:1px solid var(--line);padding:9px 0 3px;font-size:15px}
   .vg h4 + .vi{border-top:0}
   .vi .d{font-weight:650}
   .vi .w{color:var(--ink);margin-top:2px}
   .vi .w i{color:var(--muted);font-style:normal}
+  .vi .vv{color:var(--muted);font-size:13px}
   .bk{font-size:11px;border-radius:999px;padding:2px 8px;color:#fff;background:var(--conf);margin-left:6px;vertical-align:middle;font-weight:600}
   .bk.no{background:var(--other)}
-  .vseg{display:flex;gap:8px;margin:12px 0 0}
-  .vchip{flex:1;border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:999px;padding:9px 8px;font-size:14px}
-  .vchip.on{background:var(--burgundy);border-color:var(--burgundy);color:#fff}
-  .vi .vv{color:var(--muted);font-size:13px}
-  .wa{display:inline-flex;align-items:center;margin-top:10px;background:#1f9d55;color:#fff;border-radius:10px;padding:9px 16px;font-size:14px;font-weight:600;text-decoration:none}
-  .vtk{display:inline-flex;align-items:center;gap:10px;margin:6px 0 2px;padding:7px 12px;border:1px solid var(--line);border-radius:10px;font-size:15px;font-weight:600;color:var(--ink);background:var(--bg,#faf5ea)}
+  .vseg{display:flex;gap:6px;margin:12px 0 0;background:var(--wash);padding:4px;border-radius:14px}
+  .vchip{flex:1;border:0;background:transparent;color:var(--muted);border-radius:11px;padding:9px 8px;font-size:14px;font-weight:600;cursor:pointer}
+  .vchip.on{background:#fff;color:var(--burgundy);box-shadow:0 1px 4px rgba(60,30,20,.15)}
+  .vtk{display:inline-flex;align-items:center;gap:10px;margin:6px 0 2px;padding:7px 12px;border:1px solid var(--line);border-radius:12px;font-size:15px;font-weight:600;color:var(--ink);background:var(--cream)}
   .vtk input{width:22px;height:22px;padding:0;flex:none;accent-color:var(--conf)}
-  .vtk.on{border-color:var(--conf);background:#f0f8f3;color:var(--conf)}
-  .nq{margin-top:6px;font-size:13px;font-weight:700;color:var(--danger)}
-  .mg{margin-top:6px;font-size:13px;font-weight:600;color:var(--cost)}
-  .acts{margin-top:8px;border-top:1px dashed var(--line);padding-top:6px}
-  .acts .sg{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--cost);margin:6px 0 2px;display:flex;gap:8px;flex-wrap:wrap}
-  .acts .sg em{font-style:normal;text-transform:none;letter-spacing:0;font-weight:600;color:var(--muted)}
-  .acts .sg em.late{color:var(--danger)}
-  .acts .sg.later{color:var(--muted)}
-  .act{display:flex;align-items:flex-start;gap:10px;margin:2px 0;padding:6px 0;font-size:15px;color:var(--ink)}
-  .act input{width:22px;height:22px;padding:0;flex:none;accent-color:var(--conf);margin-top:1px}
-  .act.done span{text-decoration:line-through;color:var(--muted)}
-  #dActs h3{margin-top:22px}
-  /* Vendor list: "Not assigned" view - every outside-vendor item with no vendor name yet */
+  .vtk.on{border-color:var(--conf);background:#f3faf5;color:var(--conf)}
+  /* Vendor list: "Not assigned" view */
   .una{display:grid;grid-template-columns:1fr;gap:6px;border-top:1px solid var(--line);padding:10px 0 4px}
   .vg h4 + .una{border-top:0}
   .una .un{font-weight:650;font-size:15px}
@@ -229,7 +320,7 @@
         <div class="sub" id="sub">Loading...</div>
       </div>
     </div>
-    <button class="icon" id="refresh" aria-label="Refresh">&#8635;</button>
+    <div class="hbtns"><button class="vbtn" id="vlist" type="button">Vendors</button><button class="icon" id="refresh" aria-label="Refresh">&#8635;</button></div>
   </div>
   <input class="search" id="q" type="search" placeholder="Search name or venue">
 </header>
@@ -250,13 +341,14 @@
   <div id="list"></div>
 </main>
 
-<div class="fabs"><button class="fab alt" id="vlist">Vendor list</button><button class="fab" id="add"><span>+</span>New enquiry</button></div>
+<div class="fabs"><button class="fab" id="add"><span>+</span>New enquiry</button></div>
 
 <div class="scrim" id="scrim"></div>
 
 <div class="sheet" id="detail">
-  <h2 id="dName"></h2>
-  <div class="meta" id="dMeta"></div>
+  <div class="grab"></div>
+  <div class="dhead"><div><h2 id="dName"></h2><div class="meta" id="dMeta"></div></div><span class="badge" id="dBadge"></span></div>
+  <div class="stlab">Status</div>
   <div class="stbtns" id="stbtns">
     <button class="st" data-s="Enquiry">Enquiry</button>
     <button class="st" data-s="Costing">Costing</button>
@@ -264,9 +356,16 @@
     <button class="st" data-s="Confirmed">Confirmed</button>
     <button class="st lost" data-s="Lost">Lost - remove from list</button>
   </div>
-  <div id="dQuotes"></div>
-  <div id="dVend"></div>
-  <div id="dActs"></div>
+  <div class="dtabs" id="dTabs" role="tablist">
+    <button class="dtab on" type="button" data-t="quotes">Quotes<em id="tbQ"></em></button>
+    <button class="dtab" type="button" data-t="site">Client link<em id="tbS"></em></button>
+    <button class="dtab" type="button" data-t="vendors" id="tabV" hidden>Vendors<em id="tbV"></em></button>
+    <button class="dtab" type="button" data-t="tasks" id="tabT" hidden>Tasks<em id="tbT"></em></button>
+  </div>
+  <div class="pane on" data-p="quotes" id="dQuotes"></div>
+  <div class="pane" data-p="site" id="dSite"></div>
+  <div class="pane" data-p="vendors" id="dVend"></div>
+  <div class="pane" data-p="tasks" id="dActs"></div>
   <button class="link" id="dClose">Close</button>
 </div>
 
@@ -342,6 +441,25 @@
     <button class="primary" id="fSave" type="submit">Save enquiry</button>
     <button class="link" type="button" id="fClose">Cancel</button>
   </form>
+</div>
+
+<div class="sheet" id="ck">
+  <div class="grab"></div>
+  <h2>Staff checklist</h2>
+  <div class="meta" id="ckMeta"></div>
+  <div id="ckBody"></div>
+  <button class="primary" id="ckGo" type="button">Create Google Sheet</button>
+  <div class="pst" id="ckState"></div><div id="ckShare"></div>
+  <button class="link" id="ckClose" type="button">Back</button>
+</div>
+
+<div class="modal" id="cf" role="dialog" aria-modal="true">
+  <div class="mbox">
+    <h4 id="cfT"></h4>
+    <p id="cfB"></p>
+    <div id="cfKeyBox" style="display:none"><div class="note" id="cfKeyNote"></div><input id="cfKey" type="password" autocomplete="off" placeholder="Paste GitHub key"></div>
+    <div class="mbtns"><button class="ghost" id="cfNo" type="button">Not now</button><button class="primary" id="cfYes" type="button">Confirm</button></div>
+  </div>
 </div>
 
 <div class="pin" id="pin">
@@ -739,8 +857,9 @@
       return;
     }
     $('#list').innerHTML = list.map(function (i) {
-      var sc = 's-' + esc(i.status);
+      var sc = 's-' + esc(i.status), dt = i.date ? toDate(i.date) : null;
       return '<div class="card ' + sc + '" role="button" tabindex="0" data-row="' + i.row + '">' +
+        '<div class="tile"><b>' + (dt ? dt.getDate() : '-') + '</b><span>' + (dt ? dt.toLocaleDateString('en-GB', { month: 'short' }) : '') + '</span></div>' +
         '<div class="r1"><span class="name">' + esc(i.name) + '</span><span class="badge ' + sc + '">' + esc(i.status) + '</span></div>' +
         '<div class="r2">' + fmt(i.date) + ' &middot; ' + when(i.date) + '</div>' +
         '<div class="r3">' + esc(i.venue) + '</div>' +
@@ -774,18 +893,22 @@
     });
   }
   function renderActsDetail(it) {
-    var h = actHtml(it, true);
-    $('#dActs').innerHTML = h ? '<h3>Actions</h3>' + h : '';
+    var h = actHtml(it, true), out = '';
+    if (it.status === 'Confirmed') out += ckCard(it);
+    if (h) out += '<h3>Reminders</h3>' + h;
+    else if (it.status === 'Confirmed') out += '<div class="note" style="margin-top:14px">Reminders appear here from 3 days before the wedding.</div>';
+    $('#dActs').innerHTML = out;
+    updateTabs(it);
   }
   function actToggle(e) {
     var cb = e.target.closest('.actcb'); if (!cb) return;
     var it = items.filter(function (i) { return i.row === +cb.getAttribute('data-row'); })[0]; if (!it) return;
     var task = cb.getAttribute('data-task'), on = cb.checked, k = wkey(it) + '|' + task, had = k in FL.acts, was = FL.acts[k];
     FL.acts[k] = on;
-    render(); if (cur === it) renderActsDetail(it);
+    render(); if (cur === it) { renderActsDetail(it); renderSite(it); }
     busy(true);
     call('api_action', pin, { row: it.row, id: it.id, date: it.date, task: task, done: on })
-      .catch(function (err) { if (had) FL.acts[k] = was; else delete FL.acts[k]; render(); if (cur === it) renderActsDetail(it); toast('Not saved: ' + err.message, true); })
+      .catch(function (err) { if (had) FL.acts[k] = was; else delete FL.acts[k]; render(); if (cur === it) { renderActsDetail(it); renderSite(it); } toast('Not saved: ' + err.message, true); })
       .then(function () { busy(false); });
   }
 
@@ -833,8 +956,10 @@
     $('#tl').classList.remove('show');
     $('#sd').classList.remove('show');
     $('#qe').classList.remove('show');
+    $('#ck').classList.remove('show');
     cur = null;
     $('#dActs').innerHTML = '';
+    $('#dSite').innerHTML = '';
   }
 
   // list taps
@@ -846,13 +971,17 @@
     cur = items.filter(function (i) { return i.row === row; })[0];
     if (!cur) return;
     $('#dName').textContent = cur.name;
-    $('#dMeta').textContent = fmt(cur.date) + (cur.venue ? ' - ' + cur.venue : '');
+    $('#dMeta').textContent = fmt(cur.date) + ' \u00b7 ' + when(cur.date) + (cur.venue ? ' \u00b7 ' + cur.venue : '');
+    $('#dBadge').textContent = cur.status; $('#dBadge').className = 'badge s-' + cur.status;
+    setTab('quotes');
     Array.prototype.forEach.call(document.querySelectorAll('#stbtns .st'), function (s) {
       s.classList.toggle('cur', s.getAttribute('data-s') === cur.status);
     });
     openSheet('#detail');
     renderActsDetail(cur);
     loadDetail(cur);
+    $('#dSite').innerHTML = '';
+    if (cur.status === 'Confirmed') ckLoad(cur);
   });
 
   // status change
@@ -932,7 +1061,7 @@
 
 
   /* ---------- quotes sent + outside vendors ---------- */
-  var APP_VERSION = 'v18-Nov-h';   // shown under Outside vendors, so you can tell which Index.html is running
+  var APP_VERSION = 'v19-Nov-a';   // shown under Outside vendors, so you can tell which Index.html is running
   var GH_REPO = 'ivoryeventz-ops/Ivory-Packages', GH_BRANCH = 'main', GH_SITE = 'https://ivory-packages.pages.dev';
   // The 12 standard outside vendors (same list as VENDOR_NAMES in Code.gs).
   var VNAMES = ['Garland and Bouquet', 'Wedding cake', 'Confetti', 'Cold Spark', 'Dry Ice', 'Ambiance lighting',
@@ -1201,24 +1330,12 @@
     var h = '<h3>Quotes sent <span class="vcount">' + list.length + '</span></h3>';
     if (gh.err) h += '<div class="note warn">Newer quote pages could not be loaded (' + esc(gh.err) + ').<button class="retryb" data-act="reload">Try again</button></div>';
     lastQ = list;
-    h += '<button type="button" class="qrow payrow" data-act="pay"><span><b>Payment details</b>' + (ghPay[payFolder(it, list)] ? '<span class="tag">Sent</span>' : '') +
-      '<span class="qs">Rates, discount and advance - send to client</span></span><span class="go">Edit &amp; send &rsaquo;</span></button>';
-    h += '<button type="button" class="qrow payrow" data-act="tl"><span><b>Wedding timeline</b>' + (FL.tl[wkey(it)] ? '<span class="tag">Sent</span>' : '') +
-      '<span class="qs">Wedding day guide - filled in from the latest quote</span></span><span class="go">Edit &amp; send &rsaquo;</span></button>';
-    var sdq = list.filter(function (q) { return q.src === 'cloud' && q.stage && q.stage.length; })[0];
-    if (sdq) {
-      h += '<button type="button" class="qrow payrow" data-act="sd"><span><b>Stage decoration list</b>' +
-        '<span class="qs">From quote #' + esc(sdq.no) + ' - share list and stage design photo</span></span><span class="go">Share &rsaquo;</span></button>';
-    }
-    if (!list.some(function (q) { return q.src === 'cloud' && q.raw; })) {
-      h += '<button type="button" class="qrow payrow" data-act="qnew"><span><b>New quote</b><span class="qs">Build a quote from the packages and add-ons</span></span><span class="go">Start &rsaquo;</span></button>';
-    }
     if (!list.length) {
       h += '<div class="note">No quote has been sent to ' + esc(it.name) + ' for this date yet.</div>';
     } else {
       h += list.map(function (q, i) {
-        var inner = '<span><b>Quote #' + esc(q.no || '-') + '</b>' + (i === 0 ? '<span class="tag">Latest</span>' : '') +
-          '<span class="qs">' + (sentLabel(q.no) ? 'Sent ' + sentLabel(q.no) : 'Date not recorded') +
+        var inner = '<span><b>' + esc(sentLabel(q.no) || 'Date not recorded') + '</b>' + (i === 0 ? '<span class="tag">Latest</span>' : '') +
+          '<span class="qs">Quote #' + esc(q.no || '-') +
           (q.src === 'site' ? ' &middot; Google Site' : (q.venue ? ' &middot; ' + esc(q.venue) : '')) + '</span></span>';
         if (q.src === 'cloud' && q.raw) {
           return '<div class="qwrap"><a class="qrow" href="' + esc(q.url) + '" target="_blank" rel="noopener">' + inner + '<span class="go">Open &rsaquo;</span></a>' +
@@ -1229,8 +1346,20 @@
           : '<div class="qrow">' + inner + '</div>';
       }).join('');
     }
+    var tools = '';
+    var sdq = list.filter(function (q) { return q.src === 'cloud' && q.stage && q.stage.length; })[0];
+    if (sdq) {
+      tools += '<button type="button" class="qrow payrow" data-act="sd"><span><b>Stage decoration list</b>' +
+        '<span class="qs">From quote #' + esc(sdq.no) + ' - share list and stage design photo</span></span><span class="go">Share &rsaquo;</span></button>';
+    }
+    if (!list.some(function (q) { return q.src === 'cloud' && q.raw; })) {
+      tools += '<button type="button" class="qrow payrow" data-act="qnew"><span><b>New quote</b><span class="qs">Build a quote from the packages and add-ons</span></span><span class="go">Start &rsaquo;</span></button>';
+    }
+    if (tools) h += '<h3>Tools</h3>' + tools;
     $('#dQuotes').innerHTML = h;
     renderVendors(it, d, list, gh, fresh);
+    updateTabs(it);
+    if (curTab === 'site') siteLoad(it);
   }
 
   function vSaved(name) { var s = VS[name]; return !!(s && (s.booked || (s.supplier || '').trim() || (s.details || '').trim())); }
@@ -1262,9 +1391,10 @@
     var rows = document.querySelectorAll('#vmain .vrow'), n = 0;
     Array.prototype.forEach.call(rows, function (r) { if ((VS[r.getAttribute('data-v')] || {}).booked) n++; });
     var el = $('#vcount'); if (el) el.textContent = rows.length ? n + ' of ' + rows.length + ' booked' : '';
+    if (cur) updateTabs(cur);
   }
   function renderVendors(it, d, list, gh, fresh) {
-    vItem = null;
+    vItem = null; vMainList = [];
     if (it.status !== 'Confirmed') { $('#dVend').innerHTML = ''; return; }
     vItem = it; VS = d.vendors || {};
     var names = (d.vendorList || []).slice();
@@ -1293,8 +1423,263 @@
       '<div id="vmain">' + main.map(vRow).join('') + '</div>' +
       '<datalist id="supList">' + (d.suppliers || []).map(function (n) { return '<option value="' + esc(n) + '">'; }).join('') + '</datalist>' +
       '<div class="vstate" id="vstate"></div>';
+    vMainList = main.slice();
     vCount();
   }
+
+  /* ---------- work screen tabs ---------- */
+  var curTab = 'quotes', vMainList = [];
+  function setTab(t) {
+    curTab = t;
+    Array.prototype.forEach.call(document.querySelectorAll('#dTabs .dtab'), function (b) { b.classList.toggle('on', b.getAttribute('data-t') === t); });
+    Array.prototype.forEach.call(document.querySelectorAll('#detail .pane'), function (p) { p.classList.toggle('on', p.getAttribute('data-p') === t); });
+    if (t === 'site' && cur) siteLoad(cur);
+  }
+  function updateTabs(it) {
+    if (!it) return;
+    var conf = it.status === 'Confirmed';
+    $('#tabV').hidden = !conf; $('#tabT').hidden = !conf;
+    $('#tbQ').textContent = lastQ.length || '';
+    var n = pending(it);
+    $('#tbT').textContent = n || ''; $('#tabT').classList.toggle('alert', n > 0);
+    var vc = $('#vcount'), m = vc && /(\d+) of (\d+) booked/.exec(vc.textContent || '');
+    $('#tbV').textContent = m ? m[1] + '/' + m[2] : '';
+    if (!conf && (curTab === 'vendors' || curTab === 'tasks')) setTab('quotes');
+  }
+  $('#dTabs').addEventListener('click', function (e) {
+    var b = e.target.closest('.dtab'); if (!b || b.hidden) return;
+    setTab(b.getAttribute('data-t'));
+  });
+
+  /* ---------- confirm dialog: every item that goes live is confirmed on its own ---------- */
+  var cfRes = null;
+  function askConfirm(o) {
+    return new Promise(function (res) {
+      $('#cfT').textContent = o.title; $('#cfB').textContent = o.body; $('#cfYes').textContent = o.ok || 'Confirm';
+      $('#cfKeyBox').style.display = o.needKey ? 'block' : 'none';
+      $('#cfKeyNote').textContent = o.keyNote || ''; $('#cfKey').value = '';
+      $('#cf').classList.add('show');
+      cfRes = function (ok) { $('#cf').classList.remove('show'); cfRes = null; res({ ok: ok, key: ok && o.needKey ? $('#cfKey').value.trim() : '' }); };
+    });
+  }
+  $('#cfYes').addEventListener('click', function () {
+    if (!cfRes) return;
+    if ($('#cfKeyBox').style.display === 'block' && !$('#cfKey').value.trim()) { $('#cfKey').focus(); return; }
+    cfRes(true);
+  });
+  $('#cfNo').addEventListener('click', function () { if (cfRes) cfRes(false); });
+  $('#cf').addEventListener('click', function (e) { if (e.target === $('#cf') && cfRes) cfRes(false); });
+
+  /* ---------- client link: the client's one page (Ivory-Events > New A > <Client>) ----------
+     Its tabs: quotes by date (latest first), then Wedding timeline, then Payment. This screen adds ONE item per tap, after a confirm. */
+  var SITE_RAW = 'https://raw.githubusercontent.com/ivoryeventz-ops/Ivory-Events/main/New%20A/';
+  var SITE_URL = 'https://ivory-events.pages.dev/New%20A/';
+  var SITE = {}, ADDED = {};
+  function siteFolder(it) { return payFolder(it, lastQ); }
+  function siteLoad(it) {
+    var f = siteFolder(it);
+    renderSite(it);
+    var rd = fetch(SITE_RAW + encodeURIComponent(f) + '/data.json?t=' + Date.now())
+      .then(function (r) {
+        if (r.status === 404) return null;
+        if (!r.ok) throw new Error('GitHub answered ' + r.status);
+        return r.json();
+      })
+      .then(function (d) { SITE[f] = { data: d }; }, function (e) { SITE[f] = { err: e.message, data: (SITE[f] || {}).data }; });
+    return Promise.all([rd, tlGet().then(function () {}, function () {})]).then(function () { if (cur === it && curTab === 'site') renderSite(it); });
+  }
+  function sRow(title, sub, ok, buttons) {
+    return '<div class="srow"><span><b>' + title + '</b><span class="qs' + (ok ? ' ok' : '') + '">' + sub + '</span></span><span class="rb">' + buttons + '</span></div>';
+  }
+  function renderSite(it) {
+    var el = $('#dSite'); if (!el || !it) return;
+    var f = siteFolder(it), st = SITE[f] || {}, d = st.data;
+    var onQ = {};
+    if (d) (d.quotes || []).forEach(function (q) { onQ[String(q.id)] = 1; });
+    Object.keys(ADDED).forEach(function (k) { var p = k.split('|'); if (p[0] === f && p[1] === 'quote') onQ[p[2]] = 1; });
+    var tlAdded = !!((d && d.timeline && d.timeline.url) || ADDED[f + '|timeline']);
+    var payAdded = !!((d && d.payment && d.payment.url) || ADDED[f + '|payment']);
+    var any = !!d || Object.keys(ADDED).some(function (k) { return k.split('|')[0] === f; });
+    var onLink = '<span class="onlink">&#10003; On link</span>';
+    var h = '<h3>Client link</h3><div class="note">One page for ' + esc(it.name) + '. Quotes show as dated tabs, latest first, then the wedding timeline, then payment. Nothing is added until you confirm that item.</div>';
+    if (any) h += '<div class="lnk"><span>' + esc(decodeURIComponent(SITE_URL.replace('https://', '')) + f + '/') + '</span><a href="' + esc(SITE_URL + encodeURIComponent(f) + '/') + '" target="_blank" rel="noopener">Open</a></div>';
+    else if (st.data === undefined && !st.err && !SITE[f]) h += '<div class="note">Checking the client link...</div>';
+    else h += '<div class="note warn">No client link yet. It is created when you add the first item.</div>';
+    if (st.err) h += '<div class="note warn">Could not read the client link (' + esc(st.err) + ').</div>';
+
+    var cloud = lastQ.filter(function (q) { return q.src === 'cloud'; });
+    h += '<div class="stepn"><i>1</i>Quotes</div><div class="group">';
+    if (!cloud.length) h += '<div class="srow"><span class="qs">No quote is ready to add yet.</span></div>';
+    cloud.forEach(function (q, i) {
+      var on = !!onQ[q.no];
+      h += sRow(esc(sentLabel(q.no) || q.no) + (i === 0 ? '<span class="tag">Latest</span>' : ''), 'Quote #' + esc(q.no) + (on ? ' - on the client link' : ' - not on the link yet'), on,
+        on ? onLink : '<button type="button" class="sbtn" data-sa="quote" data-no="' + esc(q.no) + '">Add to link</button>');
+    });
+    h += '</div>';
+
+    var tlOn = isDone(it, 'timeline'), tlF = tlDates ? tlFolderFor(it, tlDates) : '', tlReady = !!FL.tl[wkey(it)] && !!tlF;
+    h += '<div class="stepn"><i>2</i>Wedding timeline</div><div class="group">' +
+      '<label class="optrow"><input type="checkbox" class="actcb" data-row="' + it.row + '" data-id="' + esc(it.id) + '" data-date="' + esc(it.date) + '" data-task="timeline"' + (tlOn ? ' checked' : '') + '><span>Send the wedding timeline to the client</span></label>';
+    if (tlOn) {
+      h += sRow('Wedding timeline', tlAdded ? 'On the client link' : (tlReady ? 'Page is ready' : 'Not published yet - edit and publish it first'), tlAdded,
+        '<button type="button" class="sbtn alt" data-act="tl">Edit</button>' + (tlAdded ? onLink : '<button type="button" class="sbtn" data-sa="timeline"' + (tlReady ? '' : ' disabled') + '>Add to link</button>'));
+    }
+    h += '</div>';
+
+    var payReady = !!ghPay[f];
+    h += '<div class="stepn"><i>3</i>Payment</div><div class="group">' +
+      sRow('Payment details', payAdded ? 'On the client link' : (payReady ? 'Page is ready' : 'Not published yet - edit and publish it first'), payAdded,
+        '<button type="button" class="sbtn alt" data-act="pay">Edit</button>' + (payAdded ? onLink : '<button type="button" class="sbtn" data-sa="payment"' + (payReady ? '' : ' disabled') + '>Add to link</button>')) +
+      '</div>';
+    el.innerHTML = h;
+  }
+  function siteAdd(it, kind, no) {
+    var f = siteFolder(it), url = '', title = '', body = '', extra = {};
+    if (kind === 'quote') {
+      var q = lastQ.filter(function (x) { return x.src === 'cloud' && x.no === no; })[0]; if (!q) return;
+      url = q.url; extra = { no: q.no, created: '20' + q.no.slice(0, 2) + '-' + q.no.slice(2, 4) + '-' + q.no.slice(4, 6) };
+      title = 'Add this quote to the client link?';
+      body = 'Quote #' + q.no + ' (' + sentLabel(q.no) + ') will appear as a tab for ' + it.name + ', in date order with the latest first. The client sees it straight away.';
+    } else if (kind === 'timeline') {
+      var tf = tlDates ? tlFolderFor(it, tlDates) : '';
+      if (!tf) { toast('Publish the wedding timeline first', true); return; }
+      url = TL_SITE + '/' + encodeURIComponent(tf) + '/timeline';
+      title = 'Add the wedding timeline to the client link?';
+      body = 'It will appear as its own tab after the quotes. The client sees it straight away.';
+    } else {
+      if (!ghPay[f]) { toast('Publish the payment details first', true); return; }
+      url = GH_SITE + '/' + encodeURIComponent(f) + '/payment';
+      title = 'Add payment details to the client link?';
+      body = 'It will appear as the last of these tabs, after the wedding timeline. The client sees the payment details straight away.';
+    }
+    return call('api_site_status', pin).then(function (s) { return !!s.hasKey; }, function () { return null; }).then(function (has) {
+      if (has === null) { toast('Paste the new Code.gs into Apps Script first - the client link needs it', true); return; }
+      return askConfirm({ title: title, body: body, ok: 'Confirm and add', needKey: !has,
+        keyNote: 'A GitHub key that can write to Ivory-Events (Contents read/write) is needed once. It is kept in the script, so both phones use it.' }).then(function (r) {
+        if (!r.ok) return;
+        var p = { confirmed: true, kind: kind, folder: f, url: url, name: it.name, date: it.date, venue: it.venue, key: r.key };
+        Object.keys(extra).forEach(function (k) { p[k] = extra[k]; });
+        busy(true);
+        return call('api_site_tab', pin, p).then(function () {
+          ADDED[f + '|' + kind + (kind === 'quote' ? '|' + no : '')] = 1;
+          toast('Added to the client link');
+          if (cur === it) renderSite(it);
+        }).catch(function (err) { toast(err.message, true); }).then(function () { busy(false); });
+      });
+    });
+  }
+  $('#dSite').addEventListener('click', function (e) {
+    if (!cur) return;
+    if (e.target.closest('[data-act="tl"]')) { tlOpen(cur, lastQ); return; }
+    if (e.target.closest('[data-act="pay"]')) { openPay(cur, lastQ); return; }
+    var b = e.target.closest('[data-sa]');
+    if (b && !b.disabled) siteAdd(cur, b.getAttribute('data-sa'), b.getAttribute('data-no'));
+  });
+  $('#dSite').addEventListener('change', actToggle);
+
+  /* ---------- staff checklist: a Google Sheet for the day before, items picked from the latest quote ---------- */
+  var CK = {}, ckS = null;
+  function ckLoad(it) {
+    var k = wkey(it);
+    return call('api_chk_get', pin, { row: it.row, id: it.id, date: it.date })
+      .then(function (r) { CK[k] = { last: r.last }; }, function () { CK[k] = { last: null, old: true }; })
+      .then(function () { if (cur === it) renderActsDetail(it); });
+  }
+  function ckCard(it) {
+    var c = CK[wkey(it)] || {}, last = c.last, h = '<div class="ckcard"><b>Staff checklist</b><span class="qs">';
+    if (c.old) h += 'Paste the new Code.gs into Apps Script to make checklist sheets.';
+    else if (last) h += 'Google Sheet made ' + esc(sentLabel(last.created.replace(/-/g, '').slice(2)) || last.created) + ' - ' + last.items + ' items';
+    else h += 'A Google Sheet from the latest quote, to send to staff the day before';
+    h += '</span><div class="rb">';
+    if (last && last.url) {
+      h += '<a class="sbtn" href="' + esc(last.url) + '" target="_blank" rel="noopener">Open sheet</a>' +
+        '<a class="sbtn alt" href="' + esc(ckWa(it, last.url)) + '" target="_blank" rel="noopener">Send on WhatsApp</a>';
+    }
+    if (!c.old) h += '<button type="button" class="sbtn' + (last ? ' alt' : '') + '" data-act="ck">' + (last ? 'Make a new one' : 'Make checklist') + '</button>';
+    return h + '</div></div>';
+  }
+  function ckWa(it, url) { return 'https://wa.me/?text=' + encodeURIComponent('Ivory wedding day checklist - ' + it.name + ', ' + fmt(it.date) + '\n' + url); }
+  function ckOpen(it) {
+    var q = lastQ[0], items = [];
+    if (q && q.src === 'cloud') {
+      // same rules as the Stage decoration list: outside-vendor lines are left out here (they are listed under Outside vendors below)
+      sdBuild(q.stage, q.extras, q).forEach(function (r) { items.push({ section: 'Stage and decor', item: r.t, details: '', on: !r.opt }); });
+    }
+    if (vItem === it) vMainList.forEach(function (n) {
+      var s = VS[n] || {};
+      items.push({ section: 'Outside vendors', item: n, details: [(s.supplier || '').trim(), (s.details || '').trim()].filter(Boolean).join(' - '), on: true });
+    });
+    ckS = { it: it, q: q, items: items, done: false };
+    $('#ckMeta').textContent = it.name + ' - ' + fmt(it.date) + (it.venue ? ' - ' + it.venue : '') + (q && q.src === 'cloud' ? ' - items from quote #' + q.no : '');
+    $('#ckState').textContent = ''; $('#ckShare').innerHTML = '';
+    ckRender();
+    openSheet('#ck');
+  }
+  function ckRender() {
+    var S = ckS, groups = {}, order = [], h = '';
+    S.items.forEach(function (x, i) { if (!groups[x.section]) { groups[x.section] = []; order.push(x.section); } groups[x.section].push(i); });
+    if (!S.q) h += '<div class="note warn">No quote was found for this work, so add the items yourself below.</div>';
+    else if (S.q.src !== 'cloud') h += '<div class="note warn">The latest quote is a Google Site and cannot be read here, so add the items yourself below.</div>';
+    else h += '<div class="note">Untick anything staff do not need to check. Add your own items at the bottom.</div>';
+    order.forEach(function (g) {
+      h += '<div class="ckg">' + esc(g) + '</div>' + groups[g].map(function (i) {
+        var x = S.items[i];
+        return '<label class="ckrow"><input type="checkbox" data-i="' + i + '"' + (x.on ? ' checked' : '') + '><span>' + esc(x.item) + (x.details ? '<small>' + esc(x.details) + '</small>' : '') + '</span></label>';
+      }).join('');
+    });
+    h += '<div class="ckg">Add your own</div><div class="ckadd"><input id="ckNew" placeholder="e.g. Extension boards" autocomplete="off"><button type="button" class="sbtn alt" id="ckAddBtn">Add</button></div>';
+    $('#ckBody').innerHTML = h;
+    ckCount();
+  }
+  function ckCount() {
+    var n = ckS.items.filter(function (x) { return x.on; }).length;
+    $('#ckGo').textContent = 'Create Google Sheet (' + n + ' item' + (n === 1 ? '' : 's') + ')';
+    $('#ckGo').disabled = !n || ckS.done;
+  }
+  $('#ckBody').addEventListener('change', function (e) {
+    var cb = e.target.closest('input[data-i]'); if (!cb || !ckS) return;
+    ckS.items[+cb.getAttribute('data-i')].on = cb.checked; ckCount();
+  });
+  function ckAdd() {
+    var inp = $('#ckNew'), t = inp.value.trim(); if (!t || !ckS) return;
+    ckS.items.push({ section: 'Other', item: t, details: '', on: true });
+    ckRender(); setTimeout(function () { var n = $('#ckNew'); if (n) n.focus(); }, 30);
+  }
+  $('#ckBody').addEventListener('click', function (e) { if (e.target.closest('#ckAddBtn')) ckAdd(); });
+  $('#ckBody').addEventListener('keydown', function (e) { if (e.key === 'Enter' && e.target.id === 'ckNew') { e.preventDefault(); ckAdd(); } });
+  $('#ckGo').addEventListener('click', function () {
+    var S = ckS; if (!S) return;
+    var list = S.items.filter(function (x) { return x.on; });
+    if (!list.length) return;
+    askConfirm({ title: 'Create the staff checklist?', ok: 'Create sheet',
+      body: list.length + ' items will go into a new Google Sheet for ' + S.it.name + ' (' + fmt(S.it.date) + '). Anyone with the link can tick items. Nothing is sent to staff until you tap Send on WhatsApp.' }).then(function (r) {
+      if (!r.ok) return;
+      busy(true); $('#ckGo').disabled = true; $('#ckState').textContent = 'Creating the sheet...';
+      return call('api_chk_create', pin, { confirmed: true, row: S.it.row, id: S.it.id, date: S.it.date, venue: S.it.venue, quote: S.q && S.q.no || '', items: list.map(function (x) { return { section: x.section, item: x.item, details: x.details }; }) })
+        .then(function (res) {
+          S.done = true;
+          CK[wkey(S.it)] = { last: { url: res.url, created: today, items: res.items } };
+          $('#ckState').textContent = 'Sheet created with ' + res.items + ' items.';
+          $('#ckShare').innerHTML = '<a class="wa" href="' + esc(ckWa(S.it, res.url)) + '" target="_blank" rel="noopener">Send on WhatsApp</a> <a class="sbtn alt" style="margin-top:10px" href="' + esc(res.url) + '" target="_blank" rel="noopener">Open sheet</a>' +
+            '<div><button type="button" class="sbtn alt" id="ckTick" style="margin-top:12px">Mark "Checklist to staff" as done</button></div>';
+          if (cur === S.it) renderActsDetail(S.it);
+        })
+        .catch(function (err) { $('#ckGo').disabled = false; $('#ckState').textContent = ''; toast(err.message, true); })
+        .then(function () { busy(false); ckCount(); });
+    });
+  });
+  $('#ckShare').addEventListener('click', function (e) {
+    if (!e.target.closest('#ckTick') || !ckS) return;
+    var it = ckS.it, k = wkey(it) + '|staffChk';
+    FL.acts[k] = true; render(); if (cur === it) renderActsDetail(it);
+    $('#ckTick').outerHTML = '<span class="onlink">&#10003; Marked as done</span>';
+    call('api_action', pin, { row: it.row, id: it.id, date: it.date, task: 'staffChk', done: true })
+      .catch(function (err) { delete FL.acts[k]; render(); toast('Not saved: ' + err.message, true); });
+  });
+  $('#ckClose').addEventListener('click', function () { $('#ck').classList.remove('show'); });
+  $('#dActs').addEventListener('click', function (e) {
+    if (cur && e.target.closest('[data-act="ck"]')) ckOpen(cur);
+  });
 
   function vSet(msg, err) { var el = $('#vstate'); if (!el) return; el.className = 'vstate' + (err ? ' err' : ''); el.innerHTML = msg; }
   function vSend() {
