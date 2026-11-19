@@ -826,3 +826,21 @@ function setupOnce() {
 function myFunction() {
   
 }
+
+// Quote Builder: one-tap Google Sheet of the ticked items (rows = array of arrays; first row is the heading)
+function api_quote_sheet(pin, p) {
+  check_(pin);
+  const rows = (p.rows || []).slice(0, 400).map(function (r) {
+    return (r || []).slice(0, 8).map(function (v) { return v == null ? '' : (typeof v === 'number' ? v : String(v).slice(0, 300)); });
+  });
+  if (!rows.length) throw new Error('Nothing to put in the sheet');
+  const width = rows.reduce(function (m, r) { return Math.max(m, r.length); }, 1);
+  rows.forEach(function (r) { while (r.length < width) r.push(''); });
+  const book = SpreadsheetApp.create(String(p.title || 'Ivory quote').replace(/[\u0000-\u001F]/g, '').slice(0, 90));
+  const sh = book.getSheets()[0];
+  sh.getRange(1, 1, rows.length, width).setValues(rows);
+  sh.setFrozenRows(1);
+  sh.getRange(1, 1, 1, width).setFontWeight('bold');
+  sh.autoResizeColumns(1, width);
+  return { url: book.getUrl() };
+}
