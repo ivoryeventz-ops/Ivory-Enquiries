@@ -1501,7 +1501,7 @@
     var payAdded = !!((d && d.payment && d.payment.url) || ADDED[f + '|payment']);
     var any = !!d || Object.keys(ADDED).some(function (k) { return k.split('|')[0] === f; });
     var onLink = '<span class="onlink">&#10003; On link</span>';
-    var h = '<h3>Client link</h3><div class="note">One page for ' + esc(it.name) + '. Quotes show as dated tabs, latest first, then the wedding timeline, then payment. Nothing is added until you confirm that item.</div>';
+    var h = '<h3>Client link</h3><div class="note">One page for ' + esc(it.name) + '. Quotes show as dated tabs, latest first, with the wedding timeline in front of the latest quote and payment in front of the timeline. Nothing is added until you confirm that item.</div>';
     if (any) h += '<div class="lnk"><span>' + esc(decodeURIComponent(SITE_URL.replace('https://', '')) + f + '/') + '</span><a href="' + esc(SITE_URL + encodeURIComponent(f) + '/') + '" target="_blank" rel="noopener">Open</a></div>';
     else if (st.data === undefined && !st.err && !SITE[f]) h += '<div class="note">Checking the client link...</div>';
     else h += '<div class="note warn">No client link yet. It is created when you add the first item.</div>';
@@ -1545,12 +1545,12 @@
       if (!tf) { toast('Publish the wedding timeline first', true); return; }
       url = TL_SITE + '/' + encodeURIComponent(tf) + '/timeline';
       title = 'Add the wedding timeline to the client link?';
-      body = 'It will appear as its own tab after the quotes. The client sees it straight away.';
+      body = 'It will appear as its own tab, in front of the latest quote. The client sees it straight away.';
     } else {
       if (!ghPay[f]) { toast('Publish the payment details first', true); return; }
       url = GH_SITE + '/' + encodeURIComponent(f) + '/payment';
       title = 'Add payment details to the client link?';
-      body = 'It will appear as the last of these tabs, after the wedding timeline. The client sees the payment details straight away.';
+      body = 'It will appear as the first tab, in front of the wedding timeline. The client sees the payment details straight away.';
     }
     return call('api_site_status', pin).then(function (s) { return !!s.hasKey; }, function () { return null; }).then(function (has) {
       if (has === null) { toast('Paste the new Code.gs into Apps Script first - the client link needs it', true); return; }
