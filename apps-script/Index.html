@@ -3350,11 +3350,17 @@
       .toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
   }
 
+  // File lists come through the script (saved GitHub key, so no hourly limit); direct GitHub is only the fallback for an old Code.gs.
+  function ghTreeFetch(repo, branch) {
+    return call('api_gh_tree', pin, { repo: repo, branch: branch }).catch(function () {
+      return fetch('https://api.github.com/repos/' + repo + '/git/trees/' + branch + '?recursive=1')
+        .then(function (r) { if (!r.ok) throw new Error('GitHub answered ' + r.status + ' - paste the new Code.gs into Apps Script'); return r.json(); });
+    });
+  }
   var ghTree = null, ghTreeAt = 0, ghCache = {}, ghPay = {}, ghImgs = {};
   function ghTreeGet(maxAge) {
     if (ghTree && Date.now() - ghTreeAt < (maxAge || 300000)) return Promise.resolve(ghTree);
-    return fetch('https://api.github.com/repos/' + GH_REPO + '/git/trees/' + GH_BRANCH + '?recursive=1')
-      .then(function (r) { if (!r.ok) throw new Error('GitHub answered ' + r.status); return r.json(); })
+    return ghTreeFetch(GH_REPO, GH_BRANCH)
       .then(function (j) {
         var t = {};
         (j.tree || []).forEach(function (x) {
@@ -3502,8 +3508,7 @@
   // { folder: [dates it mentions] } for every client folder in the timeline repo
   function tlGet() {
     if (tlDates && Date.now() - tlDatesAt < 300000) return Promise.resolve(tlDates);
-    return fetch('https://api.github.com/repos/' + TL_REPO + '/git/trees/' + TL_BRANCH + '?recursive=1')
-      .then(function (r) { if (!r.ok) throw new Error('GitHub answered ' + r.status); return r.json(); })
+    return ghTreeFetch(TL_REPO, TL_BRANCH)
       .then(function (j) {
         var dirs = {};
         (j.tree || []).forEach(function (x) {

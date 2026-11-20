@@ -655,6 +655,27 @@ function api_site_create(pin, p) {
   }
 }
 
+// File lists of the quotes and timeline repos, read with the saved GitHub key. The phone used to ask GitHub directly with no key,
+// and GitHub allows only 60 such requests an hour per network, which shows as "GitHub answered 403".
+function api_gh_tree(pin, p) {
+  check_(pin);
+  const repo = String(p.repo || ''), branch = String(p.branch || 'main');
+  if (['ivoryeventz-ops/Ivory-Packages', 'ivoryeventz-ops/Ivory-Wedding-Timeline', 'ivoryeventz-ops/Ivory-Events'].indexOf(repo) < 0) throw new Error('Unknown repo');
+  if (!/^[A-Za-z0-9._-]+$/.test(branch)) throw new Error('Bad branch');
+  const props = PropertiesService.getScriptProperties();
+  const keys = ['GH_KEY', 'TL_KEY', 'SITE_KEY'].map(function (k) { return props.getProperty(k); }).filter(Boolean);
+  keys.push('');
+  let last = 0;
+  for (let i = 0; i < keys.length; i++) {
+    const hd = { Accept: 'application/vnd.github+json' };
+    if (keys[i]) hd.Authorization = 'Bearer ' + keys[i];
+    const r = UrlFetchApp.fetch('https://api.github.com/repos/' + repo + '/git/trees/' + branch + '?recursive=1', { headers: hd, muteHttpExceptions: true });
+    last = r.getResponseCode();
+    if (last === 200) return { tree: (JSON.parse(r.getContentText()).tree || []).map(function (x) { return { path: x.path }; }) };
+  }
+  throw new Error('GitHub answered ' + last);
+}
+
 /* ---------- staff checklist: a Google Sheet made the day before the wedding, items from the latest quote ---------- */
 const CHK_TAB = 'Checklists';
 
