@@ -156,6 +156,8 @@
   .sbtn.alt{background:#fff;color:var(--burgundy)}
   a.sbtn{display:inline-block;text-decoration:none;text-align:center}
   .sbtn:disabled{opacity:.45}
+  .evsel{border:1px solid var(--burgundy);border-radius:11px;padding:9px 10px;font-size:14px;background:#fff;color:var(--ink);max-width:170px}
+  .lkurl{background:var(--wash);border-radius:12px;padding:10px 12px;margin:0 0 12px;font-size:13px;color:var(--muted);word-break:break-all}
   .onlink{color:var(--conf);font-weight:700;font-size:14px;white-space:nowrap}
   .stepn{display:flex;gap:10px;align-items:center;font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:16px 0 4px}
   .stepn i{font-style:normal;width:20px;height:20px;border-radius:50%;background:var(--burgundy);color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:11px;letter-spacing:0}
@@ -1716,6 +1718,14 @@
     <input id="fDate" type="date" required>
     <label for="fVenue">Venue</label>
     <input id="fVenue">
+    <label for="fType">Event type</label>
+    <select id="fType" required>
+      <option value="">Choose...</option>
+      <option value="christian">Wedding - Christian</option>
+      <option value="pentecost">Wedding - Pentecost</option>
+      <option value="engagement">Engagement</option>
+      <option value="hindu">Reception - Hindu</option>
+    </select>
     <label for="fStatus">Status</label>
     <select id="fStatus">
       <option>Enquiry</option><option>Costing</option><option>Blocked</option><option>Confirmed</option>
@@ -1741,6 +1751,15 @@
     <p id="cfB"></p>
     <div id="cfKeyBox" style="display:none"><div class="note" id="cfKeyNote"></div><input id="cfKey" type="password" autocomplete="off" placeholder="Paste GitHub key"></div>
     <div class="mbtns"><button class="ghost" id="cfNo" type="button">Not now</button><button class="primary" id="cfYes" type="button">Confirm</button></div>
+  </div>
+</div>
+
+<div class="modal" id="lk" role="dialog" aria-modal="true">
+  <div class="mbox">
+    <h4 id="lkT">Client link ready</h4>
+    <p id="lkB"></p>
+    <div class="lkurl" id="lkUrl"></div>
+    <div class="mbtns"><button class="ghost" id="lkNo" type="button">Close</button><a class="sbtn alt" id="lkOpen" target="_blank" rel="noopener">Open</a><a class="primary" id="lkWa" target="_blank" rel="noopener" style="text-decoration:none;text-align:center">Send on WhatsApp</a></div>
   </div>
 </div>
 
@@ -3232,13 +3251,19 @@
     btn.disabled = true;
     btn.textContent = 'Saving...';
     busy(true);
+    var np = { name: $('#fName').value.trim(), date: $('#fDate').value, venue: $('#fVenue').value.trim(), type: $('#fType').value };
     call('api_add', pin, {
-      name: $('#fName').value, date: $('#fDate').value,
-      venue: $('#fVenue').value, status: $('#fStatus').value
+      name: np.name, date: np.date,
+      venue: np.venue, status: $('#fStatus').value
     }).then(function () {
       toast('Enquiry added');
       closeSheets();
-      return load(true);
+      return load(true).then(function () {
+        // the client's link (intro, packages, checklist for this event type) is made straight away, then offered for WhatsApp
+        return ensureLink(np, np.type, false).then(function (r) {
+          if (r) showLink(np.name, r.url, r.existed ? 'This client already had a link, so it was kept as it is (use the Client link tab inside the work to change its event type).' : 'Made for ' + EV_TYPES[np.type] + '. It has the introduction, packages and service checklist.');
+        }, function (err) { toast('Enquiry saved, but the client link was not made: ' + err.message + '. Open the work > Client link to try again.', true); });
+      });
     }).catch(function (err) {
       toast(err.message, true);
     }).then(function () {
@@ -3694,6 +3719,36 @@
   var SITE_RAW = 'https://raw.githubusercontent.com/ivoryeventz-ops/Ivory-Events/main/New%20A/';
   var SITE_URL = 'https://ivory-events.pages.dev/New%20A/';
   var SITE = {}, ADDED = {};
+  var EV_TYPES = { christian: 'Wedding - Christian', pentecost: 'Wedding - Pentecost', engagement: 'Engagement', hindu: 'Reception - Hindu' };
+  function linkWa(name, url) {
+    return 'https://wa.me/?text=' + encodeURIComponent('Hello ' + name + ',\nThank you for your enquiry with Ivory Events. Here is our introduction, wedding packages and service checklist for you to look through:\n' + url);
+  }
+  function showLink(name, url, note) {
+    $('#lkB').textContent = note || ''; $('#lkUrl').textContent = decodeURIComponent(url.replace('https://', ''));
+    $('#lkWa').href = linkWa(name, url); $('#lkOpen').href = url;
+    $('#lk').classList.add('show');
+  }
+  $('#lkNo').addEventListener('click', function () { $('#lk').classList.remove('show'); });
+  // Makes (or, with change=true, re-types) the client's link. Asks for the GitHub key only if the script does not hold one yet.
+  function ensureLink(it, type, change) {
+    var f = payFolder(it, []);
+    if (!EV_TYPES[type]) return Promise.reject(new Error('Choose the event type'));
+    return call('api_site_status', pin).then(function (s) { return !!s.hasKey; }, function () { return null; }).then(function (has) {
+      if (has === null) throw new Error('Paste the new Code.gs into Apps Script first');
+      var go = function (key) {
+        var p = { folder: f, name: it.name, date: it.date, venue: it.venue, type: type, change: !!change };
+        if (key) p.key = key;
+        busy(true);
+        return call('api_site_create', pin, p).then(function (r) { busy(false); delete SITE[f]; return r; }, function (e) { busy(false); throw e; });
+      };
+      if (has) return go('');
+      return askConfirm({ title: 'Make the client link', body: 'The link for ' + it.name + ' is made on the Ivory-Events site.', ok: 'Make link', needKey: true,
+        keyNote: 'A GitHub key that can write to Ivory-Events (Contents read/write) is needed once. It is kept in the script, so both phones use it.' }).then(function (r) {
+        if (!r.ok) return null;
+        return go(r.key);
+      });
+    });
+  }
   function siteFolder(it) { return payFolder(it, lastQ); }
   function siteLoad(it) {
     var f = siteFolder(it);
@@ -3723,7 +3778,13 @@
     var h = '<h3>Client link</h3><div class="note">One page for ' + esc(it.name) + '. Quotes show as dated tabs, latest first, with the wedding timeline in front of the latest quote and payment in front of the timeline. Nothing is added until you confirm that item.</div>';
     if (any) h += '<div class="lnk"><span>' + esc(decodeURIComponent(SITE_URL.replace('https://', '')) + f + '/') + '</span><a href="' + esc(SITE_URL + encodeURIComponent(f) + '/') + '" target="_blank" rel="noopener">Open</a></div>';
     else if (st.data === undefined && !st.err && !SITE[f]) h += '<div class="note">Checking the client link...</div>';
-    else h += '<div class="note warn">No client link yet. It is created when you add the first item.</div>';
+    else h += '<div class="note warn">No client link yet. Choose the event type and make it.</div>';
+    var curType = (d && d.type) || (any ? 'christian' : '');
+    var opts = '<option value="">Choose...</option>' + Object.keys(EV_TYPES).map(function (k) { return '<option value="' + k + '"' + (k === curType ? ' selected' : '') + '>' + esc(EV_TYPES[k]) + '</option>'; }).join('');
+    h += sRow('Event type', 'Decides which Packages and Checklist pages the client sees', false,
+      '<select class="evsel" id="evType">' + opts + '</select><button type="button" class="sbtn" data-lk="save">' + (any ? 'Change' : 'Make link') + '</button>');
+    if (any) h += sRow('Send the link', 'Introduction, packages and service checklist', false,
+      '<a class="sbtn alt" href="' + esc(linkWa(it.name, SITE_URL + encodeURIComponent(f) + '/')) + '" target="_blank" rel="noopener">Send on WhatsApp</a>');
     if (st.err) h += '<div class="note warn">Could not read the client link (' + esc(st.err) + ').</div>';
 
     var cloud = lastQ.filter(function (q) { return q.src === 'cloud'; });
@@ -3791,6 +3852,16 @@
     if (!cur) return;
     if (e.target.closest('[data-act="tl"]')) { tlOpen(cur, lastQ); return; }
     if (e.target.closest('[data-act="pay"]')) { openPay(cur, lastQ); return; }
+    if (e.target.closest('[data-lk="save"]')) {
+      var it0 = cur, t0 = $('#evType').value;
+      if (!t0) { toast('Choose the event type', true); return; }
+      ensureLink(it0, t0, true).then(function (r) {
+        if (!r) return;
+        toast('Client link ready - ' + EV_TYPES[t0]);
+        return siteLoad(it0);
+      }, function (err) { toast(err.message, true); });
+      return;
+    }
     var b = e.target.closest('[data-sa]');
     if (b && !b.disabled) siteAdd(cur, b.getAttribute('data-sa'), b.getAttribute('data-no'));
   });

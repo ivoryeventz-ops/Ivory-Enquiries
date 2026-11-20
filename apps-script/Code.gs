@@ -501,6 +501,8 @@ function api_tl_publish(pin, p) {
 const SITE_REPO = 'ivoryeventz-ops/Ivory-Events';
 const SITE_BRANCH = 'main';
 const SITE_DIR = 'New A';
+// Event types: what the client link shows under Packages and Service Checklist (pages live in Ivory-Events > New A > parts/<folder>).
+const SITE_TYPES = { christian: 'Wedding - Christian', pentecost: 'Wedding - Pentecost', engagement: 'Engagement', hindu: 'Reception - Hindu' };
 
 function siteKey_(props) { return props.getProperty('SITE_KEY') || props.getProperty('TL_KEY') || props.getProperty('GH_KEY') || ''; }
 
@@ -569,6 +571,7 @@ function api_site_tab(pin, p) {
       html = html.split('__NAME__').join(esc(name)).split('__WEDDING_DATE__').join(longDate).split('__VENUE__').join(esc(venue)).split('__FOLDER__').join(folder);
       put(path('index.html'), html, (get(path('index.html')) || {}).sha || null, 'Client page ' + folder);
       data = { folder: folder, name: name, wedding_date: wd, venue: venue, quotes: [] };
+      if (SITE_TYPES[p.type]) data.type = String(p.type);
     }
     data.quotes = data.quotes || [];
     if (kind === 'quote') {
@@ -579,6 +582,74 @@ function api_site_tab(pin, p) {
     }
     put(path('data.json'), JSON.stringify(data, null, 2) + '\n', sha, 'Add ' + kind + ' tab ' + folder);
     return { ok: true };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+// Makes the client's link as soon as an enquiry is entered (and lets the event type be changed later).
+// Creates <Client>/index.html (from client-shell.html) and <Client>/data.json with the event type, which decides the Packages and Checklist pages.
+// An existing link keeps its quotes/timeline/payment; only its type is updated.
+function api_site_create(pin, p) {
+  check_(pin);
+  const props = PropertiesService.getScriptProperties();
+  if (p.key) props.setProperty('SITE_KEY', String(p.key).trim());
+  const key = siteKey_(props);
+  if (!key) throw new Error('GitHub key needed');
+  const folder = String(p.folder || '').trim();
+  if (!/^[A-Za-z0-9][A-Za-z0-9 _-]{0,60}$/.test(folder)) throw new Error('Bad client folder name');
+  const type = String(p.type || '');
+  if (!SITE_TYPES[type]) throw new Error('Choose the event type');
+  const hd = { Authorization: 'Bearer ' + key, Accept: 'application/vnd.github+json' };
+  const api = 'https://api.github.com/repos/' + SITE_REPO + '/contents/';
+  const path = function (f) { return encodeURIComponent(SITE_DIR) + '/' + (f ? encodeURIComponent(folder) + '/' + encodeURIComponent(f) : encodeURIComponent('client-shell.html')); };
+  const noReach = function (code) {
+    if (code === 401) props.deleteProperty('SITE_KEY');
+    return new Error('GitHub key does not reach Ivory-Events (GitHub answered ' + code + ')');
+  };
+  const get = function (pth) {
+    const r = UrlFetchApp.fetch(api + pth + '?ref=' + SITE_BRANCH, { headers: hd, muteHttpExceptions: true });
+    const c = r.getResponseCode();
+    if (c === 200) return JSON.parse(r.getContentText());
+    if (c === 404) return null;
+    if (c === 401 || c === 403) throw noReach(c);
+    throw new Error('GitHub answered ' + c);
+  };
+  const put = function (pth, text, sha, msg) {
+    const body = { message: msg, content: Utilities.base64Encode(Utilities.newBlob(text).getBytes()), branch: SITE_BRANCH };
+    if (sha) body.sha = sha;
+    const r = UrlFetchApp.fetch(api + pth, { method: 'put', headers: hd, contentType: 'application/json', payload: JSON.stringify(body), muteHttpExceptions: true });
+    const c = r.getResponseCode();
+    if (c === 200 || c === 201) return;
+    if (c === 401 || c === 403 || c === 404) throw noReach(c);
+    throw new Error('GitHub answered ' + c);
+  };
+  const esc = function (t) { return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); };
+  const url = 'https://ivory-events.pages.dev/' + encodeURIComponent(SITE_DIR) + '/' + encodeURIComponent(folder) + '/';
+
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    const cur = get(path('data.json'));
+    if (cur) {
+      const data = JSON.parse(Utilities.newBlob(Utilities.base64Decode(cur.content.replace(/\n/g, ''))).getDataAsString());
+      if (data.type !== type && p.change === true) {
+        data.type = type;
+        put(path('data.json'), JSON.stringify(data, null, 2) + '\n', cur.sha, 'Event type ' + folder + ': ' + SITE_TYPES[type]);
+      }
+      return { ok: true, url: url, existed: true, type: type };
+    }
+    const name = String(p.name || '').trim(), venue = String(p.venue || '').trim(), wd = String(p.date || '');
+    if (!name || !/^\d{4}-\d{2}-\d{2}$/.test(wd)) throw new Error('Client name and event date are needed to make the client link');
+    const shell = get(path(''));
+    if (!shell) throw new Error('client-shell.html not found in the New A site');
+    let html = Utilities.newBlob(Utilities.base64Decode(shell.content.replace(/\n/g, ''))).getDataAsString();
+    const longDate = Utilities.formatDate(Utilities.parseDate(wd, tz_(), 'yyyy-MM-dd'), tz_(), 'd MMMM yyyy');
+    html = html.split('__NAME__').join(esc(name)).split('__WEDDING_DATE__').join(longDate).split('__VENUE__').join(esc(venue)).split('__FOLDER__').join(folder);
+    put(path('index.html'), html, (get(path('index.html')) || {}).sha || null, 'Client page ' + folder);
+    const data = { folder: folder, name: name, wedding_date: wd, venue: venue, type: type, quotes: [] };
+    put(path('data.json'), JSON.stringify(data, null, 2) + '\n', null, 'Client link ' + folder + ' (' + SITE_TYPES[type] + ')');
+    return { ok: true, url: url, type: type };
   } finally {
     lock.releaseLock();
   }
@@ -630,19 +701,41 @@ function api_chk_create(pin, p) {
     const book = SpreadsheetApp.create('Ivory Checklist - ' + client + ' - ' + String(p.date).replace(/-/g, ''));
     const sh = book.getSheets()[0];
     sh.setName('Checklist');
-    sh.getRange(1, 1).setValue('Ivory Events - wedding day checklist').setFontSize(16).setFontWeight('bold').setFontColor('#6e1f2f');
-    sh.getRange(2, 1).setValue(client + '  |  ' + dateLabel + (venue ? '  |  ' + venue : '')).setFontSize(11).setFontColor('#555555');
-    sh.getRange(3, 1).setValue('Tick each item when it is done. Items are from quote #' + clean(p.quote, 12) + '.').setFontStyle('italic').setFontColor('#777777');
-    const head = [['#', 'Section', 'Item', 'Details', 'Done', 'Checked by', 'Notes']];
-    sh.getRange(5, 1, 1, 7).setValues(head).setBackground('#6e1f2f').setFontColor('#ffffff').setFontWeight('bold');
-    const rows = list.map(function (x, i) { return [i + 1, clean(x.section, 60), clean(x.item, 200), clean(x.details, 400), false, '', '']; });
-    const body = sh.getRange(6, 1, rows.length, 7);
-    body.setValues(rows).setVerticalAlignment('top').setWrap(true);
-    sh.getRange(6, 5, rows.length, 1).insertCheckboxes();
-    sh.getRange(5, 1, rows.length + 1, 7).setBorder(true, true, true, true, true, true, '#e8dfcd', SpreadsheetApp.BorderStyle.SOLID);
-    [40, 130, 260, 300, 60, 120, 200].forEach(function (w, i) { sh.setColumnWidth(i + 1, w); });
+    // Same look as the "Wedding Setup Checklist" sheet: Done | Item | Qty | Details, section bands, ticking a box strikes the row through.
+    const GREEN = '#0e6b57', BAND = '#dcede8', LINE = '#d8e0db', FONT = 'Comfortaa';
+    sh.getRange(1, 1, Math.max(list.length * 2 + 10, 40), 4).setFontFamily(FONT).setFontSize(11).setVerticalAlignment('middle');
+    sh.getRange(1, 1).setValue('Wedding Setup Checklist').setFontSize(16).setFontWeight('bold');
+    sh.getRange(2, 1).setValue('Tick the box when a job is done');
+    sh.getRange(3, 1).setFormula('=COUNTIF(A6:A,TRUE)&" of "&(COUNTIF(A6:A,TRUE)+COUNTIF(A6:A,FALSE))&" jobs done"').setFontSize(12).setFontWeight('bold');
+    sh.getRange(4, 1).setValue(client + '  |  ' + dateLabel + (venue ? '  |  ' + venue : '')).setFontColor('#555555');
+    sh.getRange(5, 1, 1, 4).setValues([['Done', 'Item', 'Qty', 'Details']]).setBackground(GREEN).setFontColor('#ffffff').setFontWeight('bold').setWrap(true);
+    sh.getRange(5, 1).setHorizontalAlignment('center');
+    sh.getRange(5, 3).setHorizontalAlignment('center');
+    let r = 6, lastSec = null, itemCount = 0;
+    const itemRows = [];
+    list.forEach(function (x) {
+      const sec = clean(x.section, 60);
+      if (sec && sec !== lastSec) {
+        sh.getRange(r, 1, 1, 4).setBackground(BAND).setFontWeight('bold').setWrap(true);
+        sh.getRange(r, 2).setValue(sec);
+        sh.getRange(r, 1).setHorizontalAlignment('center');
+        sh.getRange(r, 3).setHorizontalAlignment('center');
+        lastSec = sec; r++;
+      }
+      sh.getRange(r, 2).setValue(clean(x.item, 200));
+      if (x.qty !== undefined && String(x.qty).trim() !== '') sh.getRange(r, 3).setValue(clean(x.qty, 20));
+      if (String(x.details || '').trim()) sh.getRange(r, 4).setValue(clean(x.details, 400));
+      sh.getRange(r, 3).setHorizontalAlignment('center');
+      sh.getRange(r, 2, 1, 3).setWrap(true);
+      itemRows.push(r); itemCount++; r++;
+    });
+    const lastRow = r - 1;
+    itemRows.forEach(function (ir) { sh.getRange(ir, 1).insertCheckboxes().setValue(false).setHorizontalAlignment('center'); });
+    sh.getRange(5, 1, lastRow - 4, 4).setBorder(true, true, true, true, true, true, LINE, SpreadsheetApp.BorderStyle.SOLID);
+    [64, 380, 54, 280].forEach(function (w, i) { sh.setColumnWidth(i + 1, w); });
     sh.setFrozenRows(5);
-    const rule = SpreadsheetApp.newConditionalFormatRule().whenFormulaSatisfied('=$E6=TRUE').setBackground('#e6f4ea').setRanges([sh.getRange(6, 1, rows.length, 7)]).build();
+    const rule = SpreadsheetApp.newConditionalFormatRule().whenFormulaSatisfied('=$A6=TRUE')
+      .setBackground('#edf7f2').setFontColor('#727f77').setStrikethrough(true).setRanges([sh.getRange(6, 2, lastRow - 5, 3)]).build();
     sh.setConditionalFormatRules([rule]);
     SpreadsheetApp.flush();
 
@@ -656,8 +749,8 @@ function api_chk_create(pin, p) {
 
     const url = book.getUrl();
     const log = chkLogTab_(ss), lr = lastRowWith_(log, 1) + 1;
-    log.getRange(lr, 1, 1, 6).setNumberFormat('@').setValues([[p.id + '|' + p.date, client, String(p.date), url, today_(), rows.length]]);
-    return { ok: true, url: url, items: rows.length };
+    log.getRange(lr, 1, 1, 6).setNumberFormat('@').setValues([[p.id + '|' + p.date, client, String(p.date), url, today_(), itemCount]]);
+    return { ok: true, url: url, items: itemCount };
   } finally {
     lock.releaseLock();
   }
