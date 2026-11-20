@@ -86,6 +86,12 @@
   .sheet{position:fixed;left:0;right:0;bottom:0;background:var(--cream);border-radius:24px 24px 0 0;padding:10px 16px calc(20px + env(safe-area-inset-bottom));z-index:21;display:none;max-height:94vh;overflow:auto;box-shadow:0 -10px 40px rgba(30,10,14,.25)}
   .sheet.show{display:block}
   @media(min-width:760px){.sheet{left:50%;right:auto;width:720px;transform:translateX(-50%)}}
+  /* keep popups pinned on phones: dynamic viewport height, scrolling stays inside the popup, page behind is locked */
+  .sheet{max-height:94vh;max-height:94dvh;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+  .scrim{touch-action:none;overscroll-behavior:contain}
+  #qe{height:94vh;height:94dvh;overflow-x:hidden}   /* fixed height: opening a group or the preview no longer resizes the popup */
+  html.sheet-lock,html.sheet-lock body{overflow:hidden;overscroll-behavior:none}
+  body.sheet-fixed{position:fixed;left:0;right:0;width:100%}
   .grab{width:44px;height:5px;border-radius:3px;background:#d9cfbb;margin:2px auto 12px}
   .sheet h2{margin:0 0 2px;font-family:var(--serif);font-size:27px;font-weight:700;line-height:1.1}
   .sheet .meta{color:var(--muted);font-size:14px;margin-bottom:14px}
@@ -3181,6 +3187,24 @@
   function openSheet(id) {
     $('#scrim').classList.add('show');
     $(id).classList.add('show');
+    syncSheetLock();
+  }
+  // While any popup is open the page behind it cannot scroll or bounce (body is pinned; its scroll position is restored on close).
+  var sheetLocked = false, sheetY = 0;
+  function syncSheetLock() {
+    var open = !!document.querySelector('.sheet.show'), b = document.body;
+    if (open && !sheetLocked) {
+      sheetLocked = true; sheetY = window.pageYOffset || document.documentElement.scrollTop || 0;
+      document.documentElement.classList.add('sheet-lock'); b.classList.add('sheet-fixed'); b.style.top = (-sheetY) + 'px';
+    } else if (!open && sheetLocked) {
+      sheetLocked = false;
+      document.documentElement.classList.remove('sheet-lock'); b.classList.remove('sheet-fixed'); b.style.top = '';
+      window.scrollTo(0, sheetY);
+    }
+  }
+  if (window.MutationObserver) {
+    var sheetObs = new MutationObserver(syncSheetLock);
+    Array.prototype.forEach.call(document.querySelectorAll('.sheet'), function (s) { sheetObs.observe(s, { attributes: true, attributeFilter: ['class'] }); });
   }
   function closeSheets() {
     if (document.activeElement && document.activeElement.blur) document.activeElement.blur();   // saves a half-typed vendor note
@@ -4333,7 +4357,7 @@
 
   // Reads an existing quote page into an editable model: header, stage photo, and every section with its inclusions, priced lines and rate cards.
   function qeParse(raw) {
-    var doc = new DOMParser().parseFromString(raw, 'text/html'), M = { name: '', date: '', venue: '', img: '', secs: [], dropped: [], showTotal: false, totalLabel: 'Total' };
+    var doc = new DOMParser().parseFromString(raw, 'text/html'), M = { name: '', date: '', venue: '', img: '', secs: [], dropped: [], options: [], showTotal: false, totalLabel: 'Total' };
     var cont = doc.querySelector('.container') || doc.body;
     var tx = function (el) { return ((el && el.textContent) || '').replace(/\s+/g, ' ').trim(); };
     var each = function (list, fn) { Array.prototype.forEach.call(list, fn); };
@@ -4371,6 +4395,7 @@
       } else if (cl.contains('section-card')) {
         var title = tx(el.querySelector('.section-title'));
         if (/complimentary|payment\s*terms/i.test(title)) return;   // the free services are regenerated for every quote
+        var isOpt = /additional\s*options/i.test(title);   // only offered to the client, not chosen: kept aside so each one can be ticked into the new quote
         var s = { title: title, bullets: [], lines: [], totals: [] };
         each(el.querySelectorAll('ul.item-list > li'), function (li) { var t = tx(li); if (t) s.bullets.push(t); });
         each(el.querySelectorAll('.line-item-box'), function (b) {
@@ -4382,6 +4407,7 @@
         var sp = el.querySelector('.section-price');
         if (sp && amt(sp) != null) s.totals.push({ title: 'Decor Package', amount: amt(sp) });
         each(el.querySelectorAll('.total-row-card'), function (tc) { addTotal(s, tc); });
+        if (isOpt) { s.lines.forEach(function (l) { M.options.push(l); }); return; }
         if (s.title || s.bullets.length || s.lines.length || s.totals.length) M.secs.push(s);
       }
     });
@@ -4495,15 +4521,21 @@
   var Q = null, qeSrv = null, qeCssText = '';
   function qeCss() { if (!qeCssText) qeCssText = ($('#qeCss') || {}).textContent || ''; return qeCssText; }
   function qeStatus(msg, err) { var el = $('#qeState'); if (el) { el.className = 'pst' + (err ? ' err' : ''); el.innerHTML = msg; } }
-  function qeTodayNo() { var t = (typeof today === 'string' && today) || ''; return t ? t.slice(2, 4) + t.slice(5, 7) + t.slice(8, 10) : ''; }
+  // Default quote # = today's date as YYMMDD, read from the phone's own clock (same as the quote builder), so it never lags behind a stale server date.
+  function qeTodayNo() {
+    var n = new Date();
+    if (isNaN(n.getTime())) { var t = (typeof today === 'string' && today) || ''; return t ? t.slice(2, 4) + t.slice(5, 7) + t.slice(8, 10) : ''; }
+    var p2 = function (v) { return (v < 10 ? '0' : '') + v; };
+    return String(n.getFullYear()).slice(2) + p2(n.getMonth() + 1) + p2(n.getDate());
+  }
   function qeTaken(no) { return !!(ghTree && ghTree[Q.folder] && ghTree[Q.folder].indexOf(no) >= 0); }
   function qeBlankSec(title) { return { title: title || '', bullets: [], lines: [], totals: [] }; }
 
   function qeOpen(it, list, src) {
     var folder = payFolder(it, list);
-    var M = src && src.raw ? qeParse(src.raw) : { name: '', date: '', venue: '', img: '', secs: [], dropped: [] };
+    var M = src && src.raw ? qeParse(src.raw) : { name: '', date: '', venue: '', img: '', secs: [], dropped: [], options: [] };
     Q = { it: it, list: list, folder: folder, base: src ? src.no : '', name: M.name || it.name || '', date: M.date || it.date || '', venue: M.venue || (src && src.venue) || it.venue || '',
-      img: M.img, imgChoice: 'keep', upload: null, secs: M.secs, dropped: M.dropped, custom: qeBlankSec('Additional Items'), pkg: null, no: qeTodayNo(), replace: false };
+      img: M.img, imgChoice: 'keep', upload: null, secs: M.secs, dropped: M.dropped, custom: qeBlankSec('Additional Items'), pkg: null, no: qeTodayNo(), replace: false, options: M.options || [], optBase: src ? src.no : '' };
     Q.showTotal = !!M.showTotal; Q.totalLabel = M.totalLabel || 'Total';
     Q.secs = Q.secs.filter(function (x) {   // an old "Additional Items" section becomes the add-ons area, so ticked services and typed ones sit together after the package
       if (!/^additional items$/i.test(x.title) || x.totals.length || x.bullets.length) return true;
@@ -4589,6 +4621,7 @@
       '<div class="qtaken" id="qeTaken"' + (tk ? '' : ' style="display:none"') + '><label class="tlchk"><input type="checkbox" id="qeRep"' + (Q.replace ? ' checked' : '') + '> Quote #' + esc(Q.no) +
       ' already exists for this client - tick to replace it (the old page is overwritten)</label></div>' +
       '<h4>Stage design</h4><button type="button" class="pbtn" data-act="stg" style="margin:0 0 8px">Choose a stage design</button><div id="qeStg" style="display:none"></div><select id="qeImg" data-d="img">' + qeImgOptions() + '</select><input type="file" id="qeFile" accept="image/*" style="display:' + (Q.imgChoice === 'up' ? 'block' : 'none') + ';margin-top:8px">' +
+      qeOptPanel() +
       '<h4>Services from the quote builder</h4><div class="note">Open a group and tick what the client wants - church decoration, pathway stands, cake, band, cars and the rest. Tick again to remove. Everything can be edited below.</div>' +
       '<div id="qeCat">' + qeCatPanel() + '</div>' +
       '<h4>Stage, services and rates</h4><button type="button" class="pbtn" data-act="sadd" style="margin:0 0 8px">+ New section</button>' +
@@ -4609,6 +4642,29 @@
   }
   function qeSection(si) { return si === 'c' ? Q.custom : Q.secs[+si]; }
 
+  function qeOptAdded(oi) { return Q.secs.concat([Q.custom]).some(function (s) { return s.lines.some(function (l) { return l.oi === oi; }); }); }
+  function qeOptPanel() {
+    if (!Q.options || !Q.options.length) return '';
+    var h = '<h4>Additional options in quote #' + esc(Q.optBase) + '</h4><div class="note">These were only offered to the client. Tap one to include it in this new quote (it goes with the add-on services); tap again to remove it.</div><div class="qcat"><div class="qcl">';
+    Q.options.forEach(function (o, i) {
+      var on = qeOptAdded(i), rate = o.rate != null ? inr(o.rate) : (o.ptext || '');
+      h += '<button type="button" class="qci' + (on ? ' on' : '') + '" data-act="oadd" data-oi="' + i + '"><i class="qtick">' + (on ? '&#10003;' : '') + '</i><span>' + esc(o.name) + ((o.subs || []).length ? '<small>' + esc(o.subs.join(' · ')) + '</small>' : '') + '</span><b>' + esc(rate) + '</b></button>';
+    });
+    return h + '</div></div>';
+  }
+  function qeAddOpt(oi) {
+    var o = Q.options[oi]; if (!o) return;
+    if (qeOptAdded(oi)) {
+      Q.secs.concat([Q.custom]).forEach(function (s2) { s2.lines = s2.lines.filter(function (l) { return l.oi !== oi; }); });
+      if (!Q.custom.lines.length) Q.custom.lines.push({ name: '', subs: [], note: '', rate: null, qty: 1 });
+      qeKeepScroll(); qeStatus(esc(o.name) + ' removed.'); return;
+    }
+    var blank = function (l) { return !String(l.name || '').trim() && !num(l.rate) && !(l.subs || []).join('').trim(); };
+    Q.custom.lines = Q.custom.lines.filter(function (l) { return !blank(l); });
+    Q.custom.lines.push({ name: o.name, subs: (o.subs || []).slice(), note: o.note || '', rate: o.rate, qty: 1, ptext: o.ptext || '', oi: oi });
+    Q.custom.lines.push({ name: '', subs: [], note: '', rate: null, qty: 1 });
+    qeKeepScroll(); qeStatus(esc(o.name) + ' added to the new quote after the Decor Package.');
+  }
   function qeAdded(ci) { return Q.secs.concat([Q.custom]).some(function (s) { return s.lines.some(function (l) { return l.ci === ci; }); }); }
   function qeCatPanel() {
     var q = (($('#qeCatQ') || {}).value || '').toLowerCase(), groups = [], by = {};
@@ -4752,6 +4808,7 @@
     var move = function (arr, i, d) { var j = i + d; if (j < 0 || j >= arr.length) return false; var t = arr[i]; arr[i] = arr[j]; arr[j] = t; return true; };
     if (a === 'cat') { var p = $('#qeCat'), on = p.style.display === 'none'; p.style.display = on ? '' : 'none'; if (on) p.innerHTML = qeCatPanel(); }
     else if (a === 'cadd') qeAddCat(+b.getAttribute('data-ci'));
+    else if (a === 'oadd') qeAddOpt(+b.getAttribute('data-oi'));
     else if (a === 'cgrp') { Q.catOpen = Q.catOpen || {}; var gn = b.getAttribute('data-g'); Q.catOpen[gn] = !Q.catOpen[gn]; $('#qeCat').innerHTML = qeCatPanel(); }
     else if (a === 'stg') { var sp = $('#qeStg'), so = sp.style.display === 'none'; sp.style.display = so ? '' : 'none'; if (so) sp.innerHTML = qeStagePanel(); }
     else if (a === 'stgpick') {
