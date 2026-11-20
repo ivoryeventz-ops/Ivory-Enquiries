@@ -3038,7 +3038,7 @@
   }
 
   /* ---------- reminders + "no quote given" flags (Confirmed works) ---------- */
-  var FL = { ready: false, sites: {}, cloud: {}, acts: {}, tl: {}, links: null, folder: {} };   // links: client folders that already have a link (null = could not be read); folder: the quote folder of a work, when it has quotes   // tl: works that already have a wedding timeline page published
+  var FL = { ready: false, sites: {}, cloud: {}, acts: {}, tl: {}, links: null, folder: {}, linkDate: {} };   // links: client folders that already have a link (null = could not be read); folder: the quote folder of a work, when it has quotes   // tl: works that already have a wedding timeline page published
   var LOOKBACK = 7;   // a finished wedding stays on the list this many days while its "day after" task is still pending
   var STAGES = [
     { title: '3 days before wedding', at: 3, tasks: [['timeline', 'Wedding timeline to be given'], ['signage', 'Signage board details'], ['vendorChk', 'Checklist to be finalised with vendors'], ['payAdv', 'Payment & advance details to be sent to client']] },
@@ -3050,7 +3050,23 @@
   function isoAdd(iso, n) { var d = toDate(iso); d.setDate(d.getDate() + n); return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()); }
   // "No client link": every work (not Lost) whose client folder has no page in Ivory-Events > New A. The folder is the one its quotes are in, else the first word of the name (as the app makes it).
   function linkFolder(i) { return String(FL.folder[wkey(i)] || payFolder(i, [])).toLowerCase(); }
-  function noLink(i) { return !!FL.links && i.status !== 'Lost' && !!String(i.name || '').trim() && !FL.links[linkFolder(i)]; }
+  function nameToks(t) { return String(t || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().split(' ').filter(Boolean); }
+  // works that share this work's first name (so one folder could belong to a different wedding)
+  function sameName(i) { var k = payFolder(i, []).toLowerCase(); return items.some(function (o) { return o !== i && o.status !== 'Lost' && payFolder(o, []).toLowerCase() === k; }); }
+  // the client's own folder, plus any link folder whose words all appear in the name (e.g. "Christy Kzy" -> Christy-Kzy)
+  function linkCands(i, L) {
+    var out = [linkFolder(i)], nt = nameToks(i.name);
+    Object.keys(L || {}).forEach(function (f) { var ft = nameToks(f); if (ft.length && ft.every(function (t) { return nt.indexOf(t) >= 0; }) && out.indexOf(f) < 0) out.push(f); });
+    return out.filter(function (f) { return L && L[f]; });
+  }
+  function noLink(i) {
+    if (!FL.links || i.status === 'Lost' || !String(i.name || '').trim()) return false;
+    var c = linkCands(i, FL.links);
+    if (!c.length) return true;
+    if (!i.date || !sameName(i)) return false;
+    // second check, only when another work has the same name: the link must be for this wedding date (a link with no readable date is given the benefit of the doubt)
+    return !c.some(function (f) { return !FL.linkDate[f] || FL.linkDate[f] === i.date; });
+  }
   function noQuote(i) { return FL.ready && i.status === 'Confirmed' && !!i.date && !FL.sites[wkey(i)] && FL.cloud[wkey(i)] === 0; }
   // quote exists only as a Google Site: counted as quoted, but outside vendors cannot be auto-picked from it until it is re-issued as a GitHub quote
   // A saved tick (or an explicit un-tick) always wins. With nothing saved, the wedding timeline shows ticked once its page exists in the timeline repo.
@@ -3129,8 +3145,16 @@
     var tl = tlGet().then(function (t) { return t; }, function () { return null; });
     var lk = ghTreeFetch('ivoryeventz-ops/Ivory-Events', 'main').then(function (j) {
       var L = {};
-      (j.tree || []).forEach(function (x) { var m = /^New A\/([^\/]+)\/(?:data\.json|index\.html)$/.exec(x.path); if (m) L[m[1].toLowerCase()] = true; });
-      return L;
+      (j.tree || []).forEach(function (x) { var m = /^New A\/([^\/]+)\/(?:data\.json|index\.html)$/.exec(x.path); if (m) L[m[1].toLowerCase()] = m[1]; });
+      // same-name works: read the wedding date saved in each candidate link, so the dates can be compared
+      var need = {};
+      items.forEach(function (i) { if (i.status !== 'Lost' && i.date && String(i.name || '').trim() && sameName(i)) linkCands(i, L).forEach(function (f) { need[f] = 1; }); });
+      var D = {};
+      return Promise.all(Object.keys(need).map(function (f) {
+        return fetch(SITE_RAW + encodeURIComponent(L[f]) + '/data.json?t=' + Date.now())
+          .then(function (r) { return r.ok ? r.json() : null; })
+          .then(function (d) { D[f] = (d && d.wedding_date) || ''; }, function () { D[f] = ''; });
+      })).then(function () { return { L: L, D: D }; });
     }, function () { return null; });
     return Promise.all([srv, gh, tl, lk]).then(function (res) {
       var r = res[0];
@@ -3141,7 +3165,7 @@
         (r.actions || []).forEach(function (a) { FL.acts[a.key + '|' + a.task] = a.done; });
       }
       res[1].forEach(function (x) { if (x.n >= 0) FL.cloud[wkey(x.it)] = x.n; if (x.folder) FL.folder[wkey(x.it)] = x.folder; });
-      FL.links = res[3];
+      FL.links = res[3] ? res[3].L : null; FL.linkDate = res[3] ? res[3].D : {};
       FL.ready = !!r;
       render();
       if (cur) renderActsDetail(cur);
@@ -3784,7 +3808,7 @@
         var p = { folder: f, name: it.name, date: it.date, venue: it.venue, type: type, change: !!change };
         if (key) p.key = key;
         busy(true);
-        return call('api_site_create', pin, p).then(function (r) { busy(false); delete SITE[f]; if (FL.links) { FL.links[String(f).toLowerCase()] = true; render(); } return r; }, function (e) { busy(false); throw e; });
+        return call('api_site_create', pin, p).then(function (r) { busy(false); delete SITE[f]; if (FL.links) { FL.links[String(f).toLowerCase()] = String(f); FL.linkDate[String(f).toLowerCase()] = it.date || ''; render(); } return r; }, function (e) { busy(false); throw e; });
       };
       if (has) return go('');
       return askConfirm({ title: 'Make the client link', body: 'The link for ' + it.name + ' is made on the Ivory-Events site.', ok: 'Make link', needKey: true,
