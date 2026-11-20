@@ -3341,6 +3341,7 @@
         // the client's link (intro, packages, checklist for this event type) is made straight away, then offered for WhatsApp
         return ensureLink(np, np.type, false).then(function (r) {
           if (r) showLink(np.name, r.url, r.existed ? 'This client already had a link, so it was kept as it is (use the Client link tab inside the work to change its event type).' : 'Made for ' + EV_TYPES[np.type] + '. It has the introduction, packages and service checklist.');
+          else toast('Enquiry saved, but no client link was made. Tap Make link on its card.', true);
         }, function (err) { toast('Enquiry saved, but the client link was not made: ' + err.message + '. Open the work > Client link to try again.', true); });
       });
     }).catch(function (err) {
@@ -3818,8 +3819,19 @@
   }
   $('#lkNo').addEventListener('click', function () { $('#lk').classList.remove('show'); });
   // Makes (or, with change=true, re-types) the client's link. Asks for the GitHub key only if the script does not hold one yet.
+  // The folder for a NEW link: the usual first-name folder, unless that already belongs to another wedding (same first name, different date) - then it gets its own, e.g. Jaison-261224, so every enquiry has its own link.
+  function newLinkFolder(it) {
+    var f = payFolder(it, []), k = f.toLowerCase();
+    if (!FL.links || !it.date) return f;
+    var hit = '';
+    Object.keys(FL.links).forEach(function (x) { if (!hit && FL.linkDate[x] === it.date && nameToks(x)[0] === nameToks(it.name)[0]) hit = FL.links[x] || x; });
+    if (hit) return hit;
+    if (!FL.links[k] || !FL.linkDate[k] || FL.linkDate[k] === it.date) return f;
+    var d = it.date.replace(/-/g, '').slice(2), n = f + '-' + d;
+    return n;
+  }
   function ensureLink(it, type, change) {
-    var f = payFolder(it, []);
+    var f = change ? payFolder(it, []) : newLinkFolder(it);
     if (!EV_TYPES[type]) return Promise.reject(new Error('Choose the event type'));
     return call('api_site_status', pin).then(function (s) { return !!s.hasKey; }, function () { return null; }).then(function (has) {
       if (has === null) throw new Error('Paste the new Code.gs into Apps Script first');
