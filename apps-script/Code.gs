@@ -946,3 +946,13 @@ function api_quote_sheet(pin, p) {
   sh.autoResizeColumns(1, width);
   return { url: book.getUrl() };
 }
+
+
+// Run this once from the Apps Script editor (select "authorizeAll", press Run, then Review permissions > Allow).
+// It asks for Google Drive access (staff checklist sheets) and external web access (GitHub), so the app stops saying "You do not have permission".
+function authorizeAll() {
+  DriveApp.getRootFolder();
+  SpreadsheetApp.openById(SHEET_ID).getName();
+  UrlFetchApp.fetch('https://api.github.com/zen', { muteHttpExceptions: true });
+  return 'Authorised';
+}
