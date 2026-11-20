@@ -664,16 +664,18 @@ function api_gh_tree(pin, p) {
   if (!/^[A-Za-z0-9._-]+$/.test(branch)) throw new Error('Bad branch');
   const props = PropertiesService.getScriptProperties();
   const keys = ['GH_KEY', 'TL_KEY', 'SITE_KEY'].map(function (k) { return props.getProperty(k); }).filter(Boolean);
+  const names = ['GH_KEY', 'TL_KEY', 'SITE_KEY'].filter(function (k) { return props.getProperty(k); });
   keys.push('');
-  let last = 0;
+  const tried = [];
   for (let i = 0; i < keys.length; i++) {
     const hd = { Accept: 'application/vnd.github+json' };
     if (keys[i]) hd.Authorization = 'Bearer ' + keys[i];
     const r = UrlFetchApp.fetch('https://api.github.com/repos/' + repo + '/git/trees/' + branch + '?recursive=1', { headers: hd, muteHttpExceptions: true });
-    last = r.getResponseCode();
-    if (last === 200) return { tree: (JSON.parse(r.getContentText()).tree || []).map(function (x) { return { path: x.path }; }) };
+    const code = r.getResponseCode();
+    if (code === 200) return { tree: (JSON.parse(r.getContentText()).tree || []).map(function (x) { return { path: x.path }; }) };
+    tried.push((keys[i] ? names[i] : 'no key') + ' ' + code);
   }
-  throw new Error('GitHub answered ' + last);
+  throw new Error('GitHub refused: ' + tried.join(', ') + (keys.length === 1 ? ' (no key saved in the script yet)' : ''));
 }
 
 /* ---------- staff checklist: a Google Sheet made the day before the wedding, items from the latest quote ---------- */

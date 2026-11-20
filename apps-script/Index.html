@@ -3352,9 +3352,13 @@
 
   // File lists come through the script (saved GitHub key, so no hourly limit); direct GitHub is only the fallback for an old Code.gs.
   function ghTreeFetch(repo, branch) {
-    return call('api_gh_tree', pin, { repo: repo, branch: branch }).catch(function () {
-      return fetch('https://api.github.com/repos/' + repo + '/git/trees/' + branch + '?recursive=1')
-        .then(function (r) { if (!r.ok) throw new Error('GitHub answered ' + r.status + ' - paste the new Code.gs into Apps Script'); return r.json(); });
+    var why = '';
+    return call('api_gh_tree', pin, { repo: repo, branch: branch }).catch(function (e) {
+      why = e.message;
+      var k = (typeof localKey === 'function') ? localKey() : '';
+      var opt = k ? { headers: { Authorization: 'Bearer ' + k, Accept: 'application/vnd.github+json' } } : {};
+      return fetch('https://api.github.com/repos/' + repo + '/git/trees/' + branch + '?recursive=1', opt)
+        .then(function (r) { if (!r.ok) throw new Error('GitHub answered ' + r.status + (k ? ' (with this phone\u2019s key)' : ' (no key)') + '. Script: ' + why); return r.json(); });
     });
   }
   var ghTree = null, ghTreeAt = 0, ghCache = {}, ghPay = {}, ghImgs = {};
