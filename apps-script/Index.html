@@ -3056,6 +3056,8 @@
   // the client's own folder, plus any link folder whose words all appear in the name (e.g. "Christy Kzy" -> Christy-Kzy)
   function linkCands(i, L) {
     var out = [linkFolder(i)], nt = nameToks(i.name);
+    // a link folder with another name that is for this very wedding date and shares the first name (e.g. two Jaisons: "Jaison" and "Jaison-Kozhencherry")
+    Object.keys(L || {}).forEach(function (f) { var ft = nameToks(f); if (i.date && FL.linkDate[f] === i.date && ft.length && nt.length && ft[0] === nt[0] && out.indexOf(f) < 0) out.push(f); });
     Object.keys(L || {}).forEach(function (f) { var ft = nameToks(f); if (ft.length && ft.every(function (t) { return nt.indexOf(t) >= 0; }) && out.indexOf(f) < 0) out.push(f); });
     return out.filter(function (f) { return L && L[f]; });
   }
@@ -3148,7 +3150,7 @@
       (j.tree || []).forEach(function (x) { var m = /^New A\/([^\/]+)\/(?:data\.json|index\.html)$/.exec(x.path); if (m) L[m[1].toLowerCase()] = m[1]; });
       // same-name works: read the wedding date saved in each candidate link, so the dates can be compared
       var need = {};
-      items.forEach(function (i) { if (i.status !== 'Lost' && i.date && String(i.name || '').trim() && sameName(i)) linkCands(i, L).forEach(function (f) { need[f] = 1; }); });
+      items.forEach(function (i) { if (i.status !== 'Lost' && i.date && String(i.name || '').trim() && sameName(i)) linkCands(i, L).forEach(function (f) { need[f] = 1; }); var t0 = nameToks(i.name)[0]; Object.keys(L).forEach(function (f) { if (t0 && nameToks(f)[0] === t0) need[f] = 1; }); });
       var D = {};
       return Promise.all(Object.keys(need).map(function (f) {
         return fetch(SITE_RAW + encodeURIComponent(L[f]) + '/data.json?t=' + Date.now())
@@ -3365,7 +3367,7 @@
 
 
   /* ---------- quotes sent + outside vendors ---------- */
-  var APP_VERSION = 'v19-Nov-a';   // shown under Outside vendors, so you can tell which Index.html is running
+  var APP_VERSION = 'v20-Nov-a';   // shown under Outside vendors, so you can tell which Index.html is running
   var GH_REPO = 'ivoryeventz-ops/Ivory-Packages', GH_BRANCH = 'main', GH_SITE = 'https://ivory-packages.pages.dev';
   // The 12 standard outside vendors (same list as VENDOR_NAMES in Code.gs).
   var VNAMES = ['Garland and Bouquet', 'Wedding cake', 'Confetti', 'Cold Spark', 'Dry Ice', 'Ambiance lighting',
@@ -3818,7 +3820,12 @@
       });
     });
   }
-  function siteFolder(it) { return payFolder(it, lastQ); }
+  // the link folder of this work: a folder already made for this wedding date and first name wins (two clients can share a first name), else the usual one
+  function siteFolder(it) {
+    var nt = nameToks(it.name), hit = '';
+    if (FL.links && it.date) Object.keys(FL.links).forEach(function (f) { var ft = nameToks(f); if (!hit && FL.linkDate[f] === it.date && ft.length && nt.length && ft[0] === nt[0]) hit = FL.links[f] || f; });
+    return hit || payFolder(it, lastQ);
+  }
   function siteLoad(it) {
     var f = siteFolder(it);
     renderSite(it);
