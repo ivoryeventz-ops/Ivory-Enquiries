@@ -58,6 +58,9 @@
   .r3{grid-column:2 / 4;font-size:13px;color:var(--muted)}
   .since{grid-column:1 / 4;margin-top:6px;font-size:12px;color:var(--cost)}
   .nq{grid-column:1 / 4;margin-top:6px;font-size:13px;font-weight:700;color:var(--danger)}
+  .mk{grid-column:1 / 4;display:flex;gap:8px;margin-top:6px}
+  .mk select{flex:1;min-width:0;font-size:14px;padding:6px}
+  .mk button{font-size:14px;font-weight:700;padding:6px 12px;border-radius:8px;border:0;background:var(--danger);color:#fff}
   .mg{margin-top:6px;font-size:13px;font-weight:600;color:var(--cost)}
   .empty{text-align:center;color:var(--muted);padding:48px 10px;font-family:var(--serif);font-size:20px}
   .acts{grid-column:1 / 4;margin-top:8px;border-top:1px dashed var(--line);padding-top:6px}
@@ -3130,7 +3133,7 @@
         '<div class="r2">' + fmt(i.date) + ' &middot; ' + when(i.date) + '</div>' +
         '<div class="r3">' + esc(i.venue) + '</div>' +
         (noQuote(i) ? '<div class="nq">&#9888; No quote given yet</div>' : '') +
-        (noLink(i) ? '<div class="nq">&#9888; No client link yet</div>' : '') +
+        (noLink(i) ? '<div class="nq">&#9888; No client link yet</div>' + (i.date ? '<div class="mk"><select class="mkType" aria-label="Event type">' + Object.keys(EV_TYPES).map(function (k) { return '<option value="' + k + '">' + esc(EV_TYPES[k]) + '</option>'; }).join('') + '</select><button type="button" class="mkBtn" data-row="' + i.row + '">Make link</button></div>' : '<div class="nq">Add the event date to make the link</div>') : '') +
         (i.status === 'Costing' && i.since ? '<div class="since">Costing since ' + fmt(i.since, true) + ' &middot; reminder every 2 days</div>' : '') +
         actHtml(i, false) +
         '</div>';
@@ -3265,6 +3268,20 @@
   // list taps
   $('#list').addEventListener('click', function (e) {
     if (e.target.closest('.acts')) return;   // ticking a reminder must not open the work
+    if (e.target.closest('.mk')) {   // one-tap client link for a work that has none
+      var mb = e.target.closest('.mkBtn');
+      if (mb) {
+        var mi = items.filter(function (i) { return i.row === +mb.getAttribute('data-row'); })[0];
+        var ty = mb.parentNode.querySelector('.mkType').value;
+        if (mi) {
+          mb.disabled = true; mb.textContent = 'Making...';
+          ensureLink(mi, ty, false).then(function (r) {
+            if (r) showLink(mi.name, r.url, r.existed ? 'This client already had a link, so it was kept as it is.' : 'Made for ' + EV_TYPES[ty] + '. It has the introduction, packages and service checklist.');
+          }, function (err) { toast('Client link not made: ' + err.message, true); }).then(function () { mb.disabled = false; mb.textContent = 'Make link'; });
+        }
+      }
+      return;
+    }
     var b = e.target.closest('.card');
     if (!b) return;
     var row = +b.getAttribute('data-row');
