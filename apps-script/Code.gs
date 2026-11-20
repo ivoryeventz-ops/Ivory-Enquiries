@@ -721,29 +721,32 @@ function api_chk_create(pin, p) {
     const clean = function (t, n) { return String(t == null ? '' : t).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '').slice(0, n); };
     const client = clean(row[1], 80), dateLabel = Utilities.formatDate(parse_(String(p.date)), tz_(), 'EEE d MMM yyyy');
     const venue = clean(p.venue, 120);
-    const book = SpreadsheetApp.create('Ivory Checklist - ' + client + ' - ' + String(p.date).replace(/-/g, ''));
+    const fileDate = Utilities.formatDate(parse_(String(p.date)), tz_(), 'd MMM yyyy');
+    const book = SpreadsheetApp.create('Ivory Checklist - ' + clean(venue || client, 80) + ' - ' + fileDate);
     const sh = book.getSheets()[0];
     sh.setName('Checklist');
-    // Look of the "Wedding Setup Checklist" sheet, simplified for staff: Done | Item | Details. No sections, no vendor names.
+    // Look of the "Wedding Setup Checklist" sheet, simplified for staff: Done | Item | Qty | Details. No sections, no vendor names.
     // Ticking a box turns the row pale green and strikes the item and details through.
     const GREEN = '#0e6b57', LINE = '#d8e0db', FONT = 'Comfortaa';
     const n = list.length;
-    sh.getRange(1, 1, Math.max(n + 10, 40), 3).setFontFamily(FONT).setFontSize(11).setVerticalAlignment('middle');
+    sh.getRange(1, 1, Math.max(n + 10, 40), 4).setFontFamily(FONT).setFontSize(11).setVerticalAlignment('middle');
     sh.getRange(1, 1).setValue('Wedding Setup Checklist').setFontSize(16).setFontWeight('bold');
     sh.getRange(2, 1).setValue('Tick the box when a job is done');
     sh.getRange(3, 1).setFormula('=COUNTIF(A6:A,TRUE)&" of "&(COUNTIF(A6:A,TRUE)+COUNTIF(A6:A,FALSE))&" jobs done"').setFontSize(12).setFontWeight('bold');
     sh.getRange(4, 1).setValue(client + '  |  ' + dateLabel + (venue ? '  |  ' + venue : '')).setFontColor('#555555');
-    sh.getRange(5, 1, 1, 3).setValues([['Done', 'Item', 'Details']]).setBackground(GREEN).setFontColor('#ffffff').setFontWeight('bold').setWrap(true);
+    sh.getRange(5, 1, 1, 4).setValues([['Done', 'Item', 'Qty', 'Details']]).setBackground(GREEN).setFontColor('#ffffff').setFontWeight('bold').setWrap(true);
     sh.getRange(5, 1).setHorizontalAlignment('center');
-    const rows = list.map(function (x) { return [false, clean(x.item, 200), clean(x.details, 400)]; });
-    const body = sh.getRange(6, 1, n, 3);
+    sh.getRange(5, 3).setHorizontalAlignment('center');
+    const rows = list.map(function (x) { return [false, clean(x.item, 200), clean(x.qty, 20), clean(x.details, 400)]; });
+    const body = sh.getRange(6, 1, n, 4);
     body.setValues(rows).setWrap(true);
     sh.getRange(6, 1, n, 1).insertCheckboxes().setHorizontalAlignment('center');
-    sh.getRange(5, 1, n + 1, 3).setBorder(true, true, true, true, true, true, LINE, SpreadsheetApp.BorderStyle.SOLID);
-    [64, 380, 280].forEach(function (w, i) { sh.setColumnWidth(i + 1, w); });
+    sh.getRange(6, 3, n, 1).setNumberFormat('@').setHorizontalAlignment('center');
+    sh.getRange(5, 1, n + 1, 4).setBorder(true, true, true, true, true, true, LINE, SpreadsheetApp.BorderStyle.SOLID);
+    [64, 380, 54, 280].forEach(function (w, i) { sh.setColumnWidth(i + 1, w); });
     sh.setFrozenRows(5);
     const rule = SpreadsheetApp.newConditionalFormatRule().whenFormulaSatisfied('=$A6=TRUE')
-      .setBackground('#edf7f2').setFontColor('#727f77').setStrikethrough(true).setRanges([sh.getRange(6, 2, n, 2)]).build();
+      .setBackground('#edf7f2').setFontColor('#727f77').setStrikethrough(true).setRanges([sh.getRange(6, 2, n, 3)]).build();
     sh.setConditionalFormatRules([rule]);
     const itemCount = n;
     SpreadsheetApp.flush();

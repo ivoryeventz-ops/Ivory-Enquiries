@@ -3898,15 +3898,20 @@
     return h + '</div></div>';
   }
   function ckWa(it, url) { return 'https://wa.me/?text=' + encodeURIComponent('Ivory wedding day checklist - ' + it.name + ', ' + fmt(it.date) + '\n' + url); }
+  // Quantity guessed from the item text (e.g. "2 nos", "x3"); shown in a small box on each row so it can be fixed before the sheet is made.
+  function ckQty(t) {
+    var m = /\b(\d+)\s*(?:nos?\b\.?|no\.s|pcs|numbers?)/i.exec(t) || /[x\u00d7]\s*(\d+)\b/i.exec(t);
+    return m ? m[1] : '';
+  }
   function ckOpen(it) {
     var q = lastQ[0], items = [];
     if (q && q.src === 'cloud') {
       // same rules as the Stage decoration list: outside-vendor lines are left out here (they are listed under Outside vendors below)
-      sdBuild(q.stage, q.extras, q).forEach(function (r) { items.push({ section: 'Stage and decor', item: r.t, details: '', on: !r.opt }); });
+      sdBuild(q.stage, q.extras, q).forEach(function (r) { items.push({ section: 'Stage and decor', item: r.t, details: '', qty: ckQty(r.t), on: !r.opt }); });
     }
     if (vItem === it) vMainList.forEach(function (n) {
       var s = VS[n] || {};
-      items.push({ section: 'Outside vendors', item: n, details: '', on: true });   // staff sheet lists the item only, no vendor names
+      items.push({ section: 'Outside vendors', item: n, details: '', qty: '', on: true });   // staff sheet lists the item only, no vendor names
     });
     ckS = { it: it, q: q, items: items, done: false };
     $('#ckMeta').textContent = it.name + ' - ' + fmt(it.date) + (it.venue ? ' - ' + it.venue : '') + (q && q.src === 'cloud' ? ' - items from quote #' + q.no : '');
@@ -3923,7 +3928,7 @@
     order.forEach(function (g) {
       h += '<div class="ckg">' + esc(g) + '</div>' + groups[g].map(function (i) {
         var x = S.items[i];
-        return '<label class="ckrow"><input type="checkbox" data-i="' + i + '"' + (x.on ? ' checked' : '') + '><span>' + esc(x.item) + (x.details ? '<small>' + esc(x.details) + '</small>' : '') + '</span></label>';
+        return '<label class="ckrow"><input type="checkbox" data-i="' + i + '"' + (x.on ? ' checked' : '') + '><span>' + esc(x.item) + (x.details ? '<small>' + esc(x.details) + '</small>' : '') + '</span><input class="ckq" data-q="' + i + '" value="' + esc(x.qty || '') + '" placeholder="Qty" inputmode="numeric" style="width:56px;height:auto;margin:0 0 0 auto;text-align:center;padding:6px;border:1px solid #ddd;border-radius:8px;accent-color:auto"></label>';
       }).join('');
     });
     h += '<div class="ckg">Add your own</div><div class="ckadd"><input id="ckNew" placeholder="e.g. Extension boards" autocomplete="off"><button type="button" class="sbtn alt" id="ckAddBtn">Add</button></div>';
@@ -3939,9 +3944,13 @@
     var cb = e.target.closest('input[data-i]'); if (!cb || !ckS) return;
     ckS.items[+cb.getAttribute('data-i')].on = cb.checked; ckCount();
   });
+  $('#ckBody').addEventListener('input', function (e) {
+    var q = e.target.closest('input[data-q]'); if (!q || !ckS) return;
+    ckS.items[+q.getAttribute('data-q')].qty = q.value.trim();
+  });
   function ckAdd() {
     var inp = $('#ckNew'), t = inp.value.trim(); if (!t || !ckS) return;
-    ckS.items.push({ section: 'Other', item: t, details: '', on: true });
+    ckS.items.push({ section: 'Other', item: t, details: '', qty: '', on: true });
     ckRender(); setTimeout(function () { var n = $('#ckNew'); if (n) n.focus(); }, 30);
   }
   $('#ckBody').addEventListener('click', function (e) { if (e.target.closest('#ckAddBtn')) ckAdd(); });
@@ -3954,7 +3963,7 @@
       body: list.length + ' items will go into a new Google Sheet for ' + S.it.name + ' (' + fmt(S.it.date) + '). Anyone with the link can tick items. Nothing is sent to staff until you tap Send on WhatsApp.' }).then(function (r) {
       if (!r.ok) return;
       busy(true); $('#ckGo').disabled = true; $('#ckState').textContent = 'Creating the sheet...';
-      return call('api_chk_create', pin, { confirmed: true, row: S.it.row, id: S.it.id, date: S.it.date, venue: S.it.venue, quote: S.q && S.q.no || '', items: list.map(function (x) { return { section: x.section, item: x.item, details: x.details }; }) })
+      return call('api_chk_create', pin, { confirmed: true, row: S.it.row, id: S.it.id, date: S.it.date, venue: S.it.venue, quote: S.q && S.q.no || '', items: list.map(function (x) { return { section: x.section, item: x.item, qty: x.qty || '', details: x.details }; }) })
         .then(function (res) {
           S.done = true;
           CK[wkey(S.it)] = { last: { url: res.url, created: today, items: res.items } };
