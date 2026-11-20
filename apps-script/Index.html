@@ -3906,7 +3906,7 @@
     }
     if (vItem === it) vMainList.forEach(function (n) {
       var s = VS[n] || {};
-      items.push({ section: 'Outside vendors', item: n, details: [(s.supplier || '').trim(), (s.details || '').trim()].filter(Boolean).join(' - '), on: true });
+      items.push({ section: 'Outside vendors', item: n, details: '', on: true });   // staff sheet lists the item only, no vendor names
     });
     ckS = { it: it, q: q, items: items, done: false };
     $('#ckMeta').textContent = it.name + ' - ' + fmt(it.date) + (it.venue ? ' - ' + it.venue : '') + (q && q.src === 'cloud' ? ' - items from quote #' + q.no : '');
