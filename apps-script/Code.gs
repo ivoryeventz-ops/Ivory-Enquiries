@@ -32,7 +32,8 @@ const QUOTE_TAB = 'Quotes';
 
 /* ---------- web app ---------- */
 
-function doGet() {
+function doGet(e) {
+  if (e && e.parameter && e.parameter.push === 'due') return pushDue_(e.parameter.key);   // read by the Cloudflare push worker
   return HtmlService.createHtmlOutputFromFile('Index')
     .setTitle('Ivory Enquiries')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1, viewport-fit=cover')
@@ -836,6 +837,92 @@ function api_action(pin, p) {
     return { ok: true };
   } finally {
     lock.releaseLock();
+  }
+}
+
+/* ---------- push notifications: what is due this morning ----------
+ * The Cloudflare push worker (ivoryeventz-ops/Process) calls this URL every morning:
+ *   <web app URL>?push=due&key=<PUSH_KEY>
+ * PUSH_KEY is a Script Property (Project Settings > Script properties > Add: PUSH_KEY = your own long password).
+ * It answers with ONE digest: the same 3-days-before / 1-day-before / day-after tasks the app shows, minus the ones ticked done.
+ * Wedding timeline counts as done when it was ticked, or when a client folder with a matching name word exists
+ * in the ivory-wedding-timeline repo (if GitHub cannot be read, the timeline task is left out rather than guessed). */
+
+const PUSH_STAGES = [
+  { at: 3, tasks: [['timeline', 'Wedding timeline'], ['signage', 'Signage board details'], ['vendorChk', 'Vendor checklist'], ['payAdv', 'Payment and advance details']] },
+  { at: 1, tasks: [['staffChk', 'Staff checklist']] },
+  { at: -1, tasks: [['finalPay', 'Final payment details']] }
+];
+const PUSH_LOOKBACK = 7;   // a finished wedding keeps reminding for this many days, as in the app
+
+function jsonOut_(o) { return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON); }
+
+function pushTimelineFolders_() {
+  try {
+    const props = PropertiesService.getScriptProperties();
+    const tok = props.getProperty('GH_KEY') || props.getProperty('TL_KEY') || '';
+    const h = { 'User-Agent': 'ivory-enquiries', Accept: 'application/vnd.github+json' };
+    if (tok) h.Authorization = 'Bearer ' + tok;
+    const r = UrlFetchApp.fetch('https://api.github.com/repos/ivoryeventz-ops/Ivory-Wedding-Timeline/contents/', { headers: h, muteHttpExceptions: true });
+    if (r.getResponseCode() !== 200) return null;
+    return JSON.parse(r.getContentText()).filter(function (x) { return x.type === 'dir'; }).map(function (x) { return String(x.name).toLowerCase(); });
+  } catch (err) { return null; }
+}
+
+function pushWords_(t) { return String(t || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().split(' ').filter(function (w) { return w.length >= 3; }); }
+
+function pushDue_(key) {
+  const want = PropertiesService.getScriptProperties().getProperty('PUSH_KEY');
+  if (!want || String(key) !== want) return jsonOut_({ error: 'Not allowed' });
+  try {
+    const ss = ss_();
+    const sh = ss.getSheetByName(CFG.ENQ);
+    const last = lastRowWith_(sh, 1);
+    const done = {};
+    const as = ss.getSheetByName(ACTION_TAB), al = as ? lastRowWith_(as, 1) : 1;
+    if (al > 1) {
+      as.getRange(2, 1, al - 1, 4).getValues().forEach(function (r) {
+        if (r[0]) done[String(r[0]) + '|' + String(r[2])] = (r[3] === true || String(r[3]).toLowerCase() === 'true');
+      });
+    }
+    const folders = pushTimelineFolders_();
+    const todayMs = parse_(today_()).getTime();
+    const lines = [];
+    let count = 0;
+    if (last > 1) {
+      sh.getRange(2, 1, last - 1, CFG.C_LAST).getValues().forEach(function (r) {
+        const id = String(r[0]).trim();
+        if (!id || String(r[5]).trim() !== 'Confirmed') return;
+        const date = iso_(r[2]);
+        if (!date) return;
+        const d = Math.round((parse_(date).getTime() - todayMs) / 86400000);
+        if (d < -PUSH_LOOKBACK) return;
+        const name = String(r[1]).trim();
+        const nw = pushWords_(name);
+        const pend = [];
+        PUSH_STAGES.forEach(function (st) {
+          if (d > st.at) return;
+          if (d < 0 && st.at > 0) return;   // after the wedding only the day-after task matters
+          st.tasks.forEach(function (t) {
+            const k = id + '|' + date + '|' + t[0];
+            if (k in done) { if (done[k]) return; }
+            else if (t[0] === 'timeline') {
+              if (folders === null) return;   // cannot tell, so do not nag
+              if (folders.some(function (f) { return pushWords_(f).some(function (w) { return nw.indexOf(w) >= 0; }); })) return;
+            }
+            pend.push(t[1]);
+          });
+        });
+        if (!pend.length) return;
+        count += pend.length;
+        const when = d === 0 ? 'today' : d > 0 ? 'in ' + d + (d === 1 ? ' day' : ' days') : Math.abs(d) + (d === -1 ? ' day ago' : ' days ago');
+        lines.push(name + ' (' + when + '): ' + pend.join(', '));
+      });
+    }
+    if (!count) return jsonOut_({ count: 0 });
+    return jsonOut_({ count: count, title: 'Ivory: ' + count + (count === 1 ? ' thing' : ' things') + ' to do', body: lines.join('\n').slice(0, 400) });
+  } catch (err) {
+    return jsonOut_({ error: String(err && err.message || err) });
   }
 }
 
