@@ -93,6 +93,16 @@ function api_list(pin) {
   const sh = ss.getSheetByName(CFG.ENQ);
   const last = lastRowWith_(sh, 1);
   const items = [];
+  // Old spellings of a client's name (Clients sheet, column G), kept so folders and links made earlier still match after a name is corrected.
+  const aliasById = {};
+  const cli0 = ss.getSheetByName(CFG.CLI);
+  const cl0 = lastRowWith_(cli0, 1);
+  if (cl0 > 1) {
+    cli0.getRange(2, 1, cl0 - 1, 7).getValues().forEach(function (r) {
+      const cid = String(r[0]).trim();
+      if (cid && String(r[6]).trim()) aliasById[cid] = String(r[6]).trim();
+    });
+  }
   if (last > 1) {
     const vals = sh.getRange(2, 1, last - 1, CFG.C_LAST).getValues();
     vals.forEach(function (r, i) {
@@ -104,6 +114,7 @@ function api_list(pin) {
         row: i + 2,
         id: id,
         name: String(r[1]),
+        alias: aliasById[id] || '',
         date: iso_(r[2]),
         venue: String(r[4]),
         status: status,

@@ -3054,13 +3054,17 @@
   // "No client link": every work (not Lost) whose client folder has no page in Ivory-Events > New A. The folder is the one its quotes are in, else the first word of the name (as the app makes it).
   function linkFolder(i) { return String(FL.folder[wkey(i)] || payFolder(i, [])).toLowerCase(); }
   function nameToks(t) { return String(t || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().split(' ').filter(Boolean); }
+  // Old spellings of a client's name (Clients sheet, column G, comma separated). Folders made before a name was corrected keep matching, so links already sent stay valid.
+  function aliasToks(i) { return String((i && i.alias) || '').split(',').map(nameToks).filter(function (t) { return t.length; }); }
+  function nameFirsts(i) { var o = [], n = nameToks(i.name); if (n.length) o.push(n[0]); aliasToks(i).forEach(function (t) { if (o.indexOf(t[0]) < 0) o.push(t[0]); }); return o; }
+  function nameAll(i) { var o = nameToks(i.name); aliasToks(i).forEach(function (t) { t.forEach(function (w) { if (o.indexOf(w) < 0) o.push(w); }); }); return o; }
   // works that share this work's first name (so one folder could belong to a different wedding)
   function sameName(i) { var k = payFolder(i, []).toLowerCase(); return items.some(function (o) { return o !== i && o.status !== 'Lost' && payFolder(o, []).toLowerCase() === k; }); }
   // the client's own folder, plus any link folder whose words all appear in the name (e.g. "Christy Kzy" -> Christy-Kzy)
   function linkCands(i, L) {
-    var out = [linkFolder(i)], nt = nameToks(i.name);
+    var out = [linkFolder(i)], nt = nameAll(i);
     // a link folder with another name that is for this very wedding date and shares the first name (e.g. two Jaisons: "Jaison" and "Jaison-Kozhencherry")
-    Object.keys(L || {}).forEach(function (f) { var ft = nameToks(f); if (i.date && FL.linkDate[f] === i.date && ft.length && nt.length && ft[0] === nt[0] && out.indexOf(f) < 0) out.push(f); });
+    Object.keys(L || {}).forEach(function (f) { var ft = nameToks(f); if (i.date && FL.linkDate[f] === i.date && ft.length && nameFirsts(i).indexOf(ft[0]) >= 0 && out.indexOf(f) < 0) out.push(f); });
     Object.keys(L || {}).forEach(function (f) { var ft = nameToks(f); if (ft.length && ft.every(function (t) { return nt.indexOf(t) >= 0; }) && out.indexOf(f) < 0) out.push(f); });
     return out.filter(function (f) { return L && L[f]; });
   }
@@ -3153,7 +3157,7 @@
       (j.tree || []).forEach(function (x) { var m = /^New A\/([^\/]+)\/(?:data\.json|index\.html)$/.exec(x.path); if (m) L[m[1].toLowerCase()] = m[1]; });
       // same-name works: read the wedding date saved in each candidate link, so the dates can be compared
       var need = {};
-      items.forEach(function (i) { if (i.status !== 'Lost' && i.date && String(i.name || '').trim() && sameName(i)) linkCands(i, L).forEach(function (f) { need[f] = 1; }); var t0 = nameToks(i.name)[0]; Object.keys(L).forEach(function (f) { if (t0 && nameToks(f)[0] === t0) need[f] = 1; }); });
+      items.forEach(function (i) { if (i.status !== 'Lost' && i.date && String(i.name || '').trim() && sameName(i)) linkCands(i, L).forEach(function (f) { need[f] = 1; }); var t0s = nameFirsts(i); Object.keys(L).forEach(function (f) { if (t0s.indexOf(nameToks(f)[0]) >= 0) need[f] = 1; }); });
       var D = {};
       return Promise.all(Object.keys(need).map(function (f) {
         return fetch(SITE_RAW + encodeURIComponent(L[f]) + '/data.json?t=' + Date.now())
@@ -3557,7 +3561,7 @@
   // Newer quote pages (ivory-packages.pages.dev). Two clients can share a first name, so a quote written for another event date is dropped.
   function ghQuotes(it, fresh) {
     return ghTreeGet(fresh ? 90000 : 0).then(function (tree) {
-      var full = ' ' + it.name.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim() + ' ';
+      var full = ' ' + [it.name].concat(String(it.alias || '').split(',')).map(function (n) { return nameToks(n).join(' '); }).filter(Boolean).join(' | ') + ' ';
       var jobs = [];
       Object.keys(tree).forEach(function (f) {
         var fn = ' ' + f.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim() + ' ';
@@ -3614,7 +3618,7 @@
   // so two weddings for the same client never get each other's tick.
   function tlMatches(it, t) {
     var words = {};
-    it.name.toLowerCase().split(/[^a-z0-9]+/).forEach(function (w) { if (w.length > 2) words[w] = 1; });
+    nameAll(it).forEach(function (w) { if (w.length > 2) words[w] = 1; });
     return Object.keys(t).some(function (f) {
       var hit = f.toLowerCase().split(/[^a-z0-9]+/).some(function (w) { return w.length > 2 && words[w]; });
       return hit && t[f].indexOf(it.date) >= 0;
@@ -3824,7 +3828,7 @@
     var f = payFolder(it, []), k = f.toLowerCase();
     if (!FL.links || !it.date) return f;
     var hit = '';
-    Object.keys(FL.links).forEach(function (x) { if (!hit && FL.linkDate[x] === it.date && nameToks(x)[0] === nameToks(it.name)[0]) hit = FL.links[x] || x; });
+    Object.keys(FL.links).forEach(function (x) { if (!hit && FL.linkDate[x] === it.date && nameFirsts(it).indexOf(nameToks(x)[0]) >= 0) hit = FL.links[x] || x; });
     if (hit) return hit;
     if (!FL.links[k] || !FL.linkDate[k] || FL.linkDate[k] === it.date) return f;
     var d = it.date.replace(/-/g, '').slice(2), n = f + '-' + d;
@@ -3851,8 +3855,8 @@
   }
   // the link folder of this work: a folder already made for this wedding date and first name wins (two clients can share a first name), else the usual one
   function siteFolder(it) {
-    var nt = nameToks(it.name), hit = '';
-    if (FL.links && it.date) Object.keys(FL.links).forEach(function (f) { var ft = nameToks(f); if (!hit && FL.linkDate[f] === it.date && ft.length && nt.length && ft[0] === nt[0]) hit = FL.links[f] || f; });
+    var nf = nameFirsts(it), hit = '';
+    if (FL.links && it.date) Object.keys(FL.links).forEach(function (f) { var ft = nameToks(f); if (!hit && FL.linkDate[f] === it.date && ft.length && nf.indexOf(ft[0]) >= 0) hit = FL.links[f] || f; });
     return hit || payFolder(it, lastQ);
   }
   function siteLoad(it) {
@@ -6131,7 +6135,7 @@
   var tlS = null, tlSrv = null;   // tlSrv: null = not asked, 'key' = a key is saved, 'nokey' = key needed once, 'old' = Code.gs not updated
   function tlFolderFor(it, t) {
     var words = {};
-    it.name.toLowerCase().split(/[^a-z0-9]+/).forEach(function (w) { if (w.length > 2) words[w] = 1; });
+    nameAll(it).forEach(function (w) { if (w.length > 2) words[w] = 1; });
     return Object.keys(t).filter(function (f) {
       return f.toLowerCase().split(/[^a-z0-9]+/).some(function (w) { return w.length > 2 && words[w]; }) && t[f].indexOf(it.date) >= 0;
     })[0] || '';
