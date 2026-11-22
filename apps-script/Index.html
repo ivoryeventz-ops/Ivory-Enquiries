@@ -3054,6 +3054,9 @@
   // "No client link": every work (not Lost) whose client folder has no page in Ivory-Events > New A. The folder is the one its quotes are in, else the first word of the name (as the app makes it).
   function linkFolder(i) { return String(FL.folder[wkey(i)] || payFolder(i, [])).toLowerCase(); }
   function nameToks(t) { return String(t || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().split(' ').filter(Boolean); }
+  // The one code a wedding is known by everywhere: client ID + event date (ddmmyy), e.g. IV-007-251126.
+  // Its client link, quotes, payment page and wedding timeline all live in a folder with exactly this name, so nothing depends on how a name is spelled.
+  function wedCode(i) { var id = String((i && i.id) || '').trim(), d = String((i && i.date) || ''); return id && /^\d{4}-\d{2}-\d{2}$/.test(d) ? id + '-' + d.slice(8, 10) + d.slice(5, 7) + d.slice(2, 4) : ''; }
   // works that share this work's first name (so one folder could belong to a different wedding)
   function sameName(i) { var k = payFolder(i, []).toLowerCase(); return items.some(function (o) { return o !== i && o.status !== 'Lost' && payFolder(o, []).toLowerCase() === k; }); }
   // the client's own folder, plus any link folder whose words all appear in the name (e.g. "Christy Kzy" -> Christy-Kzy)
@@ -3558,10 +3561,11 @@
   function ghQuotes(it, fresh) {
     return ghTreeGet(fresh ? 90000 : 0).then(function (tree) {
       var full = ' ' + it.name.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim() + ' ';
+      var code = wedCode(it).toLowerCase(), hasCode = !!code && Object.keys(tree).some(function (f) { return f.toLowerCase() === code; });
       var jobs = [];
       Object.keys(tree).forEach(function (f) {
         var fn = ' ' + f.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim() + ' ';
-        if (full.indexOf(fn) < 0) return;
+        if (hasCode ? f.toLowerCase() !== code : full.indexOf(fn) < 0) return;   // code folder wins; the name only finds folders made before codes
         tree[f].forEach(function (no) { jobs.push(ghQuote(f, no, fresh).then(function (q) { return q; }, function () { return null; })); });
       });
       return Promise.all(jobs);
@@ -3613,6 +3617,8 @@
   // A work counts as "timeline given" when a folder shares a name word with the client AND its page mentions the work's event date,
   // so two weddings for the same client never get each other's tick.
   function tlMatches(it, t) {
+    var wc = wedCode(it).toLowerCase();
+    if (wc && Object.keys(t).some(function (f) { return f.toLowerCase() === wc; })) return true;
     var words = {};
     it.name.toLowerCase().split(/[^a-z0-9]+/).forEach(function (w) { if (w.length > 2) words[w] = 1; });
     return Object.keys(t).some(function (f) {
@@ -3821,6 +3827,7 @@
   // Makes (or, with change=true, re-types) the client's link. Asks for the GitHub key only if the script does not hold one yet.
   // The folder for a NEW link: the usual first-name folder, unless that already belongs to another wedding (same first name, different date) - then it gets its own, e.g. Jaison-261224, so every enquiry has its own link.
   function newLinkFolder(it) {
+    var wcode = wedCode(it); if (wcode) return wcode;   // every new link is the wedding code, so two clients can never share one
     var f = payFolder(it, []), k = f.toLowerCase();
     if (!FL.links || !it.date) return f;
     var hit = '';
@@ -3851,6 +3858,8 @@
   }
   // the link folder of this work: a folder already made for this wedding date and first name wins (two clients can share a first name), else the usual one
   function siteFolder(it) {
+    var wc = wedCode(it).toLowerCase();
+    if (wc && FL.links && FL.links[wc]) return FL.links[wc];   // this wedding's own code folder
     var nt = nameToks(it.name), hit = '';
     if (FL.links && it.date) Object.keys(FL.links).forEach(function (f) { var ft = nameToks(f); if (!hit && FL.linkDate[f] === it.date && ft.length && nt.length && ft[0] === nt[0]) hit = FL.links[f] || f; });
     return hit || payFolder(it, lastQ);
@@ -4152,6 +4161,7 @@
   function payFolder(it, list) {
     var q = (list || []).filter(function (x) { return x.src === 'cloud' && x.folder; })[0];
     if (q) return q.folder;
+    var wc = wedCode(it); if (wc) return wc;
     var w = (it.name || '').trim().split(/\s+/)[0].replace(/[^A-Za-z0-9-]/g, '');
     return w ? w.charAt(0).toUpperCase() + w.slice(1) : 'Client';
   }
@@ -6130,6 +6140,8 @@
 
   var tlS = null, tlSrv = null;   // tlSrv: null = not asked, 'key' = a key is saved, 'nokey' = key needed once, 'old' = Code.gs not updated
   function tlFolderFor(it, t) {
+    var wc = wedCode(it).toLowerCase(), ex = wc ? Object.keys(t).filter(function (f) { return f.toLowerCase() === wc; })[0] : '';
+    if (ex) return ex;
     var words = {};
     it.name.toLowerCase().split(/[^a-z0-9]+/).forEach(function (w) { if (w.length > 2) words[w] = 1; });
     return Object.keys(t).filter(function (f) {
@@ -6166,7 +6178,7 @@
     var q = (list || []).filter(function (x) { return x.src === 'cloud' && x.scan; })[0], res = tlResolve(q ? q.scan : null);
     if (list && list[0] && list[0].src !== 'cloud' && q) res.notes.unshift('The latest quote (#' + list[0].no + ') is a Google Site and cannot be read here. Details are from quote #' + q.no + '.');
     tlS = { it: it, quote: q ? q.no : '', date: it.date, groom: '', bride: '', church: res.church, cake: res.cake, decoLine: TL_DECO, cars: res.cars,
-      notes: res.notes, folder: '', folderEdited: false, existing: '', touched: false, armed: false };
+      notes: res.notes, folder: wedCode(it), folderEdited: !!wedCode(it), existing: '', touched: false, armed: false };
     $('#tlMeta').textContent = it.name + ' - ' + fmt(it.date) + (q ? ' - from quote #' + q.no : '') + ' - app ' + APP_VERSION;
     $('#tlShare').innerHTML = ''; $('#tlPrev').style.display = 'none'; $('#tlPrev').removeAttribute('srcdoc');
     tlRender(); tlAskServer(); openSheet('#tl');
@@ -6694,9 +6706,10 @@
     ask: askConfirm,
     setView: setView,
     refresh: function () { ghTreeAt = 0; return load(true); },
-    // the folder a new quote is saved in: the client's existing quote folder, else the first word of the name (same as the quote editor)
+    // the folder a new quote is saved in: the client's existing quote folder, else the wedding code (same as the quote editor)
     folderFor: function (info) {
-      var it = { name: info.name || '', date: info.date || '' };
+      var w = items.filter(function (x) { return x.row === info.row; })[0] || {};
+      var it = { id: w.id || info.id || '', name: info.name || '', date: info.date || '' };
       return ghQuotes(it, false).then(function (q) { return payFolder(it, q); }, function () { return payFolder(it, []); });
     }
   };
