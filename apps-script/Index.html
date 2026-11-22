@@ -958,8 +958,7 @@
     <div class="item">
       <div class="gallery">
         <img src="https://ivory-packages.pages.dev/stages/thumbs/pkg-2-1.jpg" data-full="https://ivory-packages.pages.dev/stages/pkg-2-1.jpg" data-filename="Pkg 2 - 1.jpg" alt="Package 2 - photo 1" loading="lazy" decoding="async">
-        <img src="https://ivory-packages.pages.dev/stages/thumbs/pkg-2-2.jpg" data-full="https://ivory-packages.pages.dev/stages/pkg-2-2.jpg" data-filename="Pkg 2 - 2.jpg" alt="Package 2 - photo 2" loading="lazy" decoding="async">
-        <img src="https://ivory-packages.pages.dev/stages/thumbs/pkg-2-3.jpg" data-full="https://ivory-packages.pages.dev/stages/pkg-2-3.jpg" data-filename="Pkg 2 - 3.jpg" alt="Package 2 - photo 3" loading="lazy" decoding="async">
+        <img src="https://ivory-packages.pages.dev/stages/thumbs/pkg-2-3.jpg" data-full="https://ivory-packages.pages.dev/stages/pkg-2-3.jpg" data-filename="Pkg 2 - 2.jpg" alt="Package 2 - photo 2" loading="lazy" decoding="async">
       </div>
       <label>
         <input type="radio" name="pkg" data-name="Package 2" data-price="105000">
@@ -2667,6 +2666,10 @@
         lastCheckedRadio[this.name] = this;
         if (this.name === 'pkg') { this.removeAttribute('data-selected-stage'); this.removeAttribute('data-selected-img'); }
       }
+      if (this.name === 'band' && this.checked) {     // a live band needs its platform: tick it (it can still be unticked by hand)
+        var plat = ROOT.querySelector('input[type="checkbox"][data-name^="Custom raised wooden stage platform"]');
+        if (plat) plat.checked = true;
+      }
       renderBuilder();
     });
   });
@@ -3879,7 +3882,8 @@
     var tlAdded = !!((d && d.timeline && d.timeline.url) || ADDED[f + '|timeline']);
     var payAdded = !!((d && d.payment && d.payment.url) || ADDED[f + '|payment']);
     var any = !!d || Object.keys(ADDED).some(function (k) { return k.split('|')[0] === f; });
-    var onLink = '<span class="onlink">&#10003; On link</span>';
+    var onLinkTxt = '<span class="onlink">&#10003; On link</span>';
+    var onLink = function (kind, no) { return onLinkTxt + '<button type="button" class="sbtn alt" data-sr="' + kind + '"' + (no ? ' data-no="' + esc(no) + '"' : '') + '>Remove</button>'; };
     var h = '<h3>Client link</h3><div class="note">One page for ' + esc(it.name) + '. Quotes show as dated tabs, latest first, with the wedding timeline in front of the latest quote and payment in front of the timeline. Nothing is added until you confirm that item.</div>';
     if (any) h += '<div class="lnk"><span>' + esc(decodeURIComponent(SITE_URL.replace('https://', '')) + f + '/') + '</span><a href="' + esc(SITE_URL + encodeURIComponent(f) + '/') + '" target="_blank" rel="noopener">Open</a></div>';
     else if (st.data === undefined && !st.err && !SITE[f]) h += '<div class="note">Checking the client link...</div>';
@@ -3898,7 +3902,11 @@
     cloud.forEach(function (q, i) {
       var on = !!onQ[q.no];
       h += sRow(esc(sentLabel(q.no) || q.no) + (i === 0 ? '<span class="tag">Latest</span>' : ''), 'Quote #' + esc(q.no) + (on ? ' - on the client link' : ' - not on the link yet'), on,
-        on ? onLink : '<button type="button" class="sbtn" data-sa="quote" data-no="' + esc(q.no) + '">Add to link</button>');
+        on ? onLink('quote', q.no) : '<button type="button" class="sbtn" data-sa="quote" data-no="' + esc(q.no) + '">Add to link</button>');
+    });
+    Object.keys(onQ).forEach(function (no) {   // on the link but not in the list above (older quote): can still be taken off
+      if (cloud.some(function (q) { return q.no === no; })) return;
+      h += sRow(esc(sentLabel(no) || no), 'Quote #' + esc(no) + ' - on the client link', true, onLink('quote', no));
     });
     h += '</div>';
 
@@ -3907,14 +3915,14 @@
       '<label class="optrow"><input type="checkbox" class="actcb" data-row="' + it.row + '" data-id="' + esc(it.id) + '" data-date="' + esc(it.date) + '" data-task="timeline"' + (tlOn ? ' checked' : '') + '><span>Send the wedding timeline to the client</span></label>';
     if (tlOn) {
       h += sRow('Wedding timeline', tlAdded ? 'On the client link' : (tlReady ? 'Page is ready' : 'Not published yet - edit and publish it first'), tlAdded,
-        '<button type="button" class="sbtn alt" data-act="tl">Edit</button>' + (tlAdded ? onLink : '<button type="button" class="sbtn" data-sa="timeline"' + (tlReady ? '' : ' disabled') + '>Add to link</button>'));
+        '<button type="button" class="sbtn alt" data-act="tl">Edit</button>' + (tlAdded ? onLink('timeline') : '<button type="button" class="sbtn" data-sa="timeline"' + (tlReady ? '' : ' disabled') + '>Add to link</button>'));
     }
     h += '</div>';
 
     var payReady = !!ghPay[f];
     h += '<div class="stepn"><i>3</i>Payment</div><div class="group">' +
       sRow('Payment details', payAdded ? 'On the client link' : (payReady ? 'Page is ready' : 'Not published yet - edit and publish it first'), payAdded,
-        '<button type="button" class="sbtn alt" data-act="pay">Edit</button>' + (payAdded ? onLink : '<button type="button" class="sbtn" data-sa="payment"' + (payReady ? '' : ' disabled') + '>Add to link</button>')) +
+        '<button type="button" class="sbtn alt" data-act="pay">Edit</button>' + (payAdded ? onLink('payment') : '<button type="button" class="sbtn" data-sa="payment"' + (payReady ? '' : ' disabled') + '>Add to link</button>')) +
       '</div>';
     el.innerHTML = h;
   }
@@ -3953,8 +3961,30 @@
       });
     });
   }
+  function siteRemove(it, kind, no) {
+    var f = siteFolder(it), what = kind === 'quote' ? 'quote #' + no : (kind === 'timeline' ? 'the wedding timeline' : 'the payment details');
+    return askConfirm({ title: 'Remove from the client link?', body: 'The tab for ' + what + ' is taken off ' + it.name + "'s link, so the client no longer sees it. The page itself is not deleted - you can add it back with Add to link.", ok: 'Remove from link', needKey: false }).then(function (r) {
+      if (!r.ok) return;
+      busy(true);
+      return call('api_site_untab', pin, { confirmed: true, kind: kind, no: no || '', folder: f }).then(function () {
+        delete ADDED[f + '|' + kind + (kind === 'quote' ? '|' + no : '')];
+        if (SITE[f] && SITE[f].data) {
+          var d = SITE[f].data;
+          if (kind === 'quote') d.quotes = (d.quotes || []).filter(function (q) { return String(q.id) !== String(no); }); else delete d[kind];
+        }
+        toast('Removed from the client link');
+        if (cur === it) renderSite(it);
+      }).catch(function (err) {
+        var m = err.message || String(err);
+        if (/not a function|is not defined/i.test(m)) m = 'Paste the new Code.gs into Apps Script (it has the new Remove), then Deploy a new version.';
+        toast(m, true);
+      }).then(function () { busy(false); });
+    });
+  }
   $('#dSite').addEventListener('click', function (e) {
     if (!cur) return;
+    var rb = e.target.closest('[data-sr]');
+    if (rb) { siteRemove(cur, rb.getAttribute('data-sr'), rb.getAttribute('data-no')); return; }
     if (e.target.closest('[data-act="tl"]')) { tlOpen(cur, lastQ); return; }
     if (e.target.closest('[data-act="pay"]')) { openPay(cur, lastQ); return; }
     if (e.target.closest('[data-lk="save"]')) {
@@ -4415,7 +4445,9 @@
   var QE_INC = ['White flex or carpet on stage', 'Sofa', 'Welcome drink for couple', 'Single layer fresh cream cake', '3 candles', 'Fresh leaves on stage',
     'Stage floral settings artificial', 'Stage lights and facelights', 'Stage sound system', 'Centre carpet along aisle', 'Hall entrance arch artificial',
     'Wedding car decoration fresh', 'Greeting garland and bouquet fresh', 'Wedding signage board', '2 welcome hostesses', 'Manthrakodi basket and ring box returnable'];
-  var QE_STAGES = {"1": 5, "2": 3, "3": 4, "4": 5, "5": 3, "6": 4, "7": 3, "8": 4, "9": 3, "10": 4, "11": 4, "12": 4, "13": 2};   // package number -> number of stage photos (hosted in the packages repo under /stages/)
+  var QE_STAGES = {"1": 5, "2": 2, "3": 4, "4": 5, "5": 3, "6": 4, "7": 3, "8": 4, "9": 3, "10": 4, "11": 4, "12": 4, "13": 2};   // package number -> number of stage photos (hosted in the packages repo under /stages/)
+  var QE_STAGE_FILE = { '2': { 2: 3 } };   // Package 2: photo 2 was deleted, so shown photo 2 is the file pkg-2-3.jpg (old files stay in the repo for older quotes)
+  function qeStageFile(n, m) { var f = QE_STAGE_FILE[n]; return 'pkg-' + n + '-' + ((f && f[m]) || m) + '.jpg'; }
   var QE_DROP = /grand\s*total|discounted\s*total|^discount\b|^total\b/i;   // sums that would go stale the moment a rate changes
 
   function qeInclusions(pkg) {
@@ -4584,6 +4616,12 @@
       var TT = qeTotal(Q);
       if (TT.sum) h.push('    <div class="section-card">\n      <div class="total-row-card quote-total">\n        <span class="total-row-title">' + esc(String(Q.totalLabel || '').trim() || 'Total') + '</span>\n        <span class="total-row-amount">' + qeMoney(TT.sum) + '</span>\n      </div>\n    </div>');
     }
+    var DS = Math.min(num(Q.discount), qeTotal(Q).sum);
+    if (DS > 0) {   // a discount is shown as its own row; the "after discount" line only appears when the total is shown
+      var after = qeTotal(Q).sum - DS;
+      h.push('    <div class="section-card">\n      <div class="total-row-card">\n        <span class="total-row-title">Discount</span>\n        <span class="total-row-amount">&minus; ' + qeMoney(DS) + '</span>\n      </div>' +
+        (Q.showTotal ? '\n      <div class="total-row-card quote-total">\n        <span class="total-row-title">' + esc((String(Q.totalLabel || '').trim() || 'Total') + ' after discount') + '</span>\n        <span class="total-row-amount">' + qeMoney(after) + '</span>\n      </div>' : '') + '\n    </div>');
+    }
     h.push(qeComplimentary(isPkg1, hasAnchor));
     h.push('  </div>\n\n</body>\n</html>\n');
     return h.join('\n');
@@ -4607,7 +4645,7 @@
     var folder = payFolder(it, list);
     var M = src && src.raw ? qeParse(src.raw) : { name: '', date: '', venue: '', img: '', secs: [], dropped: [], options: [] };
     Q = { it: it, list: list, folder: folder, base: src ? src.no : '', name: M.name || it.name || '', date: M.date || it.date || '', venue: M.venue || (src && src.venue) || it.venue || '',
-      img: M.img, imgChoice: 'keep', upload: null, secs: M.secs, dropped: M.dropped, custom: qeBlankSec('Additional Items'), pkg: null, no: qeTodayNo(), replace: false, options: M.options || [], optBase: src ? src.no : '' };
+      img: M.img, imgChoice: 'keep', upload: null, discount: '', secs: M.secs, dropped: M.dropped, custom: qeBlankSec('Additional Items'), pkg: null, no: qeTodayNo(), replace: false, options: M.options || [], optBase: src ? src.no : '' };
     Q.showTotal = !!M.showTotal; Q.totalLabel = M.totalLabel || 'Total';
     Q.secs = Q.secs.filter(function (x) {   // an old "Additional Items" section becomes the add-ons area, so ticked services and typed ones sit together after the package
       if (!/^additional items$/i.test(x.title) || x.totals.length || x.bullets.length) return true;
@@ -4615,6 +4653,10 @@
       return false;
     });
     if (!Q.secs.length) Q.secs.push(qeBlankSec('Decor Package'));
+    var hasGen = Q.secs.concat([Q.custom]).some(function (x) { return x.lines.some(function (l) { return /generator/i.test(l.name); }); });
+    if (!hasGen) QE_CAT.forEach(function (gc, gi) {   // the generator is ticked by default; remove it with the x (or tick it off in the list) if the client does not need it
+      if (gc.g === 'Generator') Q.custom.lines.push({ name: gc.n, subs: gc.d ? [gc.d.replace(/ \(included by default.*$/i, '')] : [], note: '', rate: gc.p || null, qty: 1, ql: '', ci: gi });
+    });
     Q.custom.lines.push({ name: '', subs: [], note: '', rate: null, qty: 1 });
     $('#qeMeta').textContent = it.name + ' - ' + fmt(it.date) + (src ? '  (started from quote #' + src.no + ' - that quote stays as it is)' : '  (new quote)');
     qeRender();
@@ -4673,13 +4715,14 @@
   function qeSum() {
     var T = qeTotal(Q), el = $('#qeSum');
     if (!el) return;
-    el.textContent = T.sum ? 'Decor Package ' + inr(T.pkg) + ' + add-ons ' + inr(T.add) + ' = ' + inr(T.sum) + (Q.showTotal ? ' (this total is shown on the quote)' : ' (not shown on the quote - tick the box above to show it)') : '';
+    var dsc = Math.min(num(Q.discount), T.sum);
+    el.textContent = T.sum ? 'Decor Package ' + inr(T.pkg) + ' + add-ons ' + inr(T.add) + ' = ' + inr(T.sum) + (dsc ? ' - discount ' + inr(dsc) + ' = ' + inr(T.sum - dsc) : '') + (Q.showTotal ? ' (this total is shown on the quote)' : ' (not shown on the quote - tick the box above to show it)') : '';
   }
   function qeImgOptions() {
     var files = (ghImgs && ghImgs[Q.folder]) || [], o = '';
     if (Q.img) o += '<option value="keep"' + (Q.imgChoice === 'keep' ? ' selected' : '') + '>Keep current: ' + esc(Q.img.split('/').pop()) + '</option>';
     files.forEach(function (f) { if (f !== (Q.img || '').split('/').pop()) o += '<option value="f:' + esc(f) + '"' + (Q.imgChoice === 'f:' + f ? ' selected' : '') + '>' + esc(f) + ' (in this client folder)</option>'; });
-    if (Q.imgChoice.indexOf('s:') === 0) o += '<option value="' + esc(Q.imgChoice) + '" selected>Stage design: ' + esc(Q.imgChoice.slice(2).replace(/^pkg-(\d+)-(\d+)\.jpg$/, 'Package $1, photo $2')) + '</option>';
+    if (Q.imgChoice.indexOf('s:') === 0) o += '<option value="' + esc(Q.imgChoice) + '" selected>Stage design: ' + esc(Q.imgChoice.slice(2).replace(/^pkg-(\d+)-(\d+)\.jpg$/, function (x, a, b) { return 'Package ' + a + ', photo ' + (a === '2' && b === '3' ? 2 : b); })) + '</option>';
     o += '<option value="up"' + (Q.imgChoice === 'up' ? ' selected' : '') + '>Upload a new photo...</option><option value="none"' + (Q.imgChoice === 'none' ? ' selected' : '') + '>No stage photo</option>';
     return o;
   }
@@ -4692,7 +4735,7 @@
       '<label for="qeVenue">Venue</label><input id="qeVenue" data-d="venue" value="' + esc(Q.venue) + '">' +
       '<div class="qtaken" id="qeTaken"' + (tk ? '' : ' style="display:none"') + '><label class="tlchk"><input type="checkbox" id="qeRep"' + (Q.replace ? ' checked' : '') + '> Quote #' + esc(Q.no) +
       ' already exists for this client - tick to replace it (the old page is overwritten)</label></div>' +
-      '<h4>Stage design</h4><button type="button" class="pbtn" data-act="stg" style="margin:0 0 8px">Choose a stage design</button><div id="qeStg" style="display:none"></div><select id="qeImg" data-d="img">' + qeImgOptions() + '</select><input type="file" id="qeFile" accept="image/*" style="display:' + (Q.imgChoice === 'up' ? 'block' : 'none') + ';margin-top:8px">' +
+      '<h4>Stage design</h4><button type="button" class="pbtn" data-act="stg" style="margin:0 0 8px">Choose a stage design</button><div id="qeStg" style="display:none"></div><select id="qeImg" data-d="img">' + qeImgOptions() + '</select><input type="file" id="qeFile" accept="image/*" style="display:' + (Q.imgChoice === 'up' ? 'block' : 'none') + ';margin-top:8px"><div class="note" id="qeFileNote" style="display:' + (Q.imgChoice === 'up' && Q.upload ? 'block' : 'none') + '">' + (Q.upload ? 'Photo chosen: ' + esc(Q.upload.name || 'photo') + ' - it is added when you save. Tap Choose File to pick another.' : '') + '</div>' +
       qeOptPanel() +
       '<h4>Services from the quote builder</h4><div class="note">Open a group and tick what the client wants - church decoration, pathway stands, cake, band, cars and the rest. Tick again to remove. Everything can be edited below.</div>' +
       '<div id="qeCat">' + qeCatPanel() + '</div>' +
@@ -4701,6 +4744,9 @@
       qeSecHtml(Q.custom, 'c', true) +
       '<div class="qtotbox"><label class="tlchk"><input type="checkbox" id="qeShowTot"' + (Q.showTotal ? ' checked' : '') + '> Show a total after the add-ons</label>' +
       '<input id="qeTotLabel" data-d="totalLabel" value="' + esc(Q.totalLabel || 'Total') + '" aria-label="Total label"' + (Q.showTotal ? '' : ' style="display:none"') + '></div>' +
+      '<div class="qtotbox"><label for="qeDisc">Discount &#8377; <span class="qhint">taken off the total and shown as its own row</span></label>' +
+      '<div class="qnum"><label>Amount &#8377;<input id="qeDisc" data-d="discount" inputmode="numeric" value="' + qeNum(Q.discount) + '" placeholder="0"></label>' +
+      '<label>or % of total<input id="qeDiscPct" inputmode="decimal" placeholder="e.g. 5"></label></div></div>' +
       '<div class="qsum" id="qeSum"></div>' +
       '<div id="qeKeyBox" style="display:none"><h4>GitHub key</h4><div class="note">Needed once only - saved for both phones (Contents read/write on Ivory-Packages).</div><input id="qeKey" type="password" autocomplete="off" placeholder="Paste GitHub key"></div>' +
       '<button class="pbtn" type="button" data-act="qprev" style="margin-top:14px">Preview</button>' +
@@ -4764,7 +4810,7 @@
     Object.keys(QE_STAGES).forEach(function (n) {
       var pk = QE_CAT.filter(function (c) { return c.n === 'Package ' + n; })[0];
       h += '<div class="qcg">Package ' + n + (pk ? ' &middot; ' + inr(pk.p) : '') + '</div><div class="qstg">';
-      for (var m = 1; m <= QE_STAGES[n]; m++) h += '<button type="button" data-act="stgpick" data-p="' + n + '" data-m="' + m + '"><img loading="lazy" src="' + GH_SITE + '/stages/thumbs/pkg-' + n + '-' + m + '.jpg" alt="Package ' + n + ' photo ' + m + '"></button>';
+      for (var m = 1; m <= QE_STAGES[n]; m++) h += '<button type="button" data-act="stgpick" data-p="' + n + '" data-m="' + m + '"><img loading="lazy" src="' + GH_SITE + '/stages/thumbs/' + qeStageFile(n, m) + '" alt="Package ' + n + ' photo ' + m + '"></button>';
       h += '</div>';
     });
     return h + '</div></div>';
@@ -4790,9 +4836,15 @@
     var blank = function (l) { return !String(l.name || '').trim() && !num(l.rate) && !(l.subs || []).join('').trim(); };
     Q.custom.lines = Q.custom.lines.filter(function (l) { return !blank(l); });
     Q.custom.lines.push({ name: c.n, subs: c.d ? [c.d] : [], note: '', rate: c.p || null, qty: c.q ? c.q[1] : 1, ql: c.q ? c.q[0] : '', ci: ci });
+    var extra = '';
+    if (c.g === 'Live band and anchor' && /band/i.test(c.n)) {   // a live band needs its platform: ticked with it (untick it by hand if not needed)
+      QE_CAT.forEach(function (pc, pi) {
+        if (pc.g === 'Live band platform' && !qeAdded(pi)) { Q.custom.lines.push({ name: pc.n, subs: pc.d ? [pc.d] : [], note: '', rate: pc.p || null, qty: 1, ql: '', ci: pi }); extra = ' The live band platform is ticked too.'; }
+      });
+    }
     Q.custom.lines.push({ name: '', subs: [], note: '', rate: null, qty: 1 });
     qeKeepScroll();
-    qeStatus(esc(c.n) + ' added after the Decor Package' + (c.p ? '' : ' - type its rate below') + '.');
+    qeStatus(esc(c.n) + ' added after the Decor Package' + (c.p ? '' : ' - type its rate below') + '.' + extra);
   }
   function qeKeepScroll() { var sh = $('#qe'), y = sh ? sh.scrollTop : 0; qeRender(); if (sh) sh.scrollTop = y; }
 
@@ -4801,6 +4853,7 @@
     if (!Q.date) return 'Pick the wedding date.';
     if (!/^\d{6}$/.test(Q.no)) return 'The quote number is 6 digits (YYMMDD).';
     if (qeTaken(Q.no) && !Q.replace) return 'Quote #' + Q.no + ' already exists - tick the box to replace it, or pick another number.';
+    if (num(Q.discount) > qeTotal(Q).sum) return 'The discount is more than the total.';
     var priced = Q.secs.concat([Q.custom]).some(function (s) { return s.lines.some(function (l) { return String(l.name || '').trim() && qeLineAmount(l); }) || s.totals.some(function (t) { return num(t.amount); }); });
     if (!priced) return 'Add at least one priced service or package.';
     var blank = []; Q.secs.concat([Q.custom]).forEach(function (s) { s.lines.forEach(function (l) { if (!String(l.name || '').trim() && (num(l.rate) || (l.subs || []).length)) blank.push('a line with a rate but no name'); }); });
@@ -4814,28 +4867,30 @@
     });
   }
   function qeResize(file) {
-    return new Promise(function (res, rej) {
-      var fr = new FileReader();
-      fr.onerror = function () { rej(new Error('Could not read the photo')); };
-      fr.onload = function () {
-        var im = new Image();
-        im.onerror = function () { rej(new Error('That file is not a photo I can open')); };
-        im.onload = function () {
-          var sc = Math.min(1, 1400 / im.naturalWidth), c = document.createElement('canvas');
-          c.width = Math.round(im.naturalWidth * sc); c.height = Math.round(im.naturalHeight * sc);
-          c.getContext('2d').drawImage(im, 0, 0, c.width, c.height);
-          res(c.toDataURL('image/jpeg', 0.82).split(',')[1]);
-        };
-        im.src = fr.result;
-      };
-      fr.readAsDataURL(file);
-    });
+    var toJpeg = function (src, w, h) {
+      var sc = Math.min(1, 1400 / w), c = document.createElement('canvas');
+      c.width = Math.max(1, Math.round(w * sc)); c.height = Math.max(1, Math.round(h * sc));
+      var cx = c.getContext('2d'); cx.fillStyle = '#fff'; cx.fillRect(0, 0, c.width, c.height); cx.drawImage(src, 0, 0, c.width, c.height);
+      return c.toDataURL('image/jpeg', 0.82).split(',')[1];
+    };
+    var viaImage = function () {
+      return new Promise(function (res, rej) {
+        var u = (window.URL || window.webkitURL).createObjectURL(file), im = new Image();
+        im.onerror = function () { rej(new Error('That file is not a photo I can open - choose a JPG or PNG')); };
+        im.onload = function () { try { res(toJpeg(im, im.naturalWidth, im.naturalHeight)); } catch (e) { rej(e); } (window.URL || window.webkitURL).revokeObjectURL(u); };
+        im.src = u;
+      });
+    };
+    if (window.createImageBitmap) {
+      return createImageBitmap(file, { imageOrientation: 'from-image' }).then(function (bm) { var o = toJpeg(bm, bm.width, bm.height); if (bm.close) bm.close(); return o; }, viaImage);
+    }
+    return viaImage();
   }
   function qeFinalImg() {   // resolves { img: src for the page, up: {name,b64} | null }
     var ch = Q.imgChoice;
     if (ch === 'none') return Promise.resolve({ img: '', up: null });
     if (ch === 'up') {
-      var f = $('#qeFile') && $('#qeFile').files && $('#qeFile').files[0];
+      var f = Q.upload || ($('#qeFile') && $('#qeFile').files && $('#qeFile').files[0]);
       if (!f) return Promise.reject(new Error('Choose the stage photo, or pick another option.'));
       var name = 'stage-' + Q.no + '.jpg';
       return qeResize(f).then(function (b64) { return { img: name, up: { name: name, b64: b64 } }; });
@@ -4886,7 +4941,7 @@
     else if (a === 'stgpick') {
       var pn = b.getAttribute('data-p'), pm = b.getAttribute('data-m'), ci2 = -1;
       QE_CAT.forEach(function (c, i) { if (c.n === 'Package ' + pn) ci2 = i; });
-      Q.imgChoice = 's:pkg-' + pn + '-' + pm + '.jpg';
+      Q.imgChoice = 's:' + qeStageFile(pn, pm);
       if (ci2 >= 0) qeAddCat(ci2); else qeRender();
       qeStatus('Package ' + pn + ' stage design chosen.');
     }
@@ -4913,10 +4968,16 @@
   $('#qe').addEventListener('input', function (e) {
     var t = e.target; if (!Q) return;
     if (t.id === 'qeCatQ') { var dv = document.createElement('div'); dv.innerHTML = qeCatPanel(); $('#qeCatL').innerHTML = dv.querySelector('#qeCatL').innerHTML; return; }
+    if (t.id === 'qeDiscPct') {
+      var pv = parseFloat(String(t.value).replace(',', '.')) || 0, sm = qeTotal(Q).sum;
+      Q.discount = pv > 0 ? Math.round(sm * Math.min(pv, 100) / 100) : '';
+      var da = $('#qeDisc'); if (da) da.value = qeNum(Q.discount);
+      qeSum(); return;
+    }
     var d = t.getAttribute && t.getAttribute('data-d');
     if (d) {
       if (d === 'no') { Q.no = t.value.replace(/\D/g, '').slice(0, 6); t.value = Q.no; var tk = qeTaken(Q.no), tb = $('#qeTaken'); if (tb) { tb.style.display = tk ? '' : 'none'; if (!tk) { Q.replace = false; $('#qeRep').checked = false; } tb.querySelector('label').lastChild.textContent = ' Quote #' + Q.no + ' already exists for this client - tick to replace it (the old page is overwritten)'; } }
-      else if (d !== 'img') Q[d] = t.value;
+      else if (d !== 'img') { Q[d] = t.value; if (d === 'discount') { var pc = $('#qeDiscPct'); if (pc) pc.value = ''; qeSum(); } }
       return;
     }
     var f = t.getAttribute && t.getAttribute('data-f'); if (!f) return;
@@ -4943,6 +5004,12 @@
     var t = e.target; if (!Q) return;
     if (t.id === 'qeRep') { Q.replace = t.checked; return; }
     if (t.id === 'qeShowTot') { Q.showTotal = t.checked; $('#qeTotLabel').style.display = t.checked ? '' : 'none'; qeSum(); return; }
+    if (t.id === 'qeFile') {
+      Q.upload = (t.files && t.files[0]) || null;
+      var fn = $('#qeFileNote'); if (fn) { fn.style.display = Q.upload ? 'block' : 'none'; fn.textContent = Q.upload ? 'Photo chosen: ' + (Q.upload.name || 'photo') + ' - it is added when you save. Tap Choose File to pick another.' : ''; }
+      if (Q.upload) qeStatus('Photo chosen. Press Preview or Save as new quote.');
+      return;
+    }
     if (t.id === 'qeImg') { Q.imgChoice = t.value; $('#qeFile').style.display = t.value === 'up' ? 'block' : 'none'; return; }
     if (t.id === 'qeDate') { Q.date = t.value; }
   });

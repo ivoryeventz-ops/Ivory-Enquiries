@@ -587,6 +587,48 @@ function api_site_tab(pin, p) {
   }
 }
 
+// Takes ONE item (a quote, the timeline or the payment page) off the client's link again, after a confirm in the app.
+// Only the tab is removed from data.json; the quote / timeline / payment page itself stays where it is and can be added back.
+function api_site_untab(pin, p) {
+  check_(pin);
+  if (p.confirmed !== true) throw new Error('Not confirmed');
+  const props = PropertiesService.getScriptProperties();
+  const key = siteKey_(props);
+  if (!key) throw new Error('GitHub key needed');
+  const folder = String(p.folder || '').trim();
+  if (!/^[A-Za-z0-9][A-Za-z0-9 _-]{0,60}$/.test(folder)) throw new Error('Bad client folder name');
+  const kind = String(p.kind || '');
+  if (['quote', 'timeline', 'payment'].indexOf(kind) < 0) throw new Error('Unknown tab');
+  if (kind === 'quote' && !/^\d{6}$/.test(String(p.no || ''))) throw new Error('Bad quote number');
+  const hd = { Authorization: 'Bearer ' + key, Accept: 'application/vnd.github+json' };
+  const url = 'https://api.github.com/repos/' + SITE_REPO + '/contents/' + encodeURIComponent(SITE_DIR) + '/' + encodeURIComponent(folder) + '/data.json';
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    const g = UrlFetchApp.fetch(url + '?ref=' + SITE_BRANCH, { headers: hd, muteHttpExceptions: true });
+    const gc = g.getResponseCode();
+    if (gc === 404) return { ok: true, already: true };
+    if (gc !== 200) throw new Error('GitHub key does not reach Ivory-Events (GitHub answered ' + gc + ')');
+    const cur = JSON.parse(g.getContentText());
+    const data = JSON.parse(Utilities.newBlob(Utilities.base64Decode(cur.content.replace(/\n/g, ''))).getDataAsString());
+    data.quotes = data.quotes || [];
+    let changed = false;
+    if (kind === 'quote') {
+      const n = data.quotes.length;
+      data.quotes = data.quotes.filter(function (q) { return String(q.id) !== String(p.no); });
+      changed = data.quotes.length !== n;
+    } else if (data[kind]) { delete data[kind]; changed = true; }
+    if (!changed) return { ok: true, already: true };
+    const body = { message: 'Remove ' + kind + ' tab ' + folder, content: Utilities.base64Encode(Utilities.newBlob(JSON.stringify(data, null, 2) + '\n').getBytes()), sha: cur.sha, branch: SITE_BRANCH };
+    const r = UrlFetchApp.fetch(url, { method: 'put', headers: hd, contentType: 'application/json', payload: JSON.stringify(body), muteHttpExceptions: true });
+    const rc = r.getResponseCode();
+    if (rc !== 200 && rc !== 201) throw new Error('GitHub answered ' + rc);
+    return { ok: true };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
 // Makes the client's link as soon as an enquiry is entered (and lets the event type be changed later).
 // Creates <Client>/index.html (from client-shell.html) and <Client>/data.json with the event type, which decides the Packages and Checklist pages.
 // An existing link keeps its quotes/timeline/payment; only its type is updated.
