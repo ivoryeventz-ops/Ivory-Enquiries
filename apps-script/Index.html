@@ -3058,7 +3058,7 @@
   // Its client link, quotes, payment page and wedding timeline all live in a folder with exactly this name, so nothing depends on how a name is spelled.
   function wedCode(i) { var id = String((i && i.id) || '').trim(), d = String((i && i.date) || ''); return id && /^\d{4}-\d{2}-\d{2}$/.test(d) ? id + '-' + d.slice(8, 10) + d.slice(5, 7) + d.slice(2, 4) : ''; }
   // works that share this work's first name (so one folder could belong to a different wedding)
-  function sameName(i) { var k = payFolder(i, []).toLowerCase(); return items.some(function (o) { return o !== i && o.status !== 'Lost' && payFolder(o, []).toLowerCase() === k; }); }
+  function sameName(i) { var k = nameToks(i.name)[0]; return !!k && items.some(function (o) { return o !== i && o.status !== 'Lost' && nameToks(o.name)[0] === k; }); }
   // the client's own folder, plus any link folder whose words all appear in the name (e.g. "Christy Kzy" -> Christy-Kzy)
   function linkCands(i, L) {
     var out = [linkFolder(i)], nt = nameToks(i.name);
