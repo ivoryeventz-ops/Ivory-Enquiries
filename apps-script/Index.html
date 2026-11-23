@@ -3075,7 +3075,7 @@
     // second check, only when another work has the same name: the link must be for this wedding date (a link with no readable date is given the benefit of the doubt)
     return !c.some(function (f) { return !FL.linkDate[f] || FL.linkDate[f] === i.date; });
   }
-  function noQuote(i) { return FL.ready && i.status === 'Confirmed' && !!i.date && !FL.sites[wkey(i)] && FL.cloud[wkey(i)] === 0; }
+  function noQuote(i) { return FL.ready && i.status !== 'Lost' && !!i.date && !FL.sites[wkey(i)] && FL.cloud[wkey(i)] === 0; }
   // quote exists only as a Google Site: counted as quoted, but outside vendors cannot be auto-picked from it until it is re-issued as a GitHub quote
   // A saved tick (or an explicit un-tick) always wins. With nothing saved, the wedding timeline shows ticked once its page exists in the timeline repo.
   function isDone(i, t) {
@@ -3145,7 +3145,7 @@
 
   // one call for quote flags + ticks, plus the new-style quote pages of every confirmed work
   function loadFlags() {
-    var conf = items.filter(function (i) { return i.status === 'Confirmed' && i.date; });
+    var conf = items.filter(function (i) { return i.status !== 'Lost' && i.date; });   // every live enquiry (Enquiry, Costing, Blocked, Confirmed) is checked for a quote
     var srv = call('api_flags', pin).then(function (r) { return r; }, function () { return null; });
     var gh = Promise.all(conf.map(function (it) {
       return ghQuotes(it).then(function (qs) { return { it: it, n: qs.length, folder: (qs[0] || {}).folder || '' }; }, function () { return { it: it, n: -1 }; });
