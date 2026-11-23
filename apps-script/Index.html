@@ -1640,7 +1640,7 @@
 
 <div class="sheet" id="detail">
   <div class="grab"></div>
-  <div class="dhead"><div><h2 id="dName"></h2><div class="meta" id="dMeta"></div></div><span class="badge" id="dBadge"></span></div>
+  <div class="dhead"><div><h2 id="dName"></h2><div class="meta" id="dMeta"></div><div class="meta"><span id="dCode"></span> \u00b7 <a href="#" id="dRename" style="color:inherit;text-decoration:underline">Edit name</a></div></div><span class="badge" id="dBadge"></span></div>
   <div class="stlab">Status</div>
   <div class="stbtns" id="stbtns">
     <button class="st" data-s="Enquiry">Enquiry</button>
@@ -3291,6 +3291,7 @@
     cur = items.filter(function (i) { return i.row === row; })[0];
     if (!cur) return;
     $('#dName').textContent = cur.name;
+    $('#dCode').textContent = cur.id;
     $('#dMeta').textContent = fmt(cur.date) + ' \u00b7 ' + when(cur.date) + (cur.venue ? ' \u00b7 ' + cur.venue : '');
     $('#dBadge').textContent = cur.status; $('#dBadge').className = 'badge s-' + cur.status;
     setTab('quotes');
@@ -3354,6 +3355,23 @@
       btn.disabled = false;
       btn.textContent = 'Save enquiry';
     });
+  });
+
+  // Rename a client at any time: the client code (not the name) finds links, quotes, payments and timelines, so nothing breaks.
+  $('#dRename').addEventListener('click', function (e) {
+    e.preventDefault();
+    if (!cur) return;
+    var nn = (window.prompt('Client name for ' + cur.id, cur.name) || '').trim();
+    if (!nn || nn === cur.name) return;
+    busy(true);
+    call('api_rename', pin, { id: cur.id, name: nn }).then(function () {
+      toast('Name changed');
+      var row = cur.row;
+      return load(true).then(function () {
+        cur = items.filter(function (i) { return i.row === row; })[0] || cur;
+        $('#dName').textContent = cur.name;
+      });
+    }).catch(function (err) { toast(err.message, true); }).then(function () { busy(false); });
   });
 
   $('#list').addEventListener('change', actToggle);
@@ -3558,6 +3576,7 @@
     return entry.p;
   }
   // Newer quote pages (ivory-packages.pages.dev). Two clients can share a first name, so a quote written for another event date is dropped.
+  function hasCodeFolder(it) { var c = wedCode(it).toLowerCase(); return !!c && !!ghTree && Object.keys(ghTree).some(function (f) { return f.toLowerCase() === c; }); }
   function ghQuotes(it, fresh) {
     return ghTreeGet(fresh ? 90000 : 0).then(function (tree) {
       var full = ' ' + it.name.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim() + ' ';
@@ -3565,12 +3584,12 @@
       var jobs = [];
       Object.keys(tree).forEach(function (f) {
         var fn = ' ' + f.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim() + ' ';
-        if (hasCode ? f.toLowerCase() !== code : full.indexOf(fn) < 0) return;   // code folder wins; the name only finds folders made before codes
+        if (hasCode ? f.toLowerCase() !== code : (sameName(it) || full.indexOf(fn) < 0)) return;   // code folder wins; the name only finds folders made before codes
         tree[f].forEach(function (no) { jobs.push(ghQuote(f, no, fresh).then(function (q) { return q; }, function () { return null; })); });
       });
       return Promise.all(jobs);
     }).then(function (all) {
-      return all.filter(function (q) { return q && (!q.date || q.date === it.date); });
+      return all.filter(function (q) { return q && (hasCodeFolder(it) || (q.date && q.date === it.date)); });
     });
   }
 
@@ -3619,6 +3638,7 @@
   function tlMatches(it, t) {
     var wc = wedCode(it).toLowerCase();
     if (wc && Object.keys(t).some(function (f) { return f.toLowerCase() === wc; })) return true;
+    if (sameName(it)) return false;   // another work shares this name: only the wedding code may match
     var words = {};
     it.name.toLowerCase().split(/[^a-z0-9]+/).forEach(function (w) { if (w.length > 2) words[w] = 1; });
     return Object.keys(t).some(function (f) {
@@ -3861,7 +3881,7 @@
     var wc = wedCode(it).toLowerCase();
     if (wc && FL.links && FL.links[wc]) return FL.links[wc];   // this wedding's own code folder
     var nt = nameToks(it.name), hit = '';
-    if (FL.links && it.date) Object.keys(FL.links).forEach(function (f) { var ft = nameToks(f); if (!hit && FL.linkDate[f] === it.date && ft.length && nt.length && ft[0] === nt[0]) hit = FL.links[f] || f; });
+    if (FL.links && it.date && !sameName(it)) Object.keys(FL.links).forEach(function (f) { var ft = nameToks(f); if (!hit && FL.linkDate[f] === it.date && ft.length && nt.length && ft[0] === nt[0]) hit = FL.links[f] || f; });
     return hit || payFolder(it, lastQ);
   }
   function siteLoad(it) {

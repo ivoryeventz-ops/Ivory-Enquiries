@@ -144,29 +144,13 @@ function api_add(pin, p) {
     const cLast = lastRowWith_(cli, 1);
     const eLast = lastRowWith_(enq, 1);
 
-    // A returning client keeps the same ID; a new name gets the next one.
-    let id = '';
-    if (cLast > 1) {
-      cli.getRange(2, 1, cLast - 1, 2).getValues().forEach(function (r) {
-        if (!id && String(r[1]).trim().toLowerCase() === name.toLowerCase()) id = String(r[0]).trim();
-      });
-    }
-
-    if (id && eLast > 1) {
-      enq.getRange(2, 1, eLast - 1, 6).getValues().forEach(function (r) {
-        if (String(r[0]).trim() === id && iso_(r[2]) === date && String(r[5]).trim() !== 'Lost') {
-          throw new Error(name + ' is already listed for that date');
-        }
-      });
-    }
-
-    if (!id) {
-      id = nextId_(ss);
-      const cr = cLast + 1;
-      cloneRow_(cli, cLast, cr, 6);
-      cli.getRange(cr, 1).setValue(id);
-      cli.getRange(cr, 2).setValue(name);
-    }
+    // Every enquiry gets its own new client code (IV-###), even when the name matches an earlier client.
+    // The code, never the name, is what ties a wedding to its link, quotes, payment page and timeline.
+    const id = nextId_(ss);
+    const cr = cLast + 1;
+    cloneRow_(cli, cLast, cr, 6);
+    cli.getRange(cr, 1).setValue(id);
+    cli.getRange(cr, 2).setValue(name);
 
     const r = eLast + 1;
     cloneRow_(enq, eLast, r, 17);
@@ -179,6 +163,34 @@ function api_add(pin, p) {
     }
     SpreadsheetApp.flush();
     return { ok: true, id: id };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+// Changes the client name for one client code. Links, quotes and timelines are found by code, so nothing else needs renaming.
+function api_rename(pin, p) {
+  check_(pin);
+  const name = String(p.name || '').trim();
+  const id = String(p.id || '').trim();
+  if (!name) throw new Error('Name cannot be empty');
+  if (!/^IV-\d+$/.test(id)) throw new Error('Client code missing');
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    const ss = ss_();
+    const cli = ss.getSheetByName(CFG.CLI);
+    const cLast = lastRowWith_(cli, 1);
+    let hit = 0;
+    if (cLast > 1) {
+      cli.getRange(2, 1, cLast - 1, 1).getValues().forEach(function (r, i) {
+        if (!hit && String(r[0]).trim() === id) hit = i + 2;
+      });
+    }
+    if (!hit) throw new Error('Client code ' + id + ' not found');
+    cli.getRange(hit, 2).setValue(name);
+    SpreadsheetApp.flush();
+    return { ok: true, id: id, name: name };
   } finally {
     lock.releaseLock();
   }
