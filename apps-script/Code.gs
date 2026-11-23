@@ -599,6 +599,54 @@ function api_site_tab(pin, p) {
   }
 }
 
+// Renames the client on their one link: <Client>/data.json "name" and the name written into <Client>/index.html.
+function api_site_rename(pin, p) {
+  check_(pin);
+  const props = PropertiesService.getScriptProperties();
+  const key = siteKey_(props);
+  if (!key) throw new Error('GitHub key needed');
+  const folder = String(p.folder || '').trim();
+  if (!/^[A-Za-z0-9][A-Za-z0-9 _-]{0,60}$/.test(folder)) throw new Error('Bad client folder name');
+  const name = String(p.name || '').trim();
+  if (!name) throw new Error('Name cannot be empty');
+  const hd = { Authorization: 'Bearer ' + key, Accept: 'application/vnd.github+json' };
+  const api = 'https://api.github.com/repos/' + SITE_REPO + '/contents/';
+  const path = function (f) { return encodeURIComponent(SITE_DIR) + '/' + encodeURIComponent(folder) + '/' + encodeURIComponent(f); };
+  const get = function (pth) {
+    const r = UrlFetchApp.fetch(api + pth + '?ref=' + SITE_BRANCH, { headers: hd, muteHttpExceptions: true });
+    const c = r.getResponseCode();
+    if (c === 200) return JSON.parse(r.getContentText());
+    if (c === 404) return null;
+    throw new Error('GitHub answered ' + c);
+  };
+  const put = function (pth, text, sha, msg) {
+    const body = { message: msg, content: Utilities.base64Encode(Utilities.newBlob(text).getBytes()), branch: SITE_BRANCH, sha: sha };
+    const r = UrlFetchApp.fetch(api + pth, { method: 'put', headers: hd, contentType: 'application/json', payload: JSON.stringify(body), muteHttpExceptions: true });
+    const c = r.getResponseCode();
+    if (c !== 200 && c !== 201) throw new Error('GitHub answered ' + c);
+  };
+  const dec = function (f) { return Utilities.newBlob(Utilities.base64Decode(f.content.replace(/\n/g, ''))).getDataAsString(); };
+  const esc = function (t) { return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); };
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    const dj = get(path('data.json'));
+    if (!dj) return { ok: true, skipped: 'no client link yet' };
+    const data = JSON.parse(dec(dj));
+    const old = String(data.name || p.oldName || '').trim();
+    data.name = name;
+    put(path('data.json'), JSON.stringify(data, null, 2) + '\n', dj.sha, 'Rename client ' + folder);
+    const ix = get(path('index.html'));
+    if (ix && old && old !== name) {
+      const html = dec(ix).split(esc(old)).join(esc(name));
+      put(path('index.html'), html, ix.sha, 'Rename client ' + folder);
+    }
+    return { ok: true, old: old, name: name };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
 // Makes the client's link as soon as an enquiry is entered (and lets the event type be changed later).
 // Creates <Client>/index.html (from client-shell.html) and <Client>/data.json with the event type, which decides the Packages and Checklist pages.
 // An existing link keeps its quotes/timeline/payment; only its type is updated.
