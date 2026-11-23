@@ -3362,10 +3362,11 @@
     e.preventDefault();
     if (!cur) return;
     var nn = (window.prompt('Client name for ' + cur.id, cur.name) || '').trim();
-    if (!nn || nn === cur.name) return;
+    if (!nn) return;
     busy(true);
     var oldNm = cur.name, itc = cur;
-    call('api_rename', pin, { id: cur.id, name: nn }).then(function () {
+    // the same name again just re-sends it to the client page (fixes a page that was missed)
+    (nn === cur.name ? Promise.resolve() : call('api_rename', pin, { id: cur.id, name: nn })).then(function () {
       // the client's own page (intro "Prepared for" and name card) carries the name too
       return call('api_site_rename', pin, { folder: siteFolder(itc), name: nn, oldName: oldNm }).then(function () { toast('Name changed, client page updated'); }, function (er) { toast('Name changed, but the client page was not updated: ' + er.message, true); });
     }).then(function () {
