@@ -3872,9 +3872,9 @@
     return hit || payFolder(it, lastQ);
   }
   /* ---------- move an old name-based link to the wedding code (links already sent keep working: the old address redirects) ---------- */
-  function moveOld(it) {   // the old folder of an upcoming confirmed work that is not on its wedding-code folder yet, else ''
+  function moveOld(it) {   // the old folder of an upcoming confirmed or blocked work that is not on its wedding-code folder yet, else ''
     var wc = wedCode(it).toLowerCase();
-    if (!wc || !FL.links || FL.links[wc] || it.status !== 'Confirmed' || !it.date || daysTo(it) < 0) return '';
+    if (!wc || !FL.links || FL.links[wc] || (it.status !== 'Confirmed' && it.status !== 'Blocked') || !it.date || daysTo(it) < 0) return '';   // Blocked dates too: the code stays the same when the real name is known later
     var c = linkCands(it, FL.links).filter(function (f) { return String(f).toLowerCase() !== wc; });
     return c.length ? (FL.links[c[0]] || c[0]) : '';
   }
@@ -3937,7 +3937,7 @@
     var mvOld = moveOld(it), mvAll = moveAllList();
     if (mvOld) h += sRow('Wedding code link', 'This link is still named ' + esc(mvOld) + '. Move it to ' + esc(wedCode(it)) + ' - the old address keeps working and goes to the new one.', false,
       '<button type="button" class="sbtn" data-mv="one">Move to code</button>');
-    if (mvAll.length > 1) h += sRow('All upcoming confirmed works', mvAll.length + ' still use a name-based link.', false, '<button type="button" class="sbtn alt" data-mv="all">Move all ' + mvAll.length + '</button>');
+    if (mvAll.length > 1) h += sRow('All upcoming confirmed and blocked works', mvAll.length + ' still use a name-based link.', false, '<button type="button" class="sbtn alt" data-mv="all">Move all ' + mvAll.length + '</button>');
     var cloud = lastQ.filter(function (q) { return q.src === 'cloud'; });
     h += '<div class="stepn"><i>1</i>Quotes</div><div class="group">';
     if (!cloud.length) h += '<div class="srow"><span class="qs">No quote is ready to add yet.</span></div>';
