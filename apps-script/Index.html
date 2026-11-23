@@ -3836,7 +3836,7 @@
   var SITE = {}, ADDED = {};
   var EV_TYPES = { christian: 'Wedding - Christian', pentecost: 'Wedding - Pentecost', engagement: 'Engagement', hindu: 'Reception - Hindu' };
   function linkWa(name, url) {
-    return 'https://wa.me/?text=' + encodeURIComponent('Hello ' + name + ',\nThank you for your enquiry with Ivory Events. Here is our introduction, wedding packages and service checklist for you to look through:\n' + url);
+    return 'https://wa.me/?text=' + encodeURIComponent(url);
   }
   function showLink(name, url, note) {
     $('#lkB').textContent = note || ''; $('#lkUrl').textContent = decodeURIComponent(url.replace('https://', ''));
