@@ -3871,6 +3871,31 @@
     if (FL.links && it.date) Object.keys(FL.links).forEach(function (f) { var ft = nameToks(f); if (!hit && FL.linkDate[f] === it.date && ft.length && nf.indexOf(ft[0]) >= 0) hit = FL.links[f] || f; });
     return hit || payFolder(it, lastQ);
   }
+  /* ---------- move an old name-based link to the wedding code (links already sent keep working: the old address redirects) ---------- */
+  function moveOld(it) {   // the old folder of an upcoming confirmed work that is not on its wedding-code folder yet, else ''
+    var wc = wedCode(it).toLowerCase();
+    if (!wc || !FL.links || FL.links[wc] || it.status !== 'Confirmed' || !it.date || daysTo(it) < 0) return '';
+    var c = linkCands(it, FL.links).filter(function (f) { return String(f).toLowerCase() !== wc; });
+    return c.length ? (FL.links[c[0]] || c[0]) : '';
+  }
+  function moveOne(it) {
+    var old = moveOld(it), code = wedCode(it);
+    if (!old) return Promise.resolve(false);
+    return call('api_site_migrate', pin, { oldFolder: old, code: code, name: it.name, date: it.date, venue: it.venue }).then(function (r) {
+      FL.links[code.toLowerCase()] = code; FL.linkDate[code.toLowerCase()] = it.date || '';
+      if (ghTree) ghTree[code] = (r.quotes || []).slice();
+      delete SITE[old]; delete SITE[code]; tlDates = null;
+      Object.keys(ghCache).forEach(function (k) { delete ghCache[k]; });
+      delete dCache[wkey(it)];
+      return true;
+    });
+  }
+  function moveFail(err) {
+    var m = err.message || String(err);
+    if (/not a function|is not defined/i.test(m)) m = 'Paste the new Code.gs into Apps Script (it has the new move to code), then Deploy a new version.';
+    toast(m, true);
+  }
+  function moveAllList() { return items.filter(function (x) { return moveOld(x); }); }
   function siteLoad(it) {
     var f = siteFolder(it);
     renderSite(it);
@@ -3909,6 +3934,10 @@
       '<a class="sbtn alt" href="' + esc(linkWa(it.name, SITE_URL + encodeURIComponent(f) + '/')) + '" target="_blank" rel="noopener">Send on WhatsApp</a>');
     if (st.err) h += '<div class="note warn">Could not read the client link (' + esc(st.err) + ').</div>';
 
+    var mvOld = moveOld(it), mvAll = moveAllList();
+    if (mvOld) h += sRow('Wedding code link', 'This link is still named ' + esc(mvOld) + '. Move it to ' + esc(wedCode(it)) + ' - the old address keeps working and goes to the new one.', false,
+      '<button type="button" class="sbtn" data-mv="one">Move to code</button>');
+    if (mvAll.length > 1) h += sRow('All upcoming confirmed works', mvAll.length + ' still use a name-based link.', false, '<button type="button" class="sbtn alt" data-mv="all">Move all ' + mvAll.length + '</button>');
     var cloud = lastQ.filter(function (q) { return q.src === 'cloud'; });
     h += '<div class="stepn"><i>1</i>Quotes</div><div class="group">';
     if (!cloud.length) h += '<div class="srow"><span class="qs">No quote is ready to add yet.</span></div>';
@@ -3996,6 +4025,25 @@
   }
   $('#dSite').addEventListener('click', function (e) {
     if (!cur) return;
+    var mb = e.target.closest('[data-mv]');
+    if (mb) {
+      var kind = mb.getAttribute('data-mv'), list = kind === 'all' ? moveAllList() : [cur], it1 = cur;
+      if (!list.length) return;
+      askConfirm({ title: kind === 'all' ? 'Move ' + list.length + ' works to their wedding codes?' : 'Move this link to the wedding code?',
+        body: 'The client link, quotes, payment page and timeline are copied to the wedding-code folder. Nothing is deleted. The old link stays and opens the new page, so links already sent keep working.', ok: 'Move', needKey: false }).then(function (r) {
+        if (!r.ok) return;
+        busy(true);
+        var done = 0, failed = [];
+        return list.reduce(function (pr, w) {
+          return pr.then(function () { return moveOne(w).then(function (ok) { if (ok) done++; }, function (err) { failed.push(w.name + ': ' + (err.message || err)); }); });
+        }, Promise.resolve()).then(function () {
+          if (failed.length) toast('Moved ' + done + '. Not moved - ' + failed[0], true); else toast('Moved ' + done + (done === 1 ? ' link' : ' links') + ' to the wedding code');
+          if (cur === it1) { siteLoad(it1); }
+          render();
+        }, moveFail).then(function () { busy(false); });
+      });
+      return;
+    }
     var rb = e.target.closest('[data-sr]');
     if (rb) { siteRemove(cur, rb.getAttribute('data-sr'), rb.getAttribute('data-no')); return; }
     if (e.target.closest('[data-act="tl"]')) { tlOpen(cur, lastQ); return; }

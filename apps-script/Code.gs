@@ -641,6 +641,107 @@ function api_site_untab(pin, p) {
   }
 }
 
+// Moves ONE client's pages from the old name-based folder to the wedding-code folder (e.g. Jaison -> IV-007-251126), in all three repos:
+//   Ivory-Events  New A/<old>/  -> New A/<code>/   (page made from client-shell, data.json copied with its links pointed at the code folder)
+//   Ivory-Packages <old>/       -> <code>/         (quotes, payment page, stage photos)
+//   Ivory-Wedding-Timeline <old>/ -> <code>/       (if there is a timeline)
+// Nothing is deleted or overwritten in the code folder. The OLD pages stay, and the old client link becomes a redirect to the code link,
+// so links already sent to the client keep working. Safe to run again: it only fills in what is missing.
+function api_site_migrate(pin, p) {
+  check_(pin);
+  const props = PropertiesService.getScriptProperties();
+  const evKey = siteKey_(props), pkKey = props.getProperty('GH_KEY') || evKey, tlKey = props.getProperty('TL_KEY') || props.getProperty('GH_KEY') || evKey;
+  if (!evKey) throw new Error('GitHub key needed');
+  const oldF = String(p.oldFolder || '').trim(), code = String(p.code || '').trim();
+  const okName = /^[A-Za-z0-9][A-Za-z0-9 _-]{0,60}$/;
+  if (!okName.test(oldF) || !/^IV-\d{3,}-\d{6}$/.test(code)) throw new Error('Bad folder name or wedding code');
+  if (oldF.toLowerCase() === code.toLowerCase()) return { ok: true, already: true, quotes: [] };
+  const H = function (k) { return { Authorization: 'Bearer ' + k, Accept: 'application/vnd.github+json' }; };
+  const call = function (repo, k, path, method, body) {
+    const o = { headers: H(k), muteHttpExceptions: true };
+    if (method) { o.method = method; o.contentType = 'application/json'; o.payload = JSON.stringify(body); }
+    const r = UrlFetchApp.fetch('https://api.github.com/repos/' + repo + path, o);
+    return { code: r.getResponseCode(), text: r.getContentText() };
+  };
+  const reach = function (repo, c) { return new Error('GitHub key does not reach ' + repo.split('/')[1] + ' (GitHub answered ' + c + ')'); };
+  const enc = function (s) { return encodeURIComponent(s); };
+  const fixLinks = function (t) { return String(t).split('/' + enc(oldF) + '/').join('/' + code + '/').split('/' + oldF + '/').join('/' + code + '/'); };
+  const readDir = function (repo, k, branch, dir) {   // [{name, sha}] of the files in a folder; [] when there is none
+    const r = call(repo, k, '/contents/' + dir.split('/').map(enc).join('/') + '?ref=' + branch);
+    if (r.code === 404) return [];
+    if (r.code !== 200) throw reach(repo, r.code);
+    return JSON.parse(r.text).filter(function (x) { return x.type === 'file'; }).map(function (x) { return { name: x.name, sha: x.sha }; });
+  };
+  const readFile = function (repo, k, sha) {   // base64, through the blob API so big photos work too
+    const r = call(repo, k, '/git/blobs/' + sha);
+    if (r.code !== 200) throw new Error('GitHub answered ' + r.code + ' reading a file');
+    return JSON.parse(r.text).content.replace(/\n/g, '');
+  };
+  const putNew = function (repo, k, branch, path, b64, msg) {   // never overwrites
+    const url = '/contents/' + path.split('/').map(enc).join('/');
+    const ex = call(repo, k, url + '?ref=' + branch);
+    if (ex.code === 200) return false;
+    if (ex.code !== 404) throw reach(repo, ex.code);
+    const w = call(repo, k, url, 'put', { message: msg, content: b64, branch: branch });
+    if (w.code !== 200 && w.code !== 201) throw reach(repo, w.code);
+    return true;
+  };
+  // copy every file of old/ into code/ in a repo; .html pages get their own folder links pointed at the code folder
+  const copyDir = function (repo, k, branch, from, to, msg) {
+    const done = [];
+    readDir(repo, k, branch, from).forEach(function (f) {
+      let b64 = readFile(repo, k, f.sha);
+      if (/\.html$/i.test(f.name)) b64 = Utilities.base64Encode(Utilities.newBlob(fixLinks(Utilities.newBlob(Utilities.base64Decode(b64)).getDataAsString())).getBytes());
+      putNew(repo, k, branch, to + '/' + f.name, b64, msg);
+      done.push(f.name);
+    });
+    return done;
+  };
+
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    const msg = 'Move ' + oldF + ' to ' + code;
+    // 1. the client link
+    const evBase = SITE_DIR + '/';
+    const od = call(SITE_REPO, evKey, '/contents/' + enc(SITE_DIR) + '/' + enc(oldF) + '/data.json?ref=' + SITE_BRANCH);
+    let oldData = null, oldSha = null;
+    if (od.code === 200) { const j = JSON.parse(od.text); oldSha = j.sha; oldData = JSON.parse(Utilities.newBlob(Utilities.base64Decode(j.content.replace(/\n/g, ''))).getDataAsString()); }
+    else if (od.code !== 404) throw reach(SITE_REPO, od.code);
+    const pk = copyDir(PAY_REPO, pkKey, PAY_BRANCH, oldF, code, msg);
+    const tl = copyDir(TL_REPO, tlKey, TL_BRANCH, oldF, code, msg);
+    if (oldData) {
+      const sh = call(SITE_REPO, evKey, '/contents/' + enc(SITE_DIR) + '/client-shell.html?ref=' + SITE_BRANCH);
+      if (sh.code !== 200) throw new Error('client-shell.html not found in the New A site');
+      let html = Utilities.newBlob(Utilities.base64Decode(JSON.parse(sh.text).content.replace(/\n/g, ''))).getDataAsString();
+      const esc = function (t) { return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); };
+      const wd = String(oldData.wedding_date || p.date || '');
+      const longDate = /^\d{4}-\d{2}-\d{2}$/.test(wd) ? Utilities.formatDate(Utilities.parseDate(wd, tz_(), 'yyyy-MM-dd'), tz_(), 'd MMMM yyyy') : '';
+      html = html.split('__NAME__').join(esc(oldData.name || p.name || '')).split('__WEDDING_DATE__').join(longDate).split('__VENUE__').join(esc(oldData.venue || p.venue || '')).split('__FOLDER__').join(code);
+      const nd = JSON.parse(fixLinks(JSON.stringify(oldData)));
+      nd.folder = code; nd.code = code; delete nd.moved_to;
+      putNew(SITE_REPO, evKey, SITE_BRANCH, SITE_DIR + '/' + code + '/index.html', Utilities.base64Encode(Utilities.newBlob(html).getBytes()), msg);
+      putNew(SITE_REPO, evKey, SITE_BRANCH, SITE_DIR + '/' + code + '/data.json', Utilities.base64Encode(Utilities.newBlob(JSON.stringify(nd, null, 2) + '\n').getBytes()), msg);
+      // 2. only now, with everything copied, the old link points to the new one
+      const target = 'https://ivory-events.pages.dev/' + enc(SITE_DIR) + '/' + code + '/';
+      const redirect = '<!DOCTYPE html>\n<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex">' +
+        '<meta http-equiv="refresh" content="0; url=' + target + '"><title>Ivory Events</title></head>' +
+        '<body style="font-family:sans-serif;text-align:center;padding:40px"><p>Opening your page... <a href="' + target + '">tap here if it does not open</a></p>' +
+        '<script>location.replace("' + target + '"+location.hash)</script></body></html>\n';
+      const oi = call(SITE_REPO, evKey, '/contents/' + enc(SITE_DIR) + '/' + enc(oldF) + '/index.html?ref=' + SITE_BRANCH);
+      if (oi.code === 200 && String(Utilities.newBlob(Utilities.base64Decode(JSON.parse(oi.text).content.replace(/\n/g, ''))).getDataAsString()).indexOf('location.replace') < 0) {
+        const w = call(SITE_REPO, evKey, '/contents/' + enc(SITE_DIR) + '/' + enc(oldF) + '/index.html', 'put', { message: msg + ' (old link redirects)', content: Utilities.base64Encode(Utilities.newBlob(redirect).getBytes()), sha: JSON.parse(oi.text).sha, branch: SITE_BRANCH });
+        if (w.code !== 200 && w.code !== 201) throw reach(SITE_REPO, w.code);
+      }
+      oldData.moved_to = code;
+      call(SITE_REPO, evKey, '/contents/' + enc(SITE_DIR) + '/' + enc(oldF) + '/data.json', 'put', { message: msg + ' (marked as moved)', content: Utilities.base64Encode(Utilities.newBlob(JSON.stringify(oldData, null, 2) + '\n').getBytes()), sha: oldSha, branch: SITE_BRANCH });
+    }
+    return { ok: true, link: !!oldData, quotes: pk.filter(function (n) { return /^\d{6}\.html$/.test(n); }).map(function (n) { return n.slice(0, 6); }), packages: pk.length, timeline: tl.length };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
 // Makes the client's link as soon as an enquiry is entered (and lets the event type be changed later).
 // Creates <Client>/index.html (from client-shell.html) and <Client>/data.json with the event type, which decides the Packages and Checklist pages.
 // An existing link keeps its quotes/timeline/payment; only its type is updated.
