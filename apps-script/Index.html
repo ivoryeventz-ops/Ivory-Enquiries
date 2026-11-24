@@ -4718,6 +4718,7 @@
     return o;
   }
   function qeRender() {
+    if (Q.imgChoice === 'keep' && !Q.img) Q.imgChoice = 'none';   // no current photo: show "No stage photo" so "Upload a new photo..." is a real change and opens the file chooser
     var tk = qeTaken(Q.no);
     var h = '<h4>Quote details</h4>' +
       '<label for="qeName">Name</label><input id="qeName" data-d="name" value="' + esc(Q.name) + '">' +
