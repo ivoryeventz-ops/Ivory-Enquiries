@@ -6323,7 +6323,16 @@
     var out = [], seen = {};
     var noGarland = vHit('Garland and Bouquet', q);   // garland & bouquet is an outside vendor in this quote, so it is not part of the stage list
     var all = (stage || []).slice();
+    var hasCake = false, hasCandle = false;   // cake / candle anywhere in the quote, including additional items that are outside vendors (e.g. Wedding cake)
+    var scan = function (str) {
+      str = String(str || '');
+      if (SD_DROP.some(function (r) { return r.test(str); })) return;
+      if (/\bcakes?\b/i.test(str)) hasCake = true;
+      if (/\bcandles?\b/i.test(str)) hasCandle = true;
+    };
+    (stage || []).forEach(scan);
     (extras || []).forEach(function (x) {
+      scan(x.name); (x.subs || []).forEach(scan);
       if (VNAMES.some(function (n) { return stdMatch(n, x.name); })) return;
       all.push(x.name + ((x.subs || []).length ? ' - ' + x.subs.join(', ') : ''));
     });
@@ -6333,10 +6342,24 @@
       if (!s || /^stage\s*decoration\s*including/i.test(s)) return;
       if (SD_DROP.some(function (r) { return r.test(s); })) return;
       var opt = SD_OPT.some(function (r) { return r.test(s); });
-      var t = /\bcandles?\b/i.test(s) ? 'Candle stand' : (/\bcake\b/i.test(s) ? 'Cake stand' : s);
+      var ts = [s];
+      if (/\bcandles?\b/i.test(s) || /\bcakes?\b/i.test(s)) {
+        ts = [];
+        if (/\bcandles?\b/i.test(s)) ts.push('Candle stand');
+        if (/\bcakes?\b/i.test(s)) ts.push('Cake stand');
+      }
+      ts.forEach(function (t) {
+        if (seen[t.toLowerCase()]) return;
+        seen[t.toLowerCase()] = 1;
+        out.push({ t: t, opt: opt, on: !opt });
+      });
+    });
+    // A cake anywhere in the quote (even an additional item) needs the cake stand; cake and candles together need both stands.
+    var need = []; if (hasCake) need.push('Cake stand'); if (hasCake && hasCandle) need.push('Candle stand');
+    need.forEach(function (t) {
       if (seen[t.toLowerCase()]) return;
       seen[t.toLowerCase()] = 1;
-      out.push({ t: t, opt: opt, on: !opt });
+      out.push({ t: t, opt: false, on: true });
     });
     return out;
   }
