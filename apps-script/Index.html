@@ -37,11 +37,13 @@
   /* ----- filters ----- */
   .chips{display:flex;gap:8px;overflow-x:auto;padding:14px 16px 4px;scrollbar-width:none}
   .chips::-webkit-scrollbar{display:none}
-  .chip{flex:0 0 auto;border:1px solid var(--line);background:var(--paper);color:var(--ink);border-radius:999px;padding:7px 15px;font-size:14px;cursor:pointer}
+  .chip{flex:0 0 auto;border:1px solid var(--line);background:var(--paper);color:var(--ink);border-radius:999px;padding:7px 14px;font-size:13.5px;cursor:pointer;transition:background .15s,color .15s}
   .chip.on{background:var(--burgundy);border-color:var(--burgundy);color:#fff}
-  .past{display:flex;align-items:center;gap:8px;padding:8px 18px 0;font-size:13px;color:var(--muted)}
+  .listbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:8px 2px 12px}
+  .past{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted);white-space:nowrap;cursor:pointer}
+  .past input{width:16px;height:16px;margin:0;accent-color:var(--burgundy)}
   main{padding:6px 16px calc(110px + env(safe-area-inset-bottom))}
-  .count{font-size:12px;color:var(--muted);margin:8px 2px 10px;letter-spacing:.02em}
+  .count{font-size:12.5px;color:var(--muted);letter-spacing:.02em}
 
   /* ----- work cards ----- */
   .card{cursor:pointer;display:grid;grid-template-columns:56px 1fr auto;gap:2px 14px;align-items:center;width:100%;text-align:left;background:var(--paper);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;margin-bottom:10px;font:inherit;color:inherit;box-shadow:var(--shadow)}
@@ -57,18 +59,13 @@
   .r2{grid-column:2 / 4;font-size:14px;color:var(--ink)}
   .r3{grid-column:2 / 4;font-size:13px;color:var(--muted)}
   .since{grid-column:1 / 4;margin-top:6px;font-size:12px;color:var(--cost)}
-  .nq{grid-column:1 / 4;margin-top:6px;font-size:13px;font-weight:700;color:var(--danger)}
-  .mk{grid-column:1 / 4;display:flex;gap:8px;margin-top:6px}
-  .mk select{flex:1;min-width:0;font-size:14px;padding:6px}
-  .mk button{font-size:14px;font-weight:700;padding:6px 12px;border-radius:8px;border:0;background:var(--danger);color:#fff}
-  .mg{margin-top:6px;font-size:13px;font-weight:600;color:var(--cost)}
+  .nq{grid-column:1 / 4;justify-self:start;margin-top:8px;font-size:12.5px;font-weight:600;color:var(--danger);background:#fbeceb;border-radius:8px;padding:4px 10px}
   .empty{text-align:center;color:var(--muted);padding:48px 10px;font-family:var(--serif);font-size:20px}
   .acts{grid-column:1 / 4;margin-top:8px;border-top:1px dashed var(--line);padding-top:6px}
   .acts .sg{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--cost);margin:6px 0 2px;display:flex;gap:8px;flex-wrap:wrap}
   .acts .sg em{font-style:normal;text-transform:none;letter-spacing:0;font-weight:600;color:var(--muted)}
   .acts .sg em.late{color:var(--danger)}
-  .acts .sg.later{color:var(--muted)}
-  .act{display:flex;align-items:flex-start;gap:10px;margin:1px 0;padding:6px 0;font-size:15px;color:var(--ink)}
+  .act{display:flex;align-items:flex-start;gap:10px;margin:0;padding:5px 0;font-size:14.5px;color:var(--ink)}
   .act input{width:22px;height:22px;padding:0;flex:none;accent-color:var(--conf);margin-top:1px}
   .act.done span{text-decoration:line-through;color:var(--muted)}
 
@@ -182,6 +179,12 @@
   .mbox p{margin:0 0 12px;font-size:15px;color:var(--ink)}
   .mbtns{display:grid;grid-template-columns:1fr 1.4fr;gap:10px;margin-top:14px}
   .mbtns .primary{margin:0}
+  #lk .mbtns{grid-template-columns:1fr 1fr}
+  #lk .mbtns .primary{grid-column:1 / 3;order:-1}
+  #lk .mbtns .sbtn,#lk .mbtns .ghost{padding:12px 13px}
+  .srow:has(#evType){flex-direction:column;align-items:stretch}
+  .srow:has(#evType) .rb{display:flex;gap:8px}
+  .srow:has(#evType) .evsel{flex:1;max-width:none;min-width:0}
 
   /* ----- staff checklist ----- */
   .ckcard{background:#fff;border:1px solid var(--gold-soft);border-radius:var(--r);padding:14px;margin:16px 0 4px;box-shadow:var(--shadow)}
@@ -203,8 +206,6 @@
   @media(min-width:520px){.vrow{display:grid;grid-template-columns:210px 1fr;gap:10px;align-items:start}.vtick{margin:0;min-height:40px}}
   .vstate{font-size:12px;color:var(--muted);min-height:16px;margin-top:4px}
   .vstate.err{color:var(--danger);font-weight:600}
-  details.vmore{margin-top:6px}
-  details.vmore summary{font-size:14px;color:var(--burgundy);font-weight:600;padding:6px 0}
   .vfields{display:grid;gap:8px;min-width:0}
   .vfields input{padding:10px 12px}
   .vfilters{display:flex;gap:18px;flex-wrap:wrap;margin:12px 0 14px}
@@ -219,8 +220,6 @@
   .vi .w{color:var(--ink);margin-top:2px}
   .vi .w i{color:var(--muted);font-style:normal}
   .vi .vv{color:var(--muted);font-size:13px}
-  .bk{font-size:11px;border-radius:999px;padding:2px 8px;color:#fff;background:var(--conf);margin-left:6px;vertical-align:middle;font-weight:600}
-  .bk.no{background:var(--other)}
   .vseg{display:flex;gap:6px;margin:12px 0 0;background:var(--wash);padding:4px;border-radius:14px}
   .vchip{flex:1;border:0;background:transparent;color:var(--muted);border-radius:11px;padding:9px 8px;font-size:14px;font-weight:600;cursor:pointer}
   .vchip.on{background:#fff;color:var(--burgundy);box-shadow:0 1px 4px rgba(60,30,20,.15)}
@@ -304,7 +303,7 @@
   .qci b{white-space:nowrap;color:var(--burgundy);font-size:14px}
   .qcat-top{grid-template-columns:1fr}
   .qtotbox{margin-top:14px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:#fff}
-  .qtotbox input[type=text],.qtotbox #qeTotLabel,.qtotbox #qeDisc,.qtotbox #qeDiscLabel{margin-top:8px}
+  .qtotbox input[type=text],.qtotbox #qeTotLabel{margin-top:8px}
   .qgh{display:flex;justify-content:space-between;align-items:center;width:100%;font:inherit;font-weight:600;font-size:14px;background:#fff;border:1px solid var(--line);border-radius:10px;padding:11px 12px;margin-top:6px;color:var(--ink);text-align:left}
   .qgh.on{border-color:var(--gold);background:#fffaf0}
   .qgh em{font-style:normal;font-weight:600;font-size:12px;color:var(--burgundy);margin-right:8px}
@@ -859,14 +858,12 @@
   <button class="chip" data-f="Costing">Costing</button>
   <button class="chip" data-f="Blocked">Blocked</button>
   <button class="chip" data-f="Confirmed">Confirmed</button>
-  <button class="chip" data-f="NoQuote">No quote given</button>
-  <button class="chip" data-f="NoLink">No client link</button>
-  <button class="chip" data-f="Action">Action due</button>
+  <button class="chip" data-f="NoQuote">No quote</button>
+  <button class="chip" data-f="Action">Actions</button>
 </div>
-<label class="past"><input type="checkbox" id="showPast" style="width:auto"> Include past events</label>
 
 <main>
-  <div class="count" id="count"></div>
+  <div class="listbar"><div class="count" id="count"></div><label class="past"><input type="checkbox" id="showPast"> Past events</label></div>
   <div id="list"><div class="skl"></div><div class="skl"></div><div class="skl"></div><div class="skl"></div></div>
 </main>
 
@@ -958,8 +955,7 @@
     <div class="item">
       <div class="gallery">
         <img src="https://ivory-packages.pages.dev/stages/thumbs/pkg-2-1.jpg" data-full="https://ivory-packages.pages.dev/stages/pkg-2-1.jpg" data-filename="Pkg 2 - 1.jpg" alt="Package 2 - photo 1" loading="lazy" decoding="async">
-        <img src="https://ivory-packages.pages.dev/stages/thumbs/pkg-2-2.jpg" data-full="https://ivory-packages.pages.dev/stages/pkg-2-2.jpg" data-filename="Pkg 2 - 2.jpg" alt="Package 2 - photo 2" loading="lazy" decoding="async">
-        <img src="https://ivory-packages.pages.dev/stages/thumbs/pkg-2-3.jpg" data-full="https://ivory-packages.pages.dev/stages/pkg-2-3.jpg" data-filename="Pkg 2 - 3.jpg" alt="Package 2 - photo 3" loading="lazy" decoding="async">
+        <img src="https://ivory-packages.pages.dev/stages/thumbs/pkg-2-3.jpg" data-full="https://ivory-packages.pages.dev/stages/pkg-2-3.jpg" data-filename="Pkg 2 - 2.jpg" alt="Package 2 - photo 2" loading="lazy" decoding="async">
       </div>
       <label>
         <input type="radio" name="pkg" data-name="Package 2" data-price="105000">
@@ -1640,7 +1636,7 @@
 
 <div class="sheet" id="detail">
   <div class="grab"></div>
-  <div class="dhead"><div><h2 id="dName"></h2><div class="meta" id="dMeta"></div></div><span class="badge" id="dBadge"></span></div>
+  <div class="dhead"><div><h2 id="dName"></h2><div class="meta" id="dMeta"></div><div class="meta"><span id="dCode"></span> &middot; <a href="#" id="dRename" style="color:inherit;text-decoration:underline">Edit name</a></div></div><span class="badge" id="dBadge"></span></div>
   <div class="stlab">Status</div>
   <div class="stbtns" id="stbtns">
     <button class="st" data-s="Enquiry">Enquiry</button>
@@ -2579,9 +2575,6 @@
     R.push(['', 'GRAND TOTAL', '', '', '=' + t]);
     return R;
   }
-  function toCsv(R) {
-    return '﻿' + R.map(function (r) { return r.map(function (c) { return '"' + String(c === undefined ? '' : c).replace(/"/g, '""') + '"'; }).join(','); }).join('\r\n');
-  }
   function toTsv(R) {
     return R.map(function (r) { return r.map(function (c) { return String(c === undefined ? '' : c).replace(/[\t\r\n]+/g, ' '); }).join('\t'); }).join('\n');
   }
@@ -2666,6 +2659,10 @@
       } else {
         lastCheckedRadio[this.name] = this;
         if (this.name === 'pkg') { this.removeAttribute('data-selected-stage'); this.removeAttribute('data-selected-img'); }
+      }
+      if (this.name === 'band' && this.checked) {     // a live band needs its platform: tick it (it can still be unticked by hand)
+        var plat = ROOT.querySelector('input[type="checkbox"][data-name^="Custom raised wooden stage platform"]');
+        if (plat) plat.checked = true;
       }
       renderBuilder();
     });
@@ -3051,16 +3048,23 @@
   function wkey(i) { return i.id + '|' + i.date; }
   function daysTo(i) { return Math.round((toDate(i.date) - toDate(today)) / 86400000); }
   function isoAdd(iso, n) { var d = toDate(iso); d.setDate(d.getDate() + n); return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()); }
-  // "No client link": every work (not Lost) whose client folder has no page in Ivory-Events > New A. The folder is the one its quotes are in, else the first word of the name (as the app makes it).
+  // Finding a work's client link folder: the folder its quotes are in, else the first word of the name (as the app makes it).
   function linkFolder(i) { return String(FL.folder[wkey(i)] || payFolder(i, [])).toLowerCase(); }
   function nameToks(t) { return String(t || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().split(' ').filter(Boolean); }
+  // The one code a wedding is known by everywhere: client ID + event date (ddmmyy), e.g. IV-007-251126.
+  // Its client link, quotes, payment page and wedding timeline all live in a folder with exactly this name, so nothing depends on how a name is spelled.
+  function wedCode(i) { var id = String((i && i.id) || '').trim(), d = String((i && i.date) || ''); return id && /^\d{4}-\d{2}-\d{2}$/.test(d) ? id + '-' + d.slice(8, 10) + d.slice(5, 7) + d.slice(2, 4) : ''; }
+  // Old spellings of a client's name (Clients sheet, column G, comma separated). Folders made before a name was corrected keep matching, so links already sent stay valid.
+  function aliasToks(i) { return String((i && i.alias) || '').split(',').map(nameToks).filter(function (t) { return t.length; }); }
+  function nameFirsts(i) { var o = [], n = nameToks(i.name); if (n.length) o.push(n[0]); aliasToks(i).forEach(function (t) { if (o.indexOf(t[0]) < 0) o.push(t[0]); }); return o; }
+  function nameAll(i) { var o = nameToks(i.name); aliasToks(i).forEach(function (t) { t.forEach(function (w) { if (o.indexOf(w) < 0) o.push(w); }); }); return o; }
   // works that share this work's first name (so one folder could belong to a different wedding)
-  function sameName(i) { var k = payFolder(i, []).toLowerCase(); return items.some(function (o) { return o !== i && o.status !== 'Lost' && payFolder(o, []).toLowerCase() === k; }); }
+  function sameName(i) { var k = nameToks(i.name)[0]; return !!k && items.some(function (o) { return o !== i && o.status !== 'Lost' && nameToks(o.name)[0] === k; }); }
   // the client's own folder, plus any link folder whose words all appear in the name (e.g. "Christy Kzy" -> Christy-Kzy)
   function linkCands(i, L) {
-    var out = [linkFolder(i)], nt = nameToks(i.name);
+    var out = [linkFolder(i)], nt = nameAll(i);
     // a link folder with another name that is for this very wedding date and shares the first name (e.g. two Jaisons: "Jaison" and "Jaison-Kozhencherry")
-    Object.keys(L || {}).forEach(function (f) { var ft = nameToks(f); if (i.date && FL.linkDate[f] === i.date && ft.length && nt.length && ft[0] === nt[0] && out.indexOf(f) < 0) out.push(f); });
+    Object.keys(L || {}).forEach(function (f) { var ft = nameToks(f); if (i.date && FL.linkDate[f] === i.date && ft.length && nameFirsts(i).indexOf(ft[0]) >= 0 && out.indexOf(f) < 0) out.push(f); });
     Object.keys(L || {}).forEach(function (f) { var ft = nameToks(f); if (ft.length && ft.every(function (t) { return nt.indexOf(t) >= 0; }) && out.indexOf(f) < 0) out.push(f); });
     return out.filter(function (f) { return L && L[f]; });
   }
@@ -3072,7 +3076,7 @@
     // second check, only when another work has the same name: the link must be for this wedding date (a link with no readable date is given the benefit of the doubt)
     return !c.some(function (f) { return !FL.linkDate[f] || FL.linkDate[f] === i.date; });
   }
-  function noQuote(i) { return FL.ready && i.status === 'Confirmed' && !!i.date && !FL.sites[wkey(i)] && FL.cloud[wkey(i)] === 0; }
+  function noQuote(i) { return FL.ready && i.status !== 'Lost' && !!i.date && !FL.sites[wkey(i)] && FL.cloud[wkey(i)] === 0; }
   // quote exists only as a Google Site: counted as quoted, but outside vendors cannot be auto-picked from it until it is re-issued as a GitHub quote
   // A saved tick (or an explicit un-tick) always wins. With nothing saved, the wedding timeline shows ticked once its page exists in the timeline repo.
   function isDone(i, t) {
@@ -3112,17 +3116,16 @@
     var list = items.filter(function (i) {
       if (!showPast && i.date && i.date < today && !(i.date >= cutoff && pending(i) > 0)) return false;
       if (filter === 'NoQuote') { if (!noQuote(i)) return false; }
-      else if (filter === 'NoLink') { if (!noLink(i)) return false; }
       else if (filter === 'Action') { if (pending(i) === 0) return false; }
       else if (filter !== 'All' && i.status !== filter) return false;
       if (ql && (i.name + ' ' + i.venue).toLowerCase().indexOf(ql) < 0) return false;
       return true;
     });
     $('#sub').textContent = list.length + ' shown';
-    $('#count').textContent = (showPast ? 'Oldest first' : 'Upcoming events, soonest first') +
+    $('#count').textContent = (showPast ? 'Oldest first' : 'Upcoming, soonest first') +
       (FL.ready ? '' : ' - quote flags and reminders need the updated Code.gs');
     if (!list.length) {
-      $('#list').innerHTML = '<div class="empty">' + (filter === 'NoQuote' ? 'Every confirmed work has a quote.' : filter === 'NoLink' ? (FL.links ? 'Every work has a client link.' : 'Could not read the client links just now. Pull to refresh and try again.') : filter === 'Action' ? 'No actions pending.' : 'Nothing here yet.') + '</div>';
+      $('#list').innerHTML = '<div class="empty">' + (filter === 'NoQuote' ? 'Every confirmed work has a quote.' : filter === 'Action' ? 'No actions pending.' : 'Nothing here yet.') + '</div>';
       return;
     }
     $('#list').innerHTML = list.map(function (i) {
@@ -3133,7 +3136,6 @@
         '<div class="r2">' + fmt(i.date) + ' &middot; ' + when(i.date) + '</div>' +
         '<div class="r3">' + esc(i.venue) + '</div>' +
         (noQuote(i) ? '<div class="nq">&#9888; No quote given yet</div>' : '') +
-        (noLink(i) ? '<div class="nq">&#9888; No client link yet</div>' + (i.date ? '<div class="mk"><select class="mkType" aria-label="Event type">' + Object.keys(EV_TYPES).map(function (k) { return '<option value="' + k + '">' + esc(EV_TYPES[k]) + '</option>'; }).join('') + '</select><button type="button" class="mkBtn" data-row="' + i.row + '">Make link</button></div>' : '<div class="nq">Add the event date to make the link</div>') : '') +
         (i.status === 'Costing' && i.since ? '<div class="since">Costing since ' + fmt(i.since, true) + ' &middot; reminder every 2 days</div>' : '') +
         actHtml(i, false) +
         '</div>';
@@ -3142,7 +3144,7 @@
 
   // one call for quote flags + ticks, plus the new-style quote pages of every confirmed work
   function loadFlags() {
-    var conf = items.filter(function (i) { return i.status === 'Confirmed' && i.date; });
+    var conf = items.filter(function (i) { return i.status !== 'Lost' && i.date; });   // every live enquiry (Enquiry, Costing, Blocked, Confirmed) is checked for a quote
     var srv = call('api_flags', pin).then(function (r) { return r; }, function () { return null; });
     var gh = Promise.all(conf.map(function (it) {
       return ghQuotes(it).then(function (qs) { return { it: it, n: qs.length, folder: (qs[0] || {}).folder || '' }; }, function () { return { it: it, n: -1 }; });
@@ -3153,7 +3155,7 @@
       (j.tree || []).forEach(function (x) { var m = /^New A\/([^\/]+)\/(?:data\.json|index\.html)$/.exec(x.path); if (m) L[m[1].toLowerCase()] = m[1]; });
       // same-name works: read the wedding date saved in each candidate link, so the dates can be compared
       var need = {};
-      items.forEach(function (i) { if (i.status !== 'Lost' && i.date && String(i.name || '').trim() && sameName(i)) linkCands(i, L).forEach(function (f) { need[f] = 1; }); var t0 = nameToks(i.name)[0]; Object.keys(L).forEach(function (f) { if (t0 && nameToks(f)[0] === t0) need[f] = 1; }); });
+      items.forEach(function (i) { if (i.status !== 'Lost' && i.date && String(i.name || '').trim() && sameName(i)) linkCands(i, L).forEach(function (f) { need[f] = 1; }); var t0s = nameFirsts(i); Object.keys(L).forEach(function (f) { if (t0s.indexOf(nameToks(f)[0]) >= 0) need[f] = 1; }); });
       var D = {};
       return Promise.all(Object.keys(need).map(function (f) {
         return fetch(SITE_RAW + encodeURIComponent(L[f]) + '/data.json?t=' + Date.now())
@@ -3268,26 +3270,13 @@
   // list taps
   $('#list').addEventListener('click', function (e) {
     if (e.target.closest('.acts')) return;   // ticking a reminder must not open the work
-    if (e.target.closest('.mk')) {   // one-tap client link for a work that has none
-      var mb = e.target.closest('.mkBtn');
-      if (mb) {
-        var mi = items.filter(function (i) { return i.row === +mb.getAttribute('data-row'); })[0];
-        var ty = mb.parentNode.querySelector('.mkType').value;
-        if (mi) {
-          mb.disabled = true; mb.textContent = 'Making...';
-          ensureLink(mi, ty, false).then(function (r) {
-            if (r) showLink(mi.name, r.url, r.existed ? 'This client already had a link, so it was kept as it is.' : 'Made for ' + EV_TYPES[ty] + '. It has the introduction, packages and service checklist.');
-          }, function (err) { toast('Client link not made: ' + err.message, true); }).then(function () { mb.disabled = false; mb.textContent = 'Make link'; });
-        }
-      }
-      return;
-    }
     var b = e.target.closest('.card');
     if (!b) return;
     var row = +b.getAttribute('data-row');
     cur = items.filter(function (i) { return i.row === row; })[0];
     if (!cur) return;
     $('#dName').textContent = cur.name;
+    $('#dCode').textContent = cur.id;
     $('#dMeta').textContent = fmt(cur.date) + ' \u00b7 ' + when(cur.date) + (cur.venue ? ' \u00b7 ' + cur.venue : '');
     $('#dBadge').textContent = cur.status; $('#dBadge').className = 'badge s-' + cur.status;
     setTab('quotes');
@@ -3341,7 +3330,7 @@
         // the client's link (intro, packages, checklist for this event type) is made straight away, then offered for WhatsApp
         return ensureLink(np, np.type, false).then(function (r) {
           if (r) showLink(np.name, r.url, r.existed ? 'This client already had a link, so it was kept as it is (use the Client link tab inside the work to change its event type).' : 'Made for ' + EV_TYPES[np.type] + '. It has the introduction, packages and service checklist.');
-          else toast('Enquiry saved, but no client link was made. Tap Make link on its card.', true);
+          else toast('Enquiry saved, but no client link was made. Open the work > Client link to make it.', true);
         }, function (err) { toast('Enquiry saved, but the client link was not made: ' + err.message + '. Open the work > Client link to try again.', true); });
       });
     }).catch(function (err) {
@@ -3351,6 +3340,27 @@
       btn.disabled = false;
       btn.textContent = 'Save enquiry';
     });
+  });
+
+  // Rename a client at any time: the client code (not the name) finds links, quotes, payments and timelines, so nothing breaks.
+  $('#dRename').addEventListener('click', function (e) {
+    e.preventDefault();
+    if (!cur) return;
+    var nn = (window.prompt('Client name for ' + cur.id, cur.name) || '').trim();
+    if (!nn) return;
+    busy(true);
+    var oldNm = cur.name, itc = cur;
+    // the same name again just re-sends it to the client page (fixes a page that was missed)
+    (nn === cur.name ? Promise.resolve() : call('api_rename', pin, { id: cur.id, name: nn })).then(function () {
+      // the client's own page (intro "Prepared for" and name card) carries the name too
+      return call('api_site_rename', pin, { folder: siteFolder(itc), name: nn, oldName: oldNm }).then(function () { toast('Name changed, client page updated'); }, function (er) { toast('Name changed, but the client page was not updated: ' + er.message, true); });
+    }).then(function () {
+      var row = cur.row;
+      return load(true).then(function () {
+        cur = items.filter(function (i) { return i.row === row; })[0] || cur;
+        $('#dName').textContent = cur.name;
+      });
+    }).catch(function (err) { toast(err.message, true); }).then(function () { busy(false); });
   });
 
   $('#list').addEventListener('change', actToggle);
@@ -3555,18 +3565,20 @@
     return entry.p;
   }
   // Newer quote pages (ivory-packages.pages.dev). Two clients can share a first name, so a quote written for another event date is dropped.
+  function hasCodeFolder(it) { var c = wedCode(it).toLowerCase(); return !!c && !!ghTree && Object.keys(ghTree).some(function (f) { return f.toLowerCase() === c; }); }
   function ghQuotes(it, fresh) {
     return ghTreeGet(fresh ? 90000 : 0).then(function (tree) {
-      var full = ' ' + it.name.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim() + ' ';
+      var full = ' ' + [it.name].concat(String(it.alias || '').split(',')).map(function (n) { return nameToks(n).join(' '); }).filter(Boolean).join(' | ') + ' ';
+      var code = wedCode(it).toLowerCase(), hasCode = !!code && Object.keys(tree).some(function (f) { return f.toLowerCase() === code; });
       var jobs = [];
       Object.keys(tree).forEach(function (f) {
         var fn = ' ' + f.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim() + ' ';
-        if (full.indexOf(fn) < 0) return;
+        if (hasCode ? f.toLowerCase() !== code : (sameName(it) || full.indexOf(fn) < 0)) return;   // code folder wins; the name only finds folders made before codes
         tree[f].forEach(function (no) { jobs.push(ghQuote(f, no, fresh).then(function (q) { return q; }, function () { return null; })); });
       });
       return Promise.all(jobs);
     }).then(function (all) {
-      return all.filter(function (q) { return q && (!q.date || q.date === it.date); });
+      return all.filter(function (q) { return q && (hasCodeFolder(it) || (q.date && q.date === it.date)); });
     });
   }
 
@@ -3613,8 +3625,11 @@
   // A work counts as "timeline given" when a folder shares a name word with the client AND its page mentions the work's event date,
   // so two weddings for the same client never get each other's tick.
   function tlMatches(it, t) {
+    var wc = wedCode(it).toLowerCase();
+    if (wc && Object.keys(t).some(function (f) { return f.toLowerCase() === wc; })) return true;
+    if (sameName(it)) return false;   // another work shares this name: only the wedding code may match
     var words = {};
-    it.name.toLowerCase().split(/[^a-z0-9]+/).forEach(function (w) { if (w.length > 2) words[w] = 1; });
+    nameAll(it).forEach(function (w) { if (w.length > 2) words[w] = 1; });
     return Object.keys(t).some(function (f) {
       var hit = f.toLowerCase().split(/[^a-z0-9]+/).some(function (w) { return w.length > 2 && words[w]; });
       return hit && t[f].indexOf(it.date) >= 0;
@@ -3695,7 +3710,6 @@
     if (curTab === 'site') siteLoad(it);
   }
 
-  function vSaved(name) { var s = VS[name]; return !!(s && (s.booked || (s.supplier || '').trim() || (s.details || '').trim())); }
   // Delete saved vendor rows from the sheet (needs the updated Code.gs; without it the rows are only hidden here).
   function removeVendors(it, names) {
     var chain = Promise.resolve();
@@ -3810,7 +3824,7 @@
   var SITE = {}, ADDED = {};
   var EV_TYPES = { christian: 'Wedding - Christian', pentecost: 'Wedding - Pentecost', engagement: 'Engagement', hindu: 'Reception - Hindu' };
   function linkWa(name, url) {
-    return 'https://wa.me/?text=' + encodeURIComponent('Hello ' + name + ',\nThank you for your enquiry with Ivory Events. Here is our introduction, wedding packages and service checklist for you to look through:\n' + url);
+    return 'https://wa.me/?text=' + encodeURIComponent(url);
   }
   function showLink(name, url, note) {
     $('#lkB').textContent = note || ''; $('#lkUrl').textContent = decodeURIComponent(url.replace('https://', ''));
@@ -3821,10 +3835,11 @@
   // Makes (or, with change=true, re-types) the client's link. Asks for the GitHub key only if the script does not hold one yet.
   // The folder for a NEW link: the usual first-name folder, unless that already belongs to another wedding (same first name, different date) - then it gets its own, e.g. Jaison-261224, so every enquiry has its own link.
   function newLinkFolder(it) {
+    var wcode = wedCode(it); if (wcode) return wcode;   // every new link is the wedding code, so two clients can never share one
     var f = payFolder(it, []), k = f.toLowerCase();
     if (!FL.links || !it.date) return f;
     var hit = '';
-    Object.keys(FL.links).forEach(function (x) { if (!hit && FL.linkDate[x] === it.date && nameToks(x)[0] === nameToks(it.name)[0]) hit = FL.links[x] || x; });
+    Object.keys(FL.links).forEach(function (x) { if (!hit && FL.linkDate[x] === it.date && nameFirsts(it).indexOf(nameToks(x)[0]) >= 0) hit = FL.links[x] || x; });
     if (hit) return hit;
     if (!FL.links[k] || !FL.linkDate[k] || FL.linkDate[k] === it.date) return f;
     var d = it.date.replace(/-/g, '').slice(2), n = f + '-' + d;
@@ -3851,10 +3866,37 @@
   }
   // the link folder of this work: a folder already made for this wedding date and first name wins (two clients can share a first name), else the usual one
   function siteFolder(it) {
-    var nt = nameToks(it.name), hit = '';
-    if (FL.links && it.date) Object.keys(FL.links).forEach(function (f) { var ft = nameToks(f); if (!hit && FL.linkDate[f] === it.date && ft.length && nt.length && ft[0] === nt[0]) hit = FL.links[f] || f; });
+    var wc = wedCode(it).toLowerCase();
+    if (wc && FL.links && FL.links[wc]) return FL.links[wc];   // this wedding's own code folder
+    var nf = nameFirsts(it), hit = '';
+    if (FL.links && it.date && !sameName(it)) Object.keys(FL.links).forEach(function (f) { var ft = nameToks(f); if (!hit && FL.linkDate[f] === it.date && ft.length && nf.indexOf(ft[0]) >= 0) hit = FL.links[f] || f; });
     return hit || payFolder(it, lastQ);
   }
+  /* ---------- move an old name-based link to the wedding code (links already sent keep working: the old address redirects) ---------- */
+  function moveOld(it) {   // the old folder of an upcoming confirmed or blocked work that is not on its wedding-code folder yet, else ''
+    var wc = wedCode(it).toLowerCase();
+    if (!wc || !FL.links || FL.links[wc] || (it.status !== 'Confirmed' && it.status !== 'Blocked') || !it.date || daysTo(it) < 0) return '';   // Blocked dates too: the code stays the same when the real name is known later
+    var c = linkCands(it, FL.links).filter(function (f) { return String(f).toLowerCase() !== wc; });
+    return c.length ? (FL.links[c[0]] || c[0]) : '';
+  }
+  function moveOne(it) {
+    var old = moveOld(it), code = wedCode(it);
+    if (!old) return Promise.resolve(false);
+    return call('api_site_migrate', pin, { oldFolder: old, code: code, name: it.name, date: it.date, venue: it.venue }).then(function (r) {
+      FL.links[code.toLowerCase()] = code; FL.linkDate[code.toLowerCase()] = it.date || '';
+      if (ghTree) ghTree[code] = (r.quotes || []).slice();
+      delete SITE[old]; delete SITE[code]; tlDates = null;
+      Object.keys(ghCache).forEach(function (k) { delete ghCache[k]; });
+      delete dCache[wkey(it)];
+      return true;
+    });
+  }
+  function moveFail(err) {
+    var m = err.message || String(err);
+    if (/not a function|is not defined/i.test(m)) m = 'Paste the new Code.gs into Apps Script (it has the new move to code), then Deploy a new version.';
+    toast(m, true);
+  }
+  function moveAllList() { return items.filter(function (x) { return moveOld(x); }); }
   function siteLoad(it) {
     var f = siteFolder(it);
     renderSite(it);
@@ -3879,7 +3921,8 @@
     var tlAdded = !!((d && d.timeline && d.timeline.url) || ADDED[f + '|timeline']);
     var payAdded = !!((d && d.payment && d.payment.url) || ADDED[f + '|payment']);
     var any = !!d || Object.keys(ADDED).some(function (k) { return k.split('|')[0] === f; });
-    var onLink = '<span class="onlink">&#10003; On link</span>';
+    var onLinkTxt = '<span class="onlink">&#10003; On link</span>';
+    var onLink = function (kind, no) { return onLinkTxt + '<button type="button" class="sbtn alt" data-sr="' + kind + '"' + (no ? ' data-no="' + esc(no) + '"' : '') + '>Remove</button>'; };
     var h = '<h3>Client link</h3><div class="note">One page for ' + esc(it.name) + '. Quotes show as dated tabs, latest first, with the wedding timeline in front of the latest quote and payment in front of the timeline. Nothing is added until you confirm that item.</div>';
     if (any) h += '<div class="lnk"><span>' + esc(decodeURIComponent(SITE_URL.replace('https://', '')) + f + '/') + '</span><a href="' + esc(SITE_URL + encodeURIComponent(f) + '/') + '" target="_blank" rel="noopener">Open</a></div>';
     else if (st.data === undefined && !st.err && !SITE[f]) h += '<div class="note">Checking the client link...</div>';
@@ -3892,13 +3935,21 @@
       '<a class="sbtn alt" href="' + esc(linkWa(it.name, SITE_URL + encodeURIComponent(f) + '/')) + '" target="_blank" rel="noopener">Send on WhatsApp</a>');
     if (st.err) h += '<div class="note warn">Could not read the client link (' + esc(st.err) + ').</div>';
 
+    var mvOld = moveOld(it), mvAll = moveAllList();
+    if (mvOld) h += sRow('Wedding code link', 'This link is still named ' + esc(mvOld) + '. Move it to ' + esc(wedCode(it)) + ' - the old address keeps working and goes to the new one.', false,
+      '<button type="button" class="sbtn" data-mv="one">Move to code</button>');
+    if (mvAll.length > 1) h += sRow('All upcoming confirmed and blocked works', mvAll.length + ' still use a name-based link.', false, '<button type="button" class="sbtn alt" data-mv="all">Move all ' + mvAll.length + '</button>');
     var cloud = lastQ.filter(function (q) { return q.src === 'cloud'; });
     h += '<div class="stepn"><i>1</i>Quotes</div><div class="group">';
     if (!cloud.length) h += '<div class="srow"><span class="qs">No quote is ready to add yet.</span></div>';
     cloud.forEach(function (q, i) {
       var on = !!onQ[q.no];
       h += sRow(esc(sentLabel(q.no) || q.no) + (i === 0 ? '<span class="tag">Latest</span>' : ''), 'Quote #' + esc(q.no) + (on ? ' - on the client link' : ' - not on the link yet'), on,
-        on ? onLink : '<button type="button" class="sbtn" data-sa="quote" data-no="' + esc(q.no) + '">Add to link</button>');
+        on ? onLink('quote', q.no) : '<button type="button" class="sbtn" data-sa="quote" data-no="' + esc(q.no) + '">Add to link</button>');
+    });
+    Object.keys(onQ).forEach(function (no) {   // on the link but not in the list above (older quote): can still be taken off
+      if (cloud.some(function (q) { return q.no === no; })) return;
+      h += sRow(esc(sentLabel(no) || no), 'Quote #' + esc(no) + ' - on the client link', true, onLink('quote', no));
     });
     h += '</div>';
 
@@ -3907,14 +3958,14 @@
       '<label class="optrow"><input type="checkbox" class="actcb" data-row="' + it.row + '" data-id="' + esc(it.id) + '" data-date="' + esc(it.date) + '" data-task="timeline"' + (tlOn ? ' checked' : '') + '><span>Send the wedding timeline to the client</span></label>';
     if (tlOn) {
       h += sRow('Wedding timeline', tlAdded ? 'On the client link' : (tlReady ? 'Page is ready' : 'Not published yet - edit and publish it first'), tlAdded,
-        '<button type="button" class="sbtn alt" data-act="tl">Edit</button>' + (tlAdded ? onLink : '<button type="button" class="sbtn" data-sa="timeline"' + (tlReady ? '' : ' disabled') + '>Add to link</button>'));
+        '<button type="button" class="sbtn alt" data-act="tl">Edit</button>' + (tlAdded ? onLink('timeline') : '<button type="button" class="sbtn" data-sa="timeline"' + (tlReady ? '' : ' disabled') + '>Add to link</button>'));
     }
     h += '</div>';
 
     var payReady = !!ghPay[f];
     h += '<div class="stepn"><i>3</i>Payment</div><div class="group">' +
       sRow('Payment details', payAdded ? 'On the client link' : (payReady ? 'Page is ready' : 'Not published yet - edit and publish it first'), payAdded,
-        '<button type="button" class="sbtn alt" data-act="pay">Edit</button>' + (payAdded ? onLink : '<button type="button" class="sbtn" data-sa="payment"' + (payReady ? '' : ' disabled') + '>Add to link</button>')) +
+        '<button type="button" class="sbtn alt" data-act="pay">Edit</button>' + (payAdded ? onLink('payment') : '<button type="button" class="sbtn" data-sa="payment"' + (payReady ? '' : ' disabled') + '>Add to link</button>')) +
       '</div>';
     el.innerHTML = h;
   }
@@ -3953,8 +4004,49 @@
       });
     });
   }
+  function siteRemove(it, kind, no) {
+    var f = siteFolder(it), what = kind === 'quote' ? 'quote #' + no : (kind === 'timeline' ? 'the wedding timeline' : 'the payment details');
+    return askConfirm({ title: 'Remove from the client link?', body: 'The tab for ' + what + ' is taken off ' + it.name + "'s link, so the client no longer sees it. The page itself is not deleted - you can add it back with Add to link.", ok: 'Remove from link', needKey: false }).then(function (r) {
+      if (!r.ok) return;
+      busy(true);
+      return call('api_site_untab', pin, { confirmed: true, kind: kind, no: no || '', folder: f }).then(function () {
+        delete ADDED[f + '|' + kind + (kind === 'quote' ? '|' + no : '')];
+        if (SITE[f] && SITE[f].data) {
+          var d = SITE[f].data;
+          if (kind === 'quote') d.quotes = (d.quotes || []).filter(function (q) { return String(q.id) !== String(no); }); else delete d[kind];
+        }
+        toast('Removed from the client link');
+        if (cur === it) renderSite(it);
+      }).catch(function (err) {
+        var m = err.message || String(err);
+        if (/not a function|is not defined/i.test(m)) m = 'Paste the new Code.gs into Apps Script (it has the new Remove), then Deploy a new version.';
+        toast(m, true);
+      }).then(function () { busy(false); });
+    });
+  }
   $('#dSite').addEventListener('click', function (e) {
     if (!cur) return;
+    var mb = e.target.closest('[data-mv]');
+    if (mb) {
+      var kind = mb.getAttribute('data-mv'), list = kind === 'all' ? moveAllList() : [cur], it1 = cur;
+      if (!list.length) return;
+      askConfirm({ title: kind === 'all' ? 'Move ' + list.length + ' works to their wedding codes?' : 'Move this link to the wedding code?',
+        body: 'The client link, quotes, payment page and timeline are copied to the wedding-code folder. Nothing is deleted. The old link stays and opens the new page, so links already sent keep working.', ok: 'Move', needKey: false }).then(function (r) {
+        if (!r.ok) return;
+        busy(true);
+        var done = 0, failed = [];
+        return list.reduce(function (pr, w) {
+          return pr.then(function () { return moveOne(w).then(function (ok) { if (ok) done++; }, function (err) { failed.push(w.name + ': ' + (err.message || err)); }); });
+        }, Promise.resolve()).then(function () {
+          if (failed.length) toast('Moved ' + done + '. Not moved - ' + failed[0], true); else toast('Moved ' + done + (done === 1 ? ' link' : ' links') + ' to the wedding code');
+          if (cur === it1) { siteLoad(it1); }
+          render();
+        }, moveFail).then(function () { busy(false); });
+      });
+      return;
+    }
+    var rb = e.target.closest('[data-sr]');
+    if (rb) { siteRemove(cur, rb.getAttribute('data-sr'), rb.getAttribute('data-no')); return; }
     if (e.target.closest('[data-act="tl"]')) { tlOpen(cur, lastQ); return; }
     if (e.target.closest('[data-act="pay"]')) { openPay(cur, lastQ); return; }
     if (e.target.closest('[data-lk="save"]')) {
@@ -4006,7 +4098,6 @@
       sdBuild(q.stage, q.extras, q).forEach(function (r) { items.push({ section: 'Stage and decor', item: r.t, details: '', qty: ckQty(r.t), on: !r.opt }); });
     }
     if (vItem === it) vMainList.forEach(function (n) {
-      var s = VS[n] || {};
       items.push({ section: 'Outside vendors', item: n, details: '', qty: '', on: true });   // staff sheet lists the item only, no vendor names
     });
     ckS = { it: it, q: q, items: items, done: false };
@@ -4152,6 +4243,7 @@
   function payFolder(it, list) {
     var q = (list || []).filter(function (x) { return x.src === 'cloud' && x.folder; })[0];
     if (q) return q.folder;
+    var wc = wedCode(it); if (wc) return wc;
     var w = (it.name || '').trim().split(/\s+/)[0].replace(/[^A-Za-z0-9-]/g, '');
     return w ? w.charAt(0).toUpperCase() + w.slice(1) : 'Client';
   }
@@ -4199,7 +4291,6 @@
     }).join('');
   }
   function payRender() {
-    var key = ''; try { key = localStorage.getItem('ivoryGhKey') || ''; } catch (e) {}
     $('#payBody').innerHTML =
       '<h4>Package &amp; add-ons</h4><div id="payItems">' + payRows() + '</div>' +
       '<button type="button" class="pbtn" data-act="padd">+ Add item</button><button type="button" class="pbtn" data-act="preload">Pick rates again from quote</button>' +
@@ -4415,7 +4506,9 @@
   var QE_INC = ['White flex or carpet on stage', 'Sofa', 'Welcome drink for couple', 'Single layer fresh cream cake', '3 candles', 'Fresh leaves on stage',
     'Stage floral settings artificial', 'Stage lights and facelights', 'Stage sound system', 'Centre carpet along aisle', 'Hall entrance arch artificial',
     'Wedding car decoration fresh', 'Greeting garland and bouquet fresh', 'Wedding signage board', '2 welcome hostesses', 'Manthrakodi basket and ring box returnable'];
-  var QE_STAGES = {"1": 5, "2": 3, "3": 4, "4": 5, "5": 3, "6": 4, "7": 3, "8": 4, "9": 3, "10": 4, "11": 4, "12": 4, "13": 2};   // package number -> number of stage photos (hosted in the packages repo under /stages/)
+  var QE_STAGES = {"1": 5, "2": 2, "3": 4, "4": 5, "5": 3, "6": 4, "7": 3, "8": 4, "9": 3, "10": 4, "11": 4, "12": 4, "13": 2};   // package number -> number of stage photos (hosted in the packages repo under /stages/)
+  var QE_STAGE_FILE = { '2': { 2: 3 } };   // Package 2: photo 2 was deleted, so shown photo 2 is the file pkg-2-3.jpg (old files stay in the repo for older quotes)
+  function qeStageFile(n, m) { var f = QE_STAGE_FILE[n]; return 'pkg-' + n + '-' + ((f && f[m]) || m) + '.jpg'; }
   var QE_DROP = /grand\s*total|discounted\s*total|^discount\b|^total\b/i;   // sums that would go stale the moment a rate changes
 
   function qeInclusions(pkg) {
@@ -4429,7 +4522,7 @@
 
   // Reads an existing quote page into an editable model: header, stage photo, and every section with its inclusions, priced lines and rate cards.
   function qeParse(raw) {
-    var doc = new DOMParser().parseFromString(raw, 'text/html'), M = { name: '', date: '', venue: '', img: '', secs: [], dropped: [], options: [], showTotal: false, totalLabel: 'Total', discount: 0, discLabel: 'Discount' };
+    var doc = new DOMParser().parseFromString(raw, 'text/html'), M = { name: '', date: '', venue: '', img: '', secs: [], dropped: [], options: [], showTotal: false, totalLabel: 'Total' };
     var cont = doc.querySelector('.container') || doc.body;
     var tx = function (el) { return ((el && el.textContent) || '').replace(/\s+/g, ' ').trim(); };
     var each = function (list, fn) { Array.prototype.forEach.call(list, fn); };
@@ -4441,9 +4534,7 @@
       return m ? parseInt(m[1].replace(/,/g, ''), 10) : null;
     };
     var addTotal = function (sec, el) {
-      if (el.classList.contains('quote-discount')) { M.discount = amt(el.querySelector('.total-row-amount')) || 0; M.discLabel = tx(el.querySelector('.total-row-title')) || 'Discount'; return; }   // our own discount row
-      if (el.classList.contains('quote-net')) return;   // discounted total: recalculated on save
-      if (el.classList.contains('quote-total')) { M.showTotal = true; M.totalLabel = tx(el.querySelector('.total-row-title')) || 'Total'; return; }   // our own add-ons total: recalculated on save
+      if (el.classList.contains('quote-total')) { M.showTotal = true; M.totalLabel = (tx(el.querySelector('.total-row-title')) || 'Total').replace(/\s+after discount$/i, '') || 'Total'; return; }   // our own add-ons total: recalculated on save
       var a = el.querySelector('.total-row-amount'), t = tx(el.querySelector('.total-row-title'));
       if (/^discounted\s+package/i.test(t)) t = 'Decor Package';   // it is the package rate, not a total
       if (!a || a.classList.contains('struck') || a.querySelector('.strike')) return;
@@ -4582,13 +4673,16 @@
       c.push('    </div>');
       h.push(c.join('\n'));
     });
-    var TT = qeTotal(Q), DD = Math.max(0, num(Q.discount)), rows = [];
-    if (TT.sum && DD > TT.sum) DD = TT.sum;
-    var trow = function (cls, label, amount) { return '      <div class="total-row-card ' + cls + '">\n        <span class="total-row-title">' + esc(label) + '</span>\n        <span class="total-row-amount">' + amount + '</span>\n      </div>'; };
-    if (Q.showTotal && TT.sum) rows.push(trow('quote-total', String(Q.totalLabel || '').trim() || 'Total', qeMoney(TT.sum)));
-    if (DD) rows.push(trow('quote-discount', String(Q.discLabel || '').trim() || 'Discount', '&minus; ' + qeMoney(DD)));
-    if (DD && Q.showTotal && TT.sum) rows.push(trow('quote-net', 'Discounted Total', qeMoney(TT.sum - DD)));   // only when the total is shown too: no grand total unless asked for
-    if (rows.length) h.push('    <div class="section-card">\n' + rows.join('\n') + '\n    </div>');
+    if (Q.showTotal) {
+      var TT = qeTotal(Q);
+      if (TT.sum) h.push('    <div class="section-card">\n      <div class="total-row-card quote-total">\n        <span class="total-row-title">' + esc(String(Q.totalLabel || '').trim() || 'Total') + '</span>\n        <span class="total-row-amount">' + qeMoney(TT.sum) + '</span>\n      </div>\n    </div>');
+    }
+    var DS = Math.min(num(Q.discount), qeTotal(Q).sum);
+    if (DS > 0) {   // a discount is shown as its own row; the "after discount" line only appears when the total is shown
+      var after = qeTotal(Q).sum - DS;
+      h.push('    <div class="section-card">\n      <div class="total-row-card">\n        <span class="total-row-title">Discount</span>\n        <span class="total-row-amount">&minus; ' + qeMoney(DS) + '</span>\n      </div>' +
+        (Q.showTotal ? '\n      <div class="total-row-card quote-total">\n        <span class="total-row-title">' + esc((String(Q.totalLabel || '').trim() || 'Total') + ' after discount') + '</span>\n        <span class="total-row-amount">' + qeMoney(after) + '</span>\n      </div>' : '') + '\n    </div>');
+    }
     h.push(qeComplimentary(isPkg1, hasAnchor));
     h.push('  </div>\n\n</body>\n</html>\n');
     return h.join('\n');
@@ -4612,14 +4706,18 @@
     var folder = payFolder(it, list);
     var M = src && src.raw ? qeParse(src.raw) : { name: '', date: '', venue: '', img: '', secs: [], dropped: [], options: [] };
     Q = { it: it, list: list, folder: folder, base: src ? src.no : '', name: M.name || it.name || '', date: M.date || it.date || '', venue: M.venue || (src && src.venue) || it.venue || '',
-      img: M.img, imgChoice: 'keep', upload: null, secs: M.secs, dropped: M.dropped, custom: qeBlankSec('Additional Items'), pkg: null, no: qeTodayNo(), replace: false, options: M.options || [], optBase: src ? src.no : '' };
-    Q.showTotal = !!M.showTotal; Q.totalLabel = M.totalLabel || 'Total'; Q.discount = M.discount || 0; Q.discLabel = M.discLabel || 'Discount';
+      img: M.img, imgChoice: 'keep', upload: null, discount: '', secs: M.secs, dropped: M.dropped, custom: qeBlankSec('Additional Items'), pkg: null, no: qeTodayNo(), replace: false, options: M.options || [], optBase: src ? src.no : '' };
+    Q.showTotal = !!M.showTotal; Q.totalLabel = M.totalLabel || 'Total';
     Q.secs = Q.secs.filter(function (x) {   // an old "Additional Items" section becomes the add-ons area, so ticked services and typed ones sit together after the package
       if (!/^additional items$/i.test(x.title) || x.totals.length || x.bullets.length) return true;
       x.lines.forEach(function (l) { QE_CAT.forEach(function (c, i) { if (c.g !== 'Choose your package' && c.n === l.name) l.ci = i; }); Q.custom.lines.push(l); });
       return false;
     });
     if (!Q.secs.length) Q.secs.push(qeBlankSec('Decor Package'));
+    var hasGen = Q.secs.concat([Q.custom]).some(function (x) { return x.lines.some(function (l) { return /generator/i.test(l.name); }); });
+    if (!hasGen) QE_CAT.forEach(function (gc, gi) {   // the generator is ticked by default; remove it with the x (or tick it off in the list) if the client does not need it
+      if (gc.g === 'Generator') Q.custom.lines.push({ name: gc.n, subs: gc.d ? [gc.d.replace(/ \(included by default.*$/i, '')] : [], note: '', rate: gc.p || null, qty: 1, ql: '', ci: gi });
+    });
     Q.custom.lines.push({ name: '', subs: [], note: '', rate: null, qty: 1 });
     $('#qeMeta').textContent = it.name + ' - ' + fmt(it.date) + (src ? '  (started from quote #' + src.no + ' - that quote stays as it is)' : '  (new quote)');
     qeRender();
@@ -4678,13 +4776,14 @@
   function qeSum() {
     var T = qeTotal(Q), el = $('#qeSum');
     if (!el) return;
-    el.textContent = T.sum ? 'Decor Package ' + inr(T.pkg) + ' + add-ons ' + inr(T.add) + ' = ' + inr(T.sum) + (Q.showTotal ? ' (this total is shown on the quote)' : ' (not shown on the quote - tick the box above to show it)') + (num(Q.discount) ? ' | Discount ' + inr(Math.min(num(Q.discount), T.sum)) + ' shown on the quote' + (Q.showTotal ? ' with Discounted Total ' + inr(Math.max(0, T.sum - num(Q.discount))) : '') : '') : '';
+    var dsc = Math.min(num(Q.discount), T.sum);
+    el.textContent = T.sum ? 'Decor Package ' + inr(T.pkg) + ' + add-ons ' + inr(T.add) + ' = ' + inr(T.sum) + (dsc ? ' - discount ' + inr(dsc) + ' = ' + inr(T.sum - dsc) : '') + (Q.showTotal ? ' (this total is shown on the quote)' : ' (not shown on the quote - tick the box above to show it)') : '';
   }
   function qeImgOptions() {
     var files = (ghImgs && ghImgs[Q.folder]) || [], o = '';
     if (Q.img) o += '<option value="keep"' + (Q.imgChoice === 'keep' ? ' selected' : '') + '>Keep current: ' + esc(Q.img.split('/').pop()) + '</option>';
     files.forEach(function (f) { if (f !== (Q.img || '').split('/').pop()) o += '<option value="f:' + esc(f) + '"' + (Q.imgChoice === 'f:' + f ? ' selected' : '') + '>' + esc(f) + ' (in this client folder)</option>'; });
-    if (Q.imgChoice.indexOf('s:') === 0) o += '<option value="' + esc(Q.imgChoice) + '" selected>Stage design: ' + esc(Q.imgChoice.slice(2).replace(/^pkg-(\d+)-(\d+)\.jpg$/, 'Package $1, photo $2')) + '</option>';
+    if (Q.imgChoice.indexOf('s:') === 0) o += '<option value="' + esc(Q.imgChoice) + '" selected>Stage design: ' + esc(Q.imgChoice.slice(2).replace(/^pkg-(\d+)-(\d+)\.jpg$/, function (x, a, b) { return 'Package ' + a + ', photo ' + (a === '2' && b === '3' ? 2 : b); })) + '</option>';
     o += '<option value="up"' + (Q.imgChoice === 'up' ? ' selected' : '') + '>Upload a new photo...</option><option value="none"' + (Q.imgChoice === 'none' ? ' selected' : '') + '>No stage photo</option>';
     return o;
   }
@@ -4698,7 +4797,7 @@
       '<label for="qeVenue">Venue</label><input id="qeVenue" data-d="venue" value="' + esc(Q.venue) + '">' +
       '<div class="qtaken" id="qeTaken"' + (tk ? '' : ' style="display:none"') + '><label class="tlchk"><input type="checkbox" id="qeRep"' + (Q.replace ? ' checked' : '') + '> Quote #' + esc(Q.no) +
       ' already exists for this client - tick to replace it (the old page is overwritten)</label></div>' +
-      '<h4>Stage design</h4><button type="button" class="pbtn" data-act="stg" style="margin:0 0 8px">Choose a stage design</button><div id="qeStg" style="display:none"></div><select id="qeImg" data-d="img">' + qeImgOptions() + '</select><input type="file" id="qeFile" accept="image/*" style="display:' + (Q.imgChoice === 'up' ? 'block' : 'none') + ';margin-top:8px">' +
+      '<h4>Stage design</h4><button type="button" class="pbtn" data-act="stg" style="margin:0 0 8px">Choose a stage design</button><div id="qeStg" style="display:none"></div><select id="qeImg" data-d="img">' + qeImgOptions() + '</select><input type="file" id="qeFile" accept="image/*" style="display:' + (Q.imgChoice === 'up' ? 'block' : 'none') + ';margin-top:8px"><div class="note" id="qeFileNote" style="display:' + (Q.imgChoice === 'up' && Q.upload ? 'block' : 'none') + '">' + (Q.upload ? 'Photo chosen: ' + esc(Q.upload.name || 'photo') + ' - it is added when you save. Tap Choose File to pick another.' : '') + '</div>' +
       qeOptPanel() +
       '<h4>Services from the quote builder</h4><div class="note">Open a group and tick what the client wants - church decoration, pathway stands, cake, band, cars and the rest. Tick again to remove. Everything can be edited below.</div>' +
       '<div id="qeCat">' + qeCatPanel() + '</div>' +
@@ -4707,9 +4806,9 @@
       qeSecHtml(Q.custom, 'c', true) +
       '<div class="qtotbox"><label class="tlchk"><input type="checkbox" id="qeShowTot"' + (Q.showTotal ? ' checked' : '') + '> Show a total after the add-ons</label>' +
       '<input id="qeTotLabel" data-d="totalLabel" value="' + esc(Q.totalLabel || 'Total') + '" aria-label="Total label"' + (Q.showTotal ? '' : ' style="display:none"') + '></div>' +
-      '<div class="qtotbox"><label class="tlchk">Discount (&#8377;)</label>' +
-      '<input id="qeDisc" inputmode="numeric" placeholder="0" value="' + (num(Q.discount) ? num(Q.discount).toLocaleString('en-IN') : '') + '" aria-label="Discount amount">' +
-      '<input id="qeDiscLabel" value="' + esc(Q.discLabel || 'Discount') + '" aria-label="Discount label"></div>' +
+      '<div class="qtotbox"><label for="qeDisc">Discount &#8377; <span class="qhint">taken off the total and shown as its own row</span></label>' +
+      '<div class="qnum"><label>Amount &#8377;<input id="qeDisc" data-d="discount" inputmode="numeric" value="' + qeNum(Q.discount) + '" placeholder="0"></label>' +
+      '<label>or % of total<input id="qeDiscPct" inputmode="decimal" placeholder="e.g. 5"></label></div></div>' +
       '<div class="qsum" id="qeSum"></div>' +
       '<div id="qeKeyBox" style="display:none"><h4>GitHub key</h4><div class="note">Needed once only - saved for both phones (Contents read/write on Ivory-Packages).</div><input id="qeKey" type="password" autocomplete="off" placeholder="Paste GitHub key"></div>' +
       '<button class="pbtn" type="button" data-act="qprev" style="margin-top:14px">Preview</button>' +
@@ -4773,7 +4872,7 @@
     Object.keys(QE_STAGES).forEach(function (n) {
       var pk = QE_CAT.filter(function (c) { return c.n === 'Package ' + n; })[0];
       h += '<div class="qcg">Package ' + n + (pk ? ' &middot; ' + inr(pk.p) : '') + '</div><div class="qstg">';
-      for (var m = 1; m <= QE_STAGES[n]; m++) h += '<button type="button" data-act="stgpick" data-p="' + n + '" data-m="' + m + '"><img loading="lazy" src="' + GH_SITE + '/stages/thumbs/pkg-' + n + '-' + m + '.jpg" alt="Package ' + n + ' photo ' + m + '"></button>';
+      for (var m = 1; m <= QE_STAGES[n]; m++) h += '<button type="button" data-act="stgpick" data-p="' + n + '" data-m="' + m + '"><img loading="lazy" src="' + GH_SITE + '/stages/thumbs/' + qeStageFile(n, m) + '" alt="Package ' + n + ' photo ' + m + '"></button>';
       h += '</div>';
     });
     return h + '</div></div>';
@@ -4799,9 +4898,15 @@
     var blank = function (l) { return !String(l.name || '').trim() && !num(l.rate) && !(l.subs || []).join('').trim(); };
     Q.custom.lines = Q.custom.lines.filter(function (l) { return !blank(l); });
     Q.custom.lines.push({ name: c.n, subs: c.d ? [c.d] : [], note: '', rate: c.p || null, qty: c.q ? c.q[1] : 1, ql: c.q ? c.q[0] : '', ci: ci });
+    var extra = '';
+    if (c.g === 'Live band and anchor' && /band/i.test(c.n)) {   // a live band needs its platform: ticked with it (untick it by hand if not needed)
+      QE_CAT.forEach(function (pc, pi) {
+        if (pc.g === 'Live band platform' && !qeAdded(pi)) { Q.custom.lines.push({ name: pc.n, subs: pc.d ? [pc.d] : [], note: '', rate: pc.p || null, qty: 1, ql: '', ci: pi }); extra = ' The live band platform is ticked too.'; }
+      });
+    }
     Q.custom.lines.push({ name: '', subs: [], note: '', rate: null, qty: 1 });
     qeKeepScroll();
-    qeStatus(esc(c.n) + ' added after the Decor Package' + (c.p ? '' : ' - type its rate below') + '.');
+    qeStatus(esc(c.n) + ' added after the Decor Package' + (c.p ? '' : ' - type its rate below') + '.' + extra);
   }
   function qeKeepScroll() { var sh = $('#qe'), y = sh ? sh.scrollTop : 0; qeRender(); if (sh) sh.scrollTop = y; }
 
@@ -4810,6 +4915,7 @@
     if (!Q.date) return 'Pick the wedding date.';
     if (!/^\d{6}$/.test(Q.no)) return 'The quote number is 6 digits (YYMMDD).';
     if (qeTaken(Q.no) && !Q.replace) return 'Quote #' + Q.no + ' already exists - tick the box to replace it, or pick another number.';
+    if (num(Q.discount) > qeTotal(Q).sum) return 'The discount is more than the total.';
     var priced = Q.secs.concat([Q.custom]).some(function (s) { return s.lines.some(function (l) { return String(l.name || '').trim() && qeLineAmount(l); }) || s.totals.some(function (t) { return num(t.amount); }); });
     if (!priced) return 'Add at least one priced service or package.';
     var blank = []; Q.secs.concat([Q.custom]).forEach(function (s) { s.lines.forEach(function (l) { if (!String(l.name || '').trim() && (num(l.rate) || (l.subs || []).length)) blank.push('a line with a rate but no name'); }); });
@@ -4823,28 +4929,30 @@
     });
   }
   function qeResize(file) {
-    return new Promise(function (res, rej) {
-      var fr = new FileReader();
-      fr.onerror = function () { rej(new Error('Could not read the photo')); };
-      fr.onload = function () {
-        var im = new Image();
-        im.onerror = function () { rej(new Error('That file is not a photo I can open')); };
-        im.onload = function () {
-          var sc = Math.min(1, 1400 / im.naturalWidth), c = document.createElement('canvas');
-          c.width = Math.round(im.naturalWidth * sc); c.height = Math.round(im.naturalHeight * sc);
-          c.getContext('2d').drawImage(im, 0, 0, c.width, c.height);
-          res(c.toDataURL('image/jpeg', 0.82).split(',')[1]);
-        };
-        im.src = fr.result;
-      };
-      fr.readAsDataURL(file);
-    });
+    var toJpeg = function (src, w, h) {
+      var sc = Math.min(1, 1400 / w), c = document.createElement('canvas');
+      c.width = Math.max(1, Math.round(w * sc)); c.height = Math.max(1, Math.round(h * sc));
+      var cx = c.getContext('2d'); cx.fillStyle = '#fff'; cx.fillRect(0, 0, c.width, c.height); cx.drawImage(src, 0, 0, c.width, c.height);
+      return c.toDataURL('image/jpeg', 0.82).split(',')[1];
+    };
+    var viaImage = function () {
+      return new Promise(function (res, rej) {
+        var u = (window.URL || window.webkitURL).createObjectURL(file), im = new Image();
+        im.onerror = function () { rej(new Error('That file is not a photo I can open - choose a JPG or PNG')); };
+        im.onload = function () { try { res(toJpeg(im, im.naturalWidth, im.naturalHeight)); } catch (e) { rej(e); } (window.URL || window.webkitURL).revokeObjectURL(u); };
+        im.src = u;
+      });
+    };
+    if (window.createImageBitmap) {
+      return createImageBitmap(file, { imageOrientation: 'from-image' }).then(function (bm) { var o = toJpeg(bm, bm.width, bm.height); if (bm.close) bm.close(); return o; }, viaImage);
+    }
+    return viaImage();
   }
   function qeFinalImg() {   // resolves { img: src for the page, up: {name,b64} | null }
     var ch = Q.imgChoice;
     if (ch === 'none') return Promise.resolve({ img: '', up: null });
     if (ch === 'up') {
-      var f = $('#qeFile') && $('#qeFile').files && $('#qeFile').files[0];
+      var f = Q.upload || ($('#qeFile') && $('#qeFile').files && $('#qeFile').files[0]);
       if (!f) return Promise.reject(new Error('Choose the stage photo, or pick another option.'));
       var name = 'stage-' + Q.no + '.jpg';
       return qeResize(f).then(function (b64) { return { img: name, up: { name: name, b64: b64 } }; });
@@ -4895,7 +5003,7 @@
     else if (a === 'stgpick') {
       var pn = b.getAttribute('data-p'), pm = b.getAttribute('data-m'), ci2 = -1;
       QE_CAT.forEach(function (c, i) { if (c.n === 'Package ' + pn) ci2 = i; });
-      Q.imgChoice = 's:pkg-' + pn + '-' + pm + '.jpg';
+      Q.imgChoice = 's:' + qeStageFile(pn, pm);
       if (ci2 >= 0) qeAddCat(ci2); else qeRender();
       qeStatus('Package ' + pn + ' stage design chosen.');
     }
@@ -4922,12 +5030,16 @@
   $('#qe').addEventListener('input', function (e) {
     var t = e.target; if (!Q) return;
     if (t.id === 'qeCatQ') { var dv = document.createElement('div'); dv.innerHTML = qeCatPanel(); $('#qeCatL').innerHTML = dv.querySelector('#qeCatL').innerHTML; return; }
-    if (t.id === 'qeDisc') { Q.discount = num(t.value); qeSum(); return; }
-    if (t.id === 'qeDiscLabel') { Q.discLabel = t.value; return; }
+    if (t.id === 'qeDiscPct') {
+      var pv = parseFloat(String(t.value).replace(',', '.')) || 0, sm = qeTotal(Q).sum;
+      Q.discount = pv > 0 ? Math.round(sm * Math.min(pv, 100) / 100) : '';
+      var da = $('#qeDisc'); if (da) da.value = qeNum(Q.discount);
+      qeSum(); return;
+    }
     var d = t.getAttribute && t.getAttribute('data-d');
     if (d) {
       if (d === 'no') { Q.no = t.value.replace(/\D/g, '').slice(0, 6); t.value = Q.no; var tk = qeTaken(Q.no), tb = $('#qeTaken'); if (tb) { tb.style.display = tk ? '' : 'none'; if (!tk) { Q.replace = false; $('#qeRep').checked = false; } tb.querySelector('label').lastChild.textContent = ' Quote #' + Q.no + ' already exists for this client - tick to replace it (the old page is overwritten)'; } }
-      else if (d !== 'img') Q[d] = t.value;
+      else if (d !== 'img') { Q[d] = t.value; if (d === 'discount') { var pc = $('#qeDiscPct'); if (pc) pc.value = ''; qeSum(); } }
       return;
     }
     var f = t.getAttribute && t.getAttribute('data-f'); if (!f) return;
@@ -4954,6 +5066,12 @@
     var t = e.target; if (!Q) return;
     if (t.id === 'qeRep') { Q.replace = t.checked; return; }
     if (t.id === 'qeShowTot') { Q.showTotal = t.checked; $('#qeTotLabel').style.display = t.checked ? '' : 'none'; qeSum(); return; }
+    if (t.id === 'qeFile') {
+      Q.upload = (t.files && t.files[0]) || null;
+      var fn = $('#qeFileNote'); if (fn) { fn.style.display = Q.upload ? 'block' : 'none'; fn.textContent = Q.upload ? 'Photo chosen: ' + (Q.upload.name || 'photo') + ' - it is added when you save. Tap Choose File to pick another.' : ''; }
+      if (Q.upload) qeStatus('Photo chosen. Press Preview or Save as new quote.');
+      return;
+    }
     if (t.id === 'qeImg') { Q.imgChoice = t.value; $('#qeFile').style.display = t.value === 'up' ? 'block' : 'none'; return; }
     if (t.id === 'qeDate') { Q.date = t.value; }
   });
@@ -6141,8 +6259,10 @@
 
   var tlS = null, tlSrv = null;   // tlSrv: null = not asked, 'key' = a key is saved, 'nokey' = key needed once, 'old' = Code.gs not updated
   function tlFolderFor(it, t) {
+    var wc = wedCode(it).toLowerCase(), ex = wc ? Object.keys(t).filter(function (f) { return f.toLowerCase() === wc; })[0] : '';
+    if (ex) return ex;
     var words = {};
-    it.name.toLowerCase().split(/[^a-z0-9]+/).forEach(function (w) { if (w.length > 2) words[w] = 1; });
+    nameAll(it).forEach(function (w) { if (w.length > 2) words[w] = 1; });
     return Object.keys(t).filter(function (f) {
       return f.toLowerCase().split(/[^a-z0-9]+/).some(function (w) { return w.length > 2 && words[w]; }) && t[f].indexOf(it.date) >= 0;
     })[0] || '';
@@ -6177,7 +6297,7 @@
     var q = (list || []).filter(function (x) { return x.src === 'cloud' && x.scan; })[0], res = tlResolve(q ? q.scan : null);
     if (list && list[0] && list[0].src !== 'cloud' && q) res.notes.unshift('The latest quote (#' + list[0].no + ') is a Google Site and cannot be read here. Details are from quote #' + q.no + '.');
     tlS = { it: it, quote: q ? q.no : '', date: it.date, groom: '', bride: '', church: res.church, cake: res.cake, decoLine: TL_DECO, cars: res.cars,
-      notes: res.notes, folder: '', folderEdited: false, existing: '', touched: false, armed: false };
+      notes: res.notes, folder: wedCode(it), folderEdited: !!wedCode(it), existing: '', touched: false, armed: false };
     $('#tlMeta').textContent = it.name + ' - ' + fmt(it.date) + (q ? ' - from quote #' + q.no : '') + ' - app ' + APP_VERSION;
     $('#tlShare').innerHTML = ''; $('#tlPrev').style.display = 'none'; $('#tlPrev').removeAttribute('srcdoc');
     tlRender(); tlAskServer(); openSheet('#tl');
@@ -6728,9 +6848,10 @@
     ask: askConfirm,
     setView: setView,
     refresh: function () { ghTreeAt = 0; return load(true); },
-    // the folder a new quote is saved in: the client's existing quote folder, else the first word of the name (same as the quote editor)
+    // the folder a new quote is saved in: the client's existing quote folder, else the wedding code (same as the quote editor)
     folderFor: function (info) {
-      var it = { name: info.name || '', date: info.date || '' };
+      var w = items.filter(function (x) { return x.row === info.row; })[0] || {};
+      var it = { id: w.id || info.id || '', name: info.name || '', date: info.date || '' };
       return ghQuotes(it, false).then(function (q) { return payFolder(it, q); }, function () { return payFolder(it, []); });
     }
   };

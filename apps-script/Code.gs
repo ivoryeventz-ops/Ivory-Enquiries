@@ -32,7 +32,8 @@ const QUOTE_TAB = 'Quotes';
 
 /* ---------- web app ---------- */
 
-function doGet() {
+function doGet(e) {
+  if (e && e.parameter && e.parameter.push === 'due') return pushDue_(e.parameter.key);   // read by the Cloudflare push worker
   return HtmlService.createHtmlOutputFromFile('Index')
     .setTitle('Ivory Enquiries')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1, viewport-fit=cover')
@@ -93,6 +94,16 @@ function api_list(pin) {
   const sh = ss.getSheetByName(CFG.ENQ);
   const last = lastRowWith_(sh, 1);
   const items = [];
+  // Old spellings of a client's name (Clients sheet, column G), kept so folders and links made earlier still match after a name is corrected.
+  const aliasById = {};
+  const cli0 = ss.getSheetByName(CFG.CLI);
+  const cl0 = lastRowWith_(cli0, 1);
+  if (cl0 > 1) {
+    cli0.getRange(2, 1, cl0 - 1, 7).getValues().forEach(function (r) {
+      const cid = String(r[0]).trim();
+      if (cid && String(r[6]).trim()) aliasById[cid] = String(r[6]).trim();
+    });
+  }
   if (last > 1) {
     const vals = sh.getRange(2, 1, last - 1, CFG.C_LAST).getValues();
     vals.forEach(function (r, i) {
@@ -104,6 +115,7 @@ function api_list(pin) {
         row: i + 2,
         id: id,
         name: String(r[1]),
+        alias: aliasById[id] || '',
         date: iso_(r[2]),
         venue: String(r[4]),
         status: status,
@@ -144,29 +156,13 @@ function api_add(pin, p) {
     const cLast = lastRowWith_(cli, 1);
     const eLast = lastRowWith_(enq, 1);
 
-    // A returning client keeps the same ID; a new name gets the next one.
-    let id = '';
-    if (cLast > 1) {
-      cli.getRange(2, 1, cLast - 1, 2).getValues().forEach(function (r) {
-        if (!id && String(r[1]).trim().toLowerCase() === name.toLowerCase()) id = String(r[0]).trim();
-      });
-    }
-
-    if (id && eLast > 1) {
-      enq.getRange(2, 1, eLast - 1, 6).getValues().forEach(function (r) {
-        if (String(r[0]).trim() === id && iso_(r[2]) === date && String(r[5]).trim() !== 'Lost') {
-          throw new Error(name + ' is already listed for that date');
-        }
-      });
-    }
-
-    if (!id) {
-      id = nextId_(ss);
-      const cr = cLast + 1;
-      cloneRow_(cli, cLast, cr, 6);
-      cli.getRange(cr, 1).setValue(id);
-      cli.getRange(cr, 2).setValue(name);
-    }
+    // Every enquiry gets its own new client code (IV-###), even when the name matches an earlier client.
+    // The code, never the name, is what ties a wedding to its link, quotes, payment page and timeline.
+    const id = nextId_(ss);
+    const cr = cLast + 1;
+    cloneRow_(cli, cLast, cr, 6);
+    cli.getRange(cr, 1).setValue(id);
+    cli.getRange(cr, 2).setValue(name);
 
     const r = eLast + 1;
     cloneRow_(enq, eLast, r, 17);
@@ -179,6 +175,34 @@ function api_add(pin, p) {
     }
     SpreadsheetApp.flush();
     return { ok: true, id: id };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+// Changes the client name for one client code. Links, quotes and timelines are found by code, so nothing else needs renaming.
+function api_rename(pin, p) {
+  check_(pin);
+  const name = String(p.name || '').trim();
+  const id = String(p.id || '').trim();
+  if (!name) throw new Error('Name cannot be empty');
+  if (!/^IV-\d+$/.test(id)) throw new Error('Client code missing');
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    const ss = ss_();
+    const cli = ss.getSheetByName(CFG.CLI);
+    const cLast = lastRowWith_(cli, 1);
+    let hit = 0;
+    if (cLast > 1) {
+      cli.getRange(2, 1, cLast - 1, 1).getValues().forEach(function (r, i) {
+        if (!hit && String(r[0]).trim() === id) hit = i + 2;
+      });
+    }
+    if (!hit) throw new Error('Client code ' + id + ' not found');
+    cli.getRange(hit, 2).setValue(name);
+    SpreadsheetApp.flush();
+    return { ok: true, id: id, name: name };
   } finally {
     lock.releaseLock();
   }
@@ -587,6 +611,197 @@ function api_site_tab(pin, p) {
   }
 }
 
+// Takes ONE item (a quote, the timeline or the payment page) off the client's link again, after a confirm in the app.
+// Only the tab is removed from data.json; the quote / timeline / payment page itself stays where it is and can be added back.
+function api_site_untab(pin, p) {
+  check_(pin);
+  if (p.confirmed !== true) throw new Error('Not confirmed');
+  const props = PropertiesService.getScriptProperties();
+  const key = siteKey_(props);
+  if (!key) throw new Error('GitHub key needed');
+  const folder = String(p.folder || '').trim();
+  if (!/^[A-Za-z0-9][A-Za-z0-9 _-]{0,60}$/.test(folder)) throw new Error('Bad client folder name');
+  const kind = String(p.kind || '');
+  if (['quote', 'timeline', 'payment'].indexOf(kind) < 0) throw new Error('Unknown tab');
+  if (kind === 'quote' && !/^\d{6}$/.test(String(p.no || ''))) throw new Error('Bad quote number');
+  const hd = { Authorization: 'Bearer ' + key, Accept: 'application/vnd.github+json' };
+  const url = 'https://api.github.com/repos/' + SITE_REPO + '/contents/' + encodeURIComponent(SITE_DIR) + '/' + encodeURIComponent(folder) + '/data.json';
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    const g = UrlFetchApp.fetch(url + '?ref=' + SITE_BRANCH, { headers: hd, muteHttpExceptions: true });
+    const gc = g.getResponseCode();
+    if (gc === 404) return { ok: true, already: true };
+    if (gc !== 200) throw new Error('GitHub key does not reach Ivory-Events (GitHub answered ' + gc + ')');
+    const cur = JSON.parse(g.getContentText());
+    const data = JSON.parse(Utilities.newBlob(Utilities.base64Decode(cur.content.replace(/\n/g, ''))).getDataAsString());
+    data.quotes = data.quotes || [];
+    let changed = false;
+    if (kind === 'quote') {
+      const n = data.quotes.length;
+      data.quotes = data.quotes.filter(function (q) { return String(q.id) !== String(p.no); });
+      changed = data.quotes.length !== n;
+    } else if (data[kind]) { delete data[kind]; changed = true; }
+    if (!changed) return { ok: true, already: true };
+    const body = { message: 'Remove ' + kind + ' tab ' + folder, content: Utilities.base64Encode(Utilities.newBlob(JSON.stringify(data, null, 2) + '\n').getBytes()), sha: cur.sha, branch: SITE_BRANCH };
+    const r = UrlFetchApp.fetch(url, { method: 'put', headers: hd, contentType: 'application/json', payload: JSON.stringify(body), muteHttpExceptions: true });
+    const rc = r.getResponseCode();
+    if (rc !== 200 && rc !== 201) throw new Error('GitHub answered ' + rc);
+    return { ok: true };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+// Moves ONE client's pages from the old name-based folder to the wedding-code folder (e.g. Jaison -> IV-007-251126), in all three repos:
+//   Ivory-Events  New A/<old>/  -> New A/<code>/   (page made from client-shell, data.json copied with its links pointed at the code folder)
+//   Ivory-Packages <old>/       -> <code>/         (quotes, payment page, stage photos)
+//   Ivory-Wedding-Timeline <old>/ -> <code>/       (if there is a timeline)
+// Nothing is deleted or overwritten in the code folder. The OLD pages stay, and the old client link becomes a redirect to the code link,
+// so links already sent to the client keep working. Safe to run again: it only fills in what is missing.
+function api_site_migrate(pin, p) {
+  check_(pin);
+  const props = PropertiesService.getScriptProperties();
+  const evKey = siteKey_(props), pkKey = props.getProperty('GH_KEY') || evKey, tlKey = props.getProperty('TL_KEY') || props.getProperty('GH_KEY') || evKey;
+  if (!evKey) throw new Error('GitHub key needed');
+  const oldF = String(p.oldFolder || '').trim(), code = String(p.code || '').trim();
+  const okName = /^[A-Za-z0-9][A-Za-z0-9 _-]{0,60}$/;
+  if (!okName.test(oldF) || !/^IV-\d{3,}-\d{6}$/.test(code)) throw new Error('Bad folder name or wedding code');
+  if (oldF.toLowerCase() === code.toLowerCase()) return { ok: true, already: true, quotes: [] };
+  const H = function (k) { return { Authorization: 'Bearer ' + k, Accept: 'application/vnd.github+json' }; };
+  const call = function (repo, k, path, method, body) {
+    const o = { headers: H(k), muteHttpExceptions: true };
+    if (method) { o.method = method; o.contentType = 'application/json'; o.payload = JSON.stringify(body); }
+    const r = UrlFetchApp.fetch('https://api.github.com/repos/' + repo + path, o);
+    return { code: r.getResponseCode(), text: r.getContentText() };
+  };
+  const reach = function (repo, c) { return new Error('GitHub key does not reach ' + repo.split('/')[1] + ' (GitHub answered ' + c + ')'); };
+  const enc = function (s) { return encodeURIComponent(s); };
+  const fixLinks = function (t) { return String(t).split('/' + enc(oldF) + '/').join('/' + code + '/').split('/' + oldF + '/').join('/' + code + '/'); };
+  const readDir = function (repo, k, branch, dir) {   // [{name, sha}] of the files in a folder; [] when there is none
+    const r = call(repo, k, '/contents/' + dir.split('/').map(enc).join('/') + '?ref=' + branch);
+    if (r.code === 404) return [];
+    if (r.code !== 200) throw reach(repo, r.code);
+    return JSON.parse(r.text).filter(function (x) { return x.type === 'file'; }).map(function (x) { return { name: x.name, sha: x.sha }; });
+  };
+  const readFile = function (repo, k, sha) {   // base64, through the blob API so big photos work too
+    const r = call(repo, k, '/git/blobs/' + sha);
+    if (r.code !== 200) throw new Error('GitHub answered ' + r.code + ' reading a file');
+    return JSON.parse(r.text).content.replace(/\n/g, '');
+  };
+  const putNew = function (repo, k, branch, path, b64, msg) {   // never overwrites
+    const url = '/contents/' + path.split('/').map(enc).join('/');
+    const ex = call(repo, k, url + '?ref=' + branch);
+    if (ex.code === 200) return false;
+    if (ex.code !== 404) throw reach(repo, ex.code);
+    const w = call(repo, k, url, 'put', { message: msg, content: b64, branch: branch });
+    if (w.code !== 200 && w.code !== 201) throw reach(repo, w.code);
+    return true;
+  };
+  // copy every file of old/ into code/ in a repo; .html pages get their own folder links pointed at the code folder
+  const copyDir = function (repo, k, branch, from, to, msg) {
+    const done = [];
+    readDir(repo, k, branch, from).forEach(function (f) {
+      let b64 = readFile(repo, k, f.sha);
+      if (/\.html$/i.test(f.name)) b64 = Utilities.base64Encode(Utilities.newBlob(fixLinks(Utilities.newBlob(Utilities.base64Decode(b64)).getDataAsString())).getBytes());
+      putNew(repo, k, branch, to + '/' + f.name, b64, msg);
+      done.push(f.name);
+    });
+    return done;
+  };
+
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    const msg = 'Move ' + oldF + ' to ' + code;
+    // 1. the client link
+    const evBase = SITE_DIR + '/';
+    const od = call(SITE_REPO, evKey, '/contents/' + enc(SITE_DIR) + '/' + enc(oldF) + '/data.json?ref=' + SITE_BRANCH);
+    let oldData = null, oldSha = null;
+    if (od.code === 200) { const j = JSON.parse(od.text); oldSha = j.sha; oldData = JSON.parse(Utilities.newBlob(Utilities.base64Decode(j.content.replace(/\n/g, ''))).getDataAsString()); }
+    else if (od.code !== 404) throw reach(SITE_REPO, od.code);
+    const pk = copyDir(PAY_REPO, pkKey, PAY_BRANCH, oldF, code, msg);
+    const tl = copyDir(TL_REPO, tlKey, TL_BRANCH, oldF, code, msg);
+    if (oldData) {
+      const sh = call(SITE_REPO, evKey, '/contents/' + enc(SITE_DIR) + '/client-shell.html?ref=' + SITE_BRANCH);
+      if (sh.code !== 200) throw new Error('client-shell.html not found in the New A site');
+      let html = Utilities.newBlob(Utilities.base64Decode(JSON.parse(sh.text).content.replace(/\n/g, ''))).getDataAsString();
+      const esc = function (t) { return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); };
+      const wd = String(oldData.wedding_date || p.date || '');
+      const longDate = /^\d{4}-\d{2}-\d{2}$/.test(wd) ? Utilities.formatDate(Utilities.parseDate(wd, tz_(), 'yyyy-MM-dd'), tz_(), 'd MMMM yyyy') : '';
+      html = html.split('__NAME__').join(esc(oldData.name || p.name || '')).split('__WEDDING_DATE__').join(longDate).split('__VENUE__').join(esc(oldData.venue || p.venue || '')).split('__FOLDER__').join(code);
+      const nd = JSON.parse(fixLinks(JSON.stringify(oldData)));
+      nd.folder = code; nd.code = code; delete nd.moved_to;
+      putNew(SITE_REPO, evKey, SITE_BRANCH, SITE_DIR + '/' + code + '/index.html', Utilities.base64Encode(Utilities.newBlob(html).getBytes()), msg);
+      putNew(SITE_REPO, evKey, SITE_BRANCH, SITE_DIR + '/' + code + '/data.json', Utilities.base64Encode(Utilities.newBlob(JSON.stringify(nd, null, 2) + '\n').getBytes()), msg);
+      // 2. only now, with everything copied, the old link points to the new one
+      const target = 'https://ivory-events.pages.dev/' + enc(SITE_DIR) + '/' + code + '/';
+      const redirect = '<!DOCTYPE html>\n<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex">' +
+        '<meta http-equiv="refresh" content="0; url=' + target + '"><title>Ivory Events</title></head>' +
+        '<body style="font-family:sans-serif;text-align:center;padding:40px"><p>Opening your page... <a href="' + target + '">tap here if it does not open</a></p>' +
+        '<script>location.replace("' + target + '"+location.hash)</script></body></html>\n';
+      const oi = call(SITE_REPO, evKey, '/contents/' + enc(SITE_DIR) + '/' + enc(oldF) + '/index.html?ref=' + SITE_BRANCH);
+      if (oi.code === 200 && String(Utilities.newBlob(Utilities.base64Decode(JSON.parse(oi.text).content.replace(/\n/g, ''))).getDataAsString()).indexOf('location.replace') < 0) {
+        const w = call(SITE_REPO, evKey, '/contents/' + enc(SITE_DIR) + '/' + enc(oldF) + '/index.html', 'put', { message: msg + ' (old link redirects)', content: Utilities.base64Encode(Utilities.newBlob(redirect).getBytes()), sha: JSON.parse(oi.text).sha, branch: SITE_BRANCH });
+        if (w.code !== 200 && w.code !== 201) throw reach(SITE_REPO, w.code);
+      }
+      oldData.moved_to = code;
+      call(SITE_REPO, evKey, '/contents/' + enc(SITE_DIR) + '/' + enc(oldF) + '/data.json', 'put', { message: msg + ' (marked as moved)', content: Utilities.base64Encode(Utilities.newBlob(JSON.stringify(oldData, null, 2) + '\n').getBytes()), sha: oldSha, branch: SITE_BRANCH });
+    }
+    return { ok: true, link: !!oldData, quotes: pk.filter(function (n) { return /^\d{6}\.html$/.test(n); }).map(function (n) { return n.slice(0, 6); }), packages: pk.length, timeline: tl.length };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+// Renames the client on their one link: <Client>/data.json "name" and the name written into <Client>/index.html.
+function api_site_rename(pin, p) {
+  check_(pin);
+  const props = PropertiesService.getScriptProperties();
+  const key = siteKey_(props);
+  if (!key) throw new Error('GitHub key needed');
+  const folder = String(p.folder || '').trim();
+  if (!/^[A-Za-z0-9][A-Za-z0-9 _-]{0,60}$/.test(folder)) throw new Error('Bad client folder name');
+  const name = String(p.name || '').trim();
+  if (!name) throw new Error('Name cannot be empty');
+  const hd = { Authorization: 'Bearer ' + key, Accept: 'application/vnd.github+json' };
+  const api = 'https://api.github.com/repos/' + SITE_REPO + '/contents/';
+  const path = function (f) { return encodeURIComponent(SITE_DIR) + '/' + encodeURIComponent(folder) + '/' + encodeURIComponent(f); };
+  const get = function (pth) {
+    const r = UrlFetchApp.fetch(api + pth + '?ref=' + SITE_BRANCH, { headers: hd, muteHttpExceptions: true });
+    const c = r.getResponseCode();
+    if (c === 200) return JSON.parse(r.getContentText());
+    if (c === 404) return null;
+    throw new Error('GitHub answered ' + c);
+  };
+  const put = function (pth, text, sha, msg) {
+    const body = { message: msg, content: Utilities.base64Encode(Utilities.newBlob(text).getBytes()), branch: SITE_BRANCH, sha: sha };
+    const r = UrlFetchApp.fetch(api + pth, { method: 'put', headers: hd, contentType: 'application/json', payload: JSON.stringify(body), muteHttpExceptions: true });
+    const c = r.getResponseCode();
+    if (c !== 200 && c !== 201) throw new Error('GitHub answered ' + c);
+  };
+  const dec = function (f) { return Utilities.newBlob(Utilities.base64Decode(f.content.replace(/\n/g, ''))).getDataAsString(); };
+  const esc = function (t) { return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); };
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    const dj = get(path('data.json'));
+    if (!dj) return { ok: true, skipped: 'no client link yet' };
+    const data = JSON.parse(dec(dj));
+    const old = String(data.name || p.oldName || '').trim();
+    data.name = name;
+    put(path('data.json'), JSON.stringify(data, null, 2) + '\n', dj.sha, 'Rename client ' + folder);
+    const ix = get(path('index.html'));
+    if (ix && old && old !== name) {
+      const html = dec(ix).split(esc(old)).join(esc(name));
+      put(path('index.html'), html, ix.sha, 'Rename client ' + folder);
+    }
+    return { ok: true, old: old, name: name };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
 // Makes the client's link as soon as an enquiry is entered (and lets the event type be changed later).
 // Creates <Client>/index.html (from client-shell.html) and <Client>/data.json with the event type, which decides the Packages and Checklist pages.
 // An existing link keeps its quotes/timeline/payment; only its type is updated.
@@ -836,6 +1051,92 @@ function api_action(pin, p) {
     return { ok: true };
   } finally {
     lock.releaseLock();
+  }
+}
+
+/* ---------- push notifications: what is due this morning ----------
+ * The Cloudflare push worker (ivoryeventz-ops/Process) calls this URL every morning:
+ *   <web app URL>?push=due&key=<PUSH_KEY>
+ * PUSH_KEY is a Script Property (Project Settings > Script properties > Add: PUSH_KEY = your own long password).
+ * It answers with ONE digest: the same 3-days-before / 1-day-before / day-after tasks the app shows, minus the ones ticked done.
+ * Wedding timeline counts as done when it was ticked, or when a client folder with a matching name word exists
+ * in the ivory-wedding-timeline repo (if GitHub cannot be read, the timeline task is left out rather than guessed). */
+
+const PUSH_STAGES = [
+  { at: 3, tasks: [['timeline', 'Wedding timeline'], ['signage', 'Signage board details'], ['vendorChk', 'Vendor checklist'], ['payAdv', 'Payment and advance details']] },
+  { at: 1, tasks: [['staffChk', 'Staff checklist']] },
+  { at: -1, tasks: [['finalPay', 'Final payment details']] }
+];
+const PUSH_LOOKBACK = 7;   // a finished wedding keeps reminding for this many days, as in the app
+
+function jsonOut_(o) { return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON); }
+
+function pushTimelineFolders_() {
+  try {
+    const props = PropertiesService.getScriptProperties();
+    const tok = props.getProperty('GH_KEY') || props.getProperty('TL_KEY') || '';
+    const h = { 'User-Agent': 'ivory-enquiries', Accept: 'application/vnd.github+json' };
+    if (tok) h.Authorization = 'Bearer ' + tok;
+    const r = UrlFetchApp.fetch('https://api.github.com/repos/ivoryeventz-ops/Ivory-Wedding-Timeline/contents/', { headers: h, muteHttpExceptions: true });
+    if (r.getResponseCode() !== 200) return null;
+    return JSON.parse(r.getContentText()).filter(function (x) { return x.type === 'dir'; }).map(function (x) { return String(x.name).toLowerCase(); });
+  } catch (err) { return null; }
+}
+
+function pushWords_(t) { return String(t || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().split(' ').filter(function (w) { return w.length >= 3; }); }
+
+function pushDue_(key) {
+  const want = PropertiesService.getScriptProperties().getProperty('PUSH_KEY');
+  if (!want || String(key) !== want) return jsonOut_({ error: 'Not allowed' });
+  try {
+    const ss = ss_();
+    const sh = ss.getSheetByName(CFG.ENQ);
+    const last = lastRowWith_(sh, 1);
+    const done = {};
+    const as = ss.getSheetByName(ACTION_TAB), al = as ? lastRowWith_(as, 1) : 1;
+    if (al > 1) {
+      as.getRange(2, 1, al - 1, 4).getValues().forEach(function (r) {
+        if (r[0]) done[String(r[0]) + '|' + String(r[2])] = (r[3] === true || String(r[3]).toLowerCase() === 'true');
+      });
+    }
+    const folders = pushTimelineFolders_();
+    const todayMs = parse_(today_()).getTime();
+    const lines = [];
+    let count = 0;
+    if (last > 1) {
+      sh.getRange(2, 1, last - 1, CFG.C_LAST).getValues().forEach(function (r) {
+        const id = String(r[0]).trim();
+        if (!id || String(r[5]).trim() !== 'Confirmed') return;
+        const date = iso_(r[2]);
+        if (!date) return;
+        const d = Math.round((parse_(date).getTime() - todayMs) / 86400000);
+        if (d < -PUSH_LOOKBACK) return;
+        const name = String(r[1]).trim();
+        const nw = pushWords_(name);
+        const pend = [];
+        PUSH_STAGES.forEach(function (st) {
+          if (d > st.at) return;
+          if (d < 0 && st.at > 0) return;   // after the wedding only the day-after task matters
+          st.tasks.forEach(function (t) {
+            const k = id + '|' + date + '|' + t[0];
+            if (k in done) { if (done[k]) return; }
+            else if (t[0] === 'timeline') {
+              if (folders === null) return;   // cannot tell, so do not nag
+              if (folders.some(function (f) { return pushWords_(f).some(function (w) { return nw.indexOf(w) >= 0; }); })) return;
+            }
+            pend.push(t[1]);
+          });
+        });
+        if (!pend.length) return;
+        count += pend.length;
+        const when = d === 0 ? 'today' : d > 0 ? 'in ' + d + (d === 1 ? ' day' : ' days') : Math.abs(d) + (d === -1 ? ' day ago' : ' days ago');
+        lines.push(name + ' (' + when + '): ' + pend.join(', '));
+      });
+    }
+    if (!count) return jsonOut_({ count: 0 });
+    return jsonOut_({ count: count, title: 'Ivory: ' + count + (count === 1 ? ' thing' : ' things') + ' to do', body: lines.join('\n').slice(0, 400) });
+  } catch (err) {
+    return jsonOut_({ error: String(err && err.message || err) });
   }
 }
 
