@@ -4241,10 +4241,11 @@
   /* ---------- payment details: published to <Client>/payment.html in the packages repo ---------- */
   var P = null;
   function payFolder(it, list) {
+    var wc = wedCode(it); if (wc) return wc;   // the wedding code always wins - never a name, never an older folder (names change; the code does not)
+    var cid = String((it && it.id) || '').trim().replace(/[^A-Za-z0-9-]/g, ''); if (cid) return cid;   // no event date yet: the client ID, still not the name
     var q = (list || []).filter(function (x) { return x.src === 'cloud' && x.folder; })[0];
     if (q) return q.folder;
-    var wc = wedCode(it); if (wc) return wc;
-    var w = (it.name || '').trim().split(/\s+/)[0].replace(/[^A-Za-z0-9-]/g, '');
+    var w =(it.name || '').trim().split(/\s+/)[0].replace(/[^A-Za-z0-9-]/g, '');
     return w ? w.charAt(0).toUpperCase() + w.slice(1) : 'Client';
   }
   function num(v) { var n = parseInt(String(v == null ? '' : v).replace(/[^\d]/g, ''), 10); return isNaN(n) ? 0 : n; }
