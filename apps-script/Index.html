@@ -3419,11 +3419,15 @@
     'Tall Men Security': /tall\s*men/i
   };
   // A line that matches one of these is NOT that vendor: a car decoration is not a wedding car, a band platform is not a live band.
-  var VENDOR_NOT = { 'Wedding Car': /decor/i, 'Live Band': /platform/i };
+  var VENDOR_NOT = { 'Wedding Car': /decor/i, 'Live Band': /platform/i, 'Table & Chair covers': /family\s*table|round\s*tables?/i };
+  // These are outside vendors only when the quote lists them as their own line (the line's name), never when the word sits inside another item's description
+  // (e.g. "Round tables ... includes table covers" or "Family Table ... 12 chairs" are our own stock, not an outside vendor).
+  var VENDOR_OWN_LINE = { 'Table & Chair covers': 1 };
   function stdMatch(n, str) { return !!(VENDOR_RE[n] && VENDOR_RE[n].test(str) && !(VENDOR_NOT[n] && VENDOR_NOT[n].test(str))); }
   // Does this quote ask for vendor n? Vendors with an exclusion rule are checked line by line (the quote's own lines), the rest on the whole page text.
   function vHit(n, q) {
     if (!q || !q.text || !VENDOR_RE[n]) return false;
+    if (VENDOR_OWN_LINE[n] && q.names) return q.names.some(function (c) { return stdMatch(n, c); });
     if (VENDOR_NOT[n] && q.chunks) return q.chunks.some(function (c) { return stdMatch(n, c); });
     return VENDOR_RE[n].test(q.text);
   }
@@ -3525,6 +3529,14 @@
             if (nm && outside.indexOf(nm) < 0) outside.push(nm);
           });
         });
+        var names = [];   // the quote's own priced line names only (no descriptions), for vendors that must be their own line
+        Array.prototype.forEach.call(doc.querySelectorAll('.section-card'), function (sc) {
+          var st0 = ((sc.querySelector('.section-title') || {}).textContent || '');
+          if (/complimentary|payment\s*terms|additional\s*options/i.test(st0)) return;
+          Array.prototype.forEach.call(sc.querySelectorAll('.line-item-name'), function (n0) {
+            var t0 = (n0.textContent || '').replace(/\s+/g, ' ').trim(); if (t0) names.push(t0);
+          });
+        });
         var chunks = [], stage = [], stageSec = null;   // chunks: each priced box / inclusion line on its own; stage: the stage decoration inclusions
         Array.prototype.forEach.call(doc.querySelectorAll('.section-card'), function (sc) {
           var st = ((sc.querySelector('.section-title') || {}).textContent || '');
@@ -3559,7 +3571,7 @@
         var text = ((doc.body && doc.body.textContent) || '').replace(/\s+/g, ' ');
         var cut = text.search(/Complimentary Wedding Management/i);   // the free services are not outside vendors
         if (cut > 0) text = text.slice(0, cut);
-        return { no: no, src: 'cloud', folder: folder, url: GH_SITE + '/' + encodeURIComponent(folder) + '/' + no, date: date, venue: venue, text: text, chunks: chunks, stage: stage, extras: extras, outside: outside, items: items, scan: scan, raw: rawHtml };
+        return { no: no, src: 'cloud', folder: folder, url: GH_SITE + '/' + encodeURIComponent(folder) + '/' + no, date: date, venue: venue, text: text, chunks: chunks, names: names, stage: stage, extras: extras, outside: outside, items: items, scan: scan, raw: rawHtml };
       })
       .catch(function (e) { if (ghCache[k] === entry) delete ghCache[k]; throw e; });
     return entry.p;
