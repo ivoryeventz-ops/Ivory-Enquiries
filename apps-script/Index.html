@@ -37,11 +37,13 @@
   /* ----- filters ----- */
   .chips{display:flex;gap:8px;overflow-x:auto;padding:14px 16px 4px;scrollbar-width:none}
   .chips::-webkit-scrollbar{display:none}
-  .chip{flex:0 0 auto;border:1px solid var(--line);background:var(--paper);color:var(--ink);border-radius:999px;padding:7px 15px;font-size:14px;cursor:pointer}
+  .chip{flex:0 0 auto;border:1px solid var(--line);background:var(--paper);color:var(--ink);border-radius:999px;padding:7px 14px;font-size:13.5px;cursor:pointer;transition:background .15s,color .15s}
   .chip.on{background:var(--burgundy);border-color:var(--burgundy);color:#fff}
-  .past{display:flex;align-items:center;gap:8px;padding:8px 18px 0;font-size:13px;color:var(--muted)}
+  .listbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:8px 2px 12px}
+  .past{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted);white-space:nowrap;cursor:pointer}
+  .past input{width:16px;height:16px;margin:0;accent-color:var(--burgundy)}
   main{padding:6px 16px calc(110px + env(safe-area-inset-bottom))}
-  .count{font-size:12px;color:var(--muted);margin:8px 2px 10px;letter-spacing:.02em}
+  .count{font-size:12.5px;color:var(--muted);letter-spacing:.02em}
 
   /* ----- work cards ----- */
   .card{cursor:pointer;display:grid;grid-template-columns:56px 1fr auto;gap:2px 14px;align-items:center;width:100%;text-align:left;background:var(--paper);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;margin-bottom:10px;font:inherit;color:inherit;box-shadow:var(--shadow)}
@@ -57,18 +59,13 @@
   .r2{grid-column:2 / 4;font-size:14px;color:var(--ink)}
   .r3{grid-column:2 / 4;font-size:13px;color:var(--muted)}
   .since{grid-column:1 / 4;margin-top:6px;font-size:12px;color:var(--cost)}
-  .nq{grid-column:1 / 4;margin-top:6px;font-size:13px;font-weight:700;color:var(--danger)}
-  .mk{grid-column:1 / 4;display:flex;gap:8px;margin-top:6px}
-  .mk select{flex:1;min-width:0;font-size:14px;padding:6px}
-  .mk button{font-size:14px;font-weight:700;padding:6px 12px;border-radius:8px;border:0;background:var(--danger);color:#fff}
-  .mg{margin-top:6px;font-size:13px;font-weight:600;color:var(--cost)}
+  .nq{grid-column:1 / 4;justify-self:start;margin-top:8px;font-size:12.5px;font-weight:600;color:var(--danger);background:#fbeceb;border-radius:8px;padding:4px 10px}
   .empty{text-align:center;color:var(--muted);padding:48px 10px;font-family:var(--serif);font-size:20px}
   .acts{grid-column:1 / 4;margin-top:8px;border-top:1px dashed var(--line);padding-top:6px}
   .acts .sg{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--cost);margin:6px 0 2px;display:flex;gap:8px;flex-wrap:wrap}
   .acts .sg em{font-style:normal;text-transform:none;letter-spacing:0;font-weight:600;color:var(--muted)}
   .acts .sg em.late{color:var(--danger)}
-  .acts .sg.later{color:var(--muted)}
-  .act{display:flex;align-items:flex-start;gap:10px;margin:1px 0;padding:6px 0;font-size:15px;color:var(--ink)}
+  .act{display:flex;align-items:flex-start;gap:10px;margin:0;padding:5px 0;font-size:14.5px;color:var(--ink)}
   .act input{width:22px;height:22px;padding:0;flex:none;accent-color:var(--conf);margin-top:1px}
   .act.done span{text-decoration:line-through;color:var(--muted)}
 
@@ -182,6 +179,12 @@
   .mbox p{margin:0 0 12px;font-size:15px;color:var(--ink)}
   .mbtns{display:grid;grid-template-columns:1fr 1.4fr;gap:10px;margin-top:14px}
   .mbtns .primary{margin:0}
+  #lk .mbtns{grid-template-columns:1fr 1fr}
+  #lk .mbtns .primary{grid-column:1 / 3;order:-1}
+  #lk .mbtns .sbtn,#lk .mbtns .ghost{padding:12px 13px}
+  .srow:has(#evType){flex-direction:column;align-items:stretch}
+  .srow:has(#evType) .rb{display:flex;gap:8px}
+  .srow:has(#evType) .evsel{flex:1;max-width:none;min-width:0}
 
   /* ----- staff checklist ----- */
   .ckcard{background:#fff;border:1px solid var(--gold-soft);border-radius:var(--r);padding:14px;margin:16px 0 4px;box-shadow:var(--shadow)}
@@ -203,8 +206,6 @@
   @media(min-width:520px){.vrow{display:grid;grid-template-columns:210px 1fr;gap:10px;align-items:start}.vtick{margin:0;min-height:40px}}
   .vstate{font-size:12px;color:var(--muted);min-height:16px;margin-top:4px}
   .vstate.err{color:var(--danger);font-weight:600}
-  details.vmore{margin-top:6px}
-  details.vmore summary{font-size:14px;color:var(--burgundy);font-weight:600;padding:6px 0}
   .vfields{display:grid;gap:8px;min-width:0}
   .vfields input{padding:10px 12px}
   .vfilters{display:flex;gap:18px;flex-wrap:wrap;margin:12px 0 14px}
@@ -219,8 +220,6 @@
   .vi .w{color:var(--ink);margin-top:2px}
   .vi .w i{color:var(--muted);font-style:normal}
   .vi .vv{color:var(--muted);font-size:13px}
-  .bk{font-size:11px;border-radius:999px;padding:2px 8px;color:#fff;background:var(--conf);margin-left:6px;vertical-align:middle;font-weight:600}
-  .bk.no{background:var(--other)}
   .vseg{display:flex;gap:6px;margin:12px 0 0;background:var(--wash);padding:4px;border-radius:14px}
   .vchip{flex:1;border:0;background:transparent;color:var(--muted);border-radius:11px;padding:9px 8px;font-size:14px;font-weight:600;cursor:pointer}
   .vchip.on{background:#fff;color:var(--burgundy);box-shadow:0 1px 4px rgba(60,30,20,.15)}
@@ -859,14 +858,12 @@
   <button class="chip" data-f="Costing">Costing</button>
   <button class="chip" data-f="Blocked">Blocked</button>
   <button class="chip" data-f="Confirmed">Confirmed</button>
-  <button class="chip" data-f="NoQuote">No quote given</button>
-  <button class="chip" data-f="NoLink">No client link</button>
-  <button class="chip" data-f="Action">Action due</button>
+  <button class="chip" data-f="NoQuote">No quote</button>
+  <button class="chip" data-f="Action">Actions</button>
 </div>
-<label class="past"><input type="checkbox" id="showPast" style="width:auto"> Include past events</label>
 
 <main>
-  <div class="count" id="count"></div>
+  <div class="listbar"><div class="count" id="count"></div><label class="past"><input type="checkbox" id="showPast"> Past events</label></div>
   <div id="list"><div class="skl"></div><div class="skl"></div><div class="skl"></div><div class="skl"></div></div>
 </main>
 
@@ -1639,7 +1636,7 @@
 
 <div class="sheet" id="detail">
   <div class="grab"></div>
-  <div class="dhead"><div><h2 id="dName"></h2><div class="meta" id="dMeta"></div><div class="meta"><span id="dCode"></span> \u00b7 <a href="#" id="dRename" style="color:inherit;text-decoration:underline">Edit name</a></div></div><span class="badge" id="dBadge"></span></div>
+  <div class="dhead"><div><h2 id="dName"></h2><div class="meta" id="dMeta"></div><div class="meta"><span id="dCode"></span> &middot; <a href="#" id="dRename" style="color:inherit;text-decoration:underline">Edit name</a></div></div><span class="badge" id="dBadge"></span></div>
   <div class="stlab">Status</div>
   <div class="stbtns" id="stbtns">
     <button class="st" data-s="Enquiry">Enquiry</button>
@@ -2578,9 +2575,6 @@
     R.push(['', 'GRAND TOTAL', '', '', '=' + t]);
     return R;
   }
-  function toCsv(R) {
-    return '﻿' + R.map(function (r) { return r.map(function (c) { return '"' + String(c === undefined ? '' : c).replace(/"/g, '""') + '"'; }).join(','); }).join('\r\n');
-  }
   function toTsv(R) {
     return R.map(function (r) { return r.map(function (c) { return String(c === undefined ? '' : c).replace(/[\t\r\n]+/g, ' '); }).join('\t'); }).join('\n');
   }
@@ -3054,7 +3048,7 @@
   function wkey(i) { return i.id + '|' + i.date; }
   function daysTo(i) { return Math.round((toDate(i.date) - toDate(today)) / 86400000); }
   function isoAdd(iso, n) { var d = toDate(iso); d.setDate(d.getDate() + n); return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()); }
-  // "No client link": every work (not Lost) whose client folder has no page in Ivory-Events > New A. The folder is the one its quotes are in, else the first word of the name (as the app makes it).
+  // Finding a work's client link folder: the folder its quotes are in, else the first word of the name (as the app makes it).
   function linkFolder(i) { return String(FL.folder[wkey(i)] || payFolder(i, [])).toLowerCase(); }
   function nameToks(t) { return String(t || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().split(' ').filter(Boolean); }
   // The one code a wedding is known by everywhere: client ID + event date (ddmmyy), e.g. IV-007-251126.
@@ -3122,17 +3116,16 @@
     var list = items.filter(function (i) {
       if (!showPast && i.date && i.date < today && !(i.date >= cutoff && pending(i) > 0)) return false;
       if (filter === 'NoQuote') { if (!noQuote(i)) return false; }
-      else if (filter === 'NoLink') { if (!noLink(i)) return false; }
       else if (filter === 'Action') { if (pending(i) === 0) return false; }
       else if (filter !== 'All' && i.status !== filter) return false;
       if (ql && (i.name + ' ' + i.venue).toLowerCase().indexOf(ql) < 0) return false;
       return true;
     });
     $('#sub').textContent = list.length + ' shown';
-    $('#count').textContent = (showPast ? 'Oldest first' : 'Upcoming events, soonest first') +
+    $('#count').textContent = (showPast ? 'Oldest first' : 'Upcoming, soonest first') +
       (FL.ready ? '' : ' - quote flags and reminders need the updated Code.gs');
     if (!list.length) {
-      $('#list').innerHTML = '<div class="empty">' + (filter === 'NoQuote' ? 'Every confirmed work has a quote.' : filter === 'NoLink' ? (FL.links ? 'Every work has a client link.' : 'Could not read the client links just now. Pull to refresh and try again.') : filter === 'Action' ? 'No actions pending.' : 'Nothing here yet.') + '</div>';
+      $('#list').innerHTML = '<div class="empty">' + (filter === 'NoQuote' ? 'Every confirmed work has a quote.' : filter === 'Action' ? 'No actions pending.' : 'Nothing here yet.') + '</div>';
       return;
     }
     $('#list').innerHTML = list.map(function (i) {
@@ -3143,7 +3136,6 @@
         '<div class="r2">' + fmt(i.date) + ' &middot; ' + when(i.date) + '</div>' +
         '<div class="r3">' + esc(i.venue) + '</div>' +
         (noQuote(i) ? '<div class="nq">&#9888; No quote given yet</div>' : '') +
-        (noLink(i) ? '<div class="nq">&#9888; No client link yet</div>' + (i.date ? '<div class="mk"><select class="mkType" aria-label="Event type">' + Object.keys(EV_TYPES).map(function (k) { return '<option value="' + k + '">' + esc(EV_TYPES[k]) + '</option>'; }).join('') + '</select><button type="button" class="mkBtn" data-row="' + i.row + '">Make link</button></div>' : '<div class="nq">Add the event date to make the link</div>') : '') +
         (i.status === 'Costing' && i.since ? '<div class="since">Costing since ' + fmt(i.since, true) + ' &middot; reminder every 2 days</div>' : '') +
         actHtml(i, false) +
         '</div>';
@@ -3278,20 +3270,6 @@
   // list taps
   $('#list').addEventListener('click', function (e) {
     if (e.target.closest('.acts')) return;   // ticking a reminder must not open the work
-    if (e.target.closest('.mk')) {   // one-tap client link for a work that has none
-      var mb = e.target.closest('.mkBtn');
-      if (mb) {
-        var mi = items.filter(function (i) { return i.row === +mb.getAttribute('data-row'); })[0];
-        var ty = mb.parentNode.querySelector('.mkType').value;
-        if (mi) {
-          mb.disabled = true; mb.textContent = 'Making...';
-          ensureLink(mi, ty, false).then(function (r) {
-            if (r) showLink(mi.name, r.url, r.existed ? 'This client already had a link, so it was kept as it is.' : 'Made for ' + EV_TYPES[ty] + '. It has the introduction, packages and service checklist.');
-          }, function (err) { toast('Client link not made: ' + err.message, true); }).then(function () { mb.disabled = false; mb.textContent = 'Make link'; });
-        }
-      }
-      return;
-    }
     var b = e.target.closest('.card');
     if (!b) return;
     var row = +b.getAttribute('data-row');
@@ -3352,7 +3330,7 @@
         // the client's link (intro, packages, checklist for this event type) is made straight away, then offered for WhatsApp
         return ensureLink(np, np.type, false).then(function (r) {
           if (r) showLink(np.name, r.url, r.existed ? 'This client already had a link, so it was kept as it is (use the Client link tab inside the work to change its event type).' : 'Made for ' + EV_TYPES[np.type] + '. It has the introduction, packages and service checklist.');
-          else toast('Enquiry saved, but no client link was made. Tap Make link on its card.', true);
+          else toast('Enquiry saved, but no client link was made. Open the work > Client link to make it.', true);
         }, function (err) { toast('Enquiry saved, but the client link was not made: ' + err.message + '. Open the work > Client link to try again.', true); });
       });
     }).catch(function (err) {
@@ -3732,7 +3710,6 @@
     if (curTab === 'site') siteLoad(it);
   }
 
-  function vSaved(name) { var s = VS[name]; return !!(s && (s.booked || (s.supplier || '').trim() || (s.details || '').trim())); }
   // Delete saved vendor rows from the sheet (needs the updated Code.gs; without it the rows are only hidden here).
   function removeVendors(it, names) {
     var chain = Promise.resolve();
@@ -4121,7 +4098,6 @@
       sdBuild(q.stage, q.extras, q).forEach(function (r) { items.push({ section: 'Stage and decor', item: r.t, details: '', qty: ckQty(r.t), on: !r.opt }); });
     }
     if (vItem === it) vMainList.forEach(function (n) {
-      var s = VS[n] || {};
       items.push({ section: 'Outside vendors', item: n, details: '', qty: '', on: true });   // staff sheet lists the item only, no vendor names
     });
     ckS = { it: it, q: q, items: items, done: false };
@@ -4315,7 +4291,6 @@
     }).join('');
   }
   function payRender() {
-    var key = ''; try { key = localStorage.getItem('ivoryGhKey') || ''; } catch (e) {}
     $('#payBody').innerHTML =
       '<h4>Package &amp; add-ons</h4><div id="payItems">' + payRows() + '</div>' +
       '<button type="button" class="pbtn" data-act="padd">+ Add item</button><button type="button" class="pbtn" data-act="preload">Pick rates again from quote</button>' +
