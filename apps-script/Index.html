@@ -304,7 +304,7 @@
   .qci b{white-space:nowrap;color:var(--burgundy);font-size:14px}
   .qcat-top{grid-template-columns:1fr}
   .qtotbox{margin-top:14px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:#fff}
-  .qtotbox input[type=text],.qtotbox #qeTotLabel{margin-top:8px}
+  .qtotbox input[type=text],.qtotbox #qeTotLabel,.qtotbox #qeDisc,.qtotbox #qeDiscLabel{margin-top:8px}
   .qgh{display:flex;justify-content:space-between;align-items:center;width:100%;font:inherit;font-weight:600;font-size:14px;background:#fff;border:1px solid var(--line);border-radius:10px;padding:11px 12px;margin-top:6px;color:var(--ink);text-align:left}
   .qgh.on{border-color:var(--gold);background:#fffaf0}
   .qgh em{font-style:normal;font-weight:600;font-size:12px;color:var(--burgundy);margin-right:8px}
@@ -4429,7 +4429,7 @@
 
   // Reads an existing quote page into an editable model: header, stage photo, and every section with its inclusions, priced lines and rate cards.
   function qeParse(raw) {
-    var doc = new DOMParser().parseFromString(raw, 'text/html'), M = { name: '', date: '', venue: '', img: '', secs: [], dropped: [], options: [], showTotal: false, totalLabel: 'Total' };
+    var doc = new DOMParser().parseFromString(raw, 'text/html'), M = { name: '', date: '', venue: '', img: '', secs: [], dropped: [], options: [], showTotal: false, totalLabel: 'Total', discount: 0, discLabel: 'Discount' };
     var cont = doc.querySelector('.container') || doc.body;
     var tx = function (el) { return ((el && el.textContent) || '').replace(/\s+/g, ' ').trim(); };
     var each = function (list, fn) { Array.prototype.forEach.call(list, fn); };
@@ -4441,6 +4441,8 @@
       return m ? parseInt(m[1].replace(/,/g, ''), 10) : null;
     };
     var addTotal = function (sec, el) {
+      if (el.classList.contains('quote-discount')) { M.discount = amt(el.querySelector('.total-row-amount')) || 0; M.discLabel = tx(el.querySelector('.total-row-title')) || 'Discount'; return; }   // our own discount row
+      if (el.classList.contains('quote-net')) return;   // discounted total: recalculated on save
       if (el.classList.contains('quote-total')) { M.showTotal = true; M.totalLabel = tx(el.querySelector('.total-row-title')) || 'Total'; return; }   // our own add-ons total: recalculated on save
       var a = el.querySelector('.total-row-amount'), t = tx(el.querySelector('.total-row-title'));
       if (/^discounted\s+package/i.test(t)) t = 'Decor Package';   // it is the package rate, not a total
@@ -4580,10 +4582,13 @@
       c.push('    </div>');
       h.push(c.join('\n'));
     });
-    if (Q.showTotal) {
-      var TT = qeTotal(Q);
-      if (TT.sum) h.push('    <div class="section-card">\n      <div class="total-row-card quote-total">\n        <span class="total-row-title">' + esc(String(Q.totalLabel || '').trim() || 'Total') + '</span>\n        <span class="total-row-amount">' + qeMoney(TT.sum) + '</span>\n      </div>\n    </div>');
-    }
+    var TT = qeTotal(Q), DD = Math.max(0, num(Q.discount)), rows = [];
+    if (TT.sum && DD > TT.sum) DD = TT.sum;
+    var trow = function (cls, label, amount) { return '      <div class="total-row-card ' + cls + '">\n        <span class="total-row-title">' + esc(label) + '</span>\n        <span class="total-row-amount">' + amount + '</span>\n      </div>'; };
+    if (Q.showTotal && TT.sum) rows.push(trow('quote-total', String(Q.totalLabel || '').trim() || 'Total', qeMoney(TT.sum)));
+    if (DD) rows.push(trow('quote-discount', String(Q.discLabel || '').trim() || 'Discount', '&minus; ' + qeMoney(DD)));
+    if (DD && Q.showTotal && TT.sum) rows.push(trow('quote-net', 'Discounted Total', qeMoney(TT.sum - DD)));   // only when the total is shown too: no grand total unless asked for
+    if (rows.length) h.push('    <div class="section-card">\n' + rows.join('\n') + '\n    </div>');
     h.push(qeComplimentary(isPkg1, hasAnchor));
     h.push('  </div>\n\n</body>\n</html>\n');
     return h.join('\n');
@@ -4608,7 +4613,7 @@
     var M = src && src.raw ? qeParse(src.raw) : { name: '', date: '', venue: '', img: '', secs: [], dropped: [], options: [] };
     Q = { it: it, list: list, folder: folder, base: src ? src.no : '', name: M.name || it.name || '', date: M.date || it.date || '', venue: M.venue || (src && src.venue) || it.venue || '',
       img: M.img, imgChoice: 'keep', upload: null, secs: M.secs, dropped: M.dropped, custom: qeBlankSec('Additional Items'), pkg: null, no: qeTodayNo(), replace: false, options: M.options || [], optBase: src ? src.no : '' };
-    Q.showTotal = !!M.showTotal; Q.totalLabel = M.totalLabel || 'Total';
+    Q.showTotal = !!M.showTotal; Q.totalLabel = M.totalLabel || 'Total'; Q.discount = M.discount || 0; Q.discLabel = M.discLabel || 'Discount';
     Q.secs = Q.secs.filter(function (x) {   // an old "Additional Items" section becomes the add-ons area, so ticked services and typed ones sit together after the package
       if (!/^additional items$/i.test(x.title) || x.totals.length || x.bullets.length) return true;
       x.lines.forEach(function (l) { QE_CAT.forEach(function (c, i) { if (c.g !== 'Choose your package' && c.n === l.name) l.ci = i; }); Q.custom.lines.push(l); });
@@ -4673,7 +4678,7 @@
   function qeSum() {
     var T = qeTotal(Q), el = $('#qeSum');
     if (!el) return;
-    el.textContent = T.sum ? 'Decor Package ' + inr(T.pkg) + ' + add-ons ' + inr(T.add) + ' = ' + inr(T.sum) + (Q.showTotal ? ' (this total is shown on the quote)' : ' (not shown on the quote - tick the box above to show it)') : '';
+    el.textContent = T.sum ? 'Decor Package ' + inr(T.pkg) + ' + add-ons ' + inr(T.add) + ' = ' + inr(T.sum) + (Q.showTotal ? ' (this total is shown on the quote)' : ' (not shown on the quote - tick the box above to show it)') + (num(Q.discount) ? ' | Discount ' + inr(Math.min(num(Q.discount), T.sum)) + ' shown on the quote' + (Q.showTotal ? ' with Discounted Total ' + inr(Math.max(0, T.sum - num(Q.discount))) : '') : '') : '';
   }
   function qeImgOptions() {
     var files = (ghImgs && ghImgs[Q.folder]) || [], o = '';
@@ -4702,6 +4707,9 @@
       qeSecHtml(Q.custom, 'c', true) +
       '<div class="qtotbox"><label class="tlchk"><input type="checkbox" id="qeShowTot"' + (Q.showTotal ? ' checked' : '') + '> Show a total after the add-ons</label>' +
       '<input id="qeTotLabel" data-d="totalLabel" value="' + esc(Q.totalLabel || 'Total') + '" aria-label="Total label"' + (Q.showTotal ? '' : ' style="display:none"') + '></div>' +
+      '<div class="qtotbox"><label class="tlchk">Discount (&#8377;)</label>' +
+      '<input id="qeDisc" inputmode="numeric" placeholder="0" value="' + (num(Q.discount) ? num(Q.discount).toLocaleString('en-IN') : '') + '" aria-label="Discount amount">' +
+      '<input id="qeDiscLabel" value="' + esc(Q.discLabel || 'Discount') + '" aria-label="Discount label"></div>' +
       '<div class="qsum" id="qeSum"></div>' +
       '<div id="qeKeyBox" style="display:none"><h4>GitHub key</h4><div class="note">Needed once only - saved for both phones (Contents read/write on Ivory-Packages).</div><input id="qeKey" type="password" autocomplete="off" placeholder="Paste GitHub key"></div>' +
       '<button class="pbtn" type="button" data-act="qprev" style="margin-top:14px">Preview</button>' +
@@ -4914,6 +4922,8 @@
   $('#qe').addEventListener('input', function (e) {
     var t = e.target; if (!Q) return;
     if (t.id === 'qeCatQ') { var dv = document.createElement('div'); dv.innerHTML = qeCatPanel(); $('#qeCatL').innerHTML = dv.querySelector('#qeCatL').innerHTML; return; }
+    if (t.id === 'qeDisc') { Q.discount = num(t.value); qeSum(); return; }
+    if (t.id === 'qeDiscLabel') { Q.discLabel = t.value; return; }
     var d = t.getAttribute && t.getAttribute('data-d');
     if (d) {
       if (d === 'no') { Q.no = t.value.replace(/\D/g, '').slice(0, 6); t.value = Q.no; var tk = qeTaken(Q.no), tb = $('#qeTaken'); if (tb) { tb.style.display = tk ? '' : 'none'; if (!tk) { Q.replace = false; $('#qeRep').checked = false; } tb.querySelector('label').lastChild.textContent = ' Quote #' + Q.no + ' already exists for this client - tick to replace it (the old page is overwritten)'; } }
