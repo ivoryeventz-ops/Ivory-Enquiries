@@ -1639,7 +1639,7 @@
 
 <div class="sheet" id="detail">
   <div class="grab"></div>
-  <div class="dhead"><div><h2 id="dName"></h2><div class="meta" id="dMeta"></div></div><span class="badge" id="dBadge"></span></div>
+  <div class="dhead"><div><h2 id="dName"></h2><div class="meta" id="dMeta"></div><div class="meta"><span id="dCode"></span> \u00b7 <a href="#" id="dRename" style="color:inherit;text-decoration:underline">Edit name</a></div></div><span class="badge" id="dBadge"></span></div>
   <div class="stlab">Status</div>
   <div class="stbtns" id="stbtns">
     <button class="st" data-s="Enquiry">Enquiry</button>
@@ -3065,7 +3065,7 @@
   function nameFirsts(i) { var o = [], n = nameToks(i.name); if (n.length) o.push(n[0]); aliasToks(i).forEach(function (t) { if (o.indexOf(t[0]) < 0) o.push(t[0]); }); return o; }
   function nameAll(i) { var o = nameToks(i.name); aliasToks(i).forEach(function (t) { t.forEach(function (w) { if (o.indexOf(w) < 0) o.push(w); }); }); return o; }
   // works that share this work's first name (so one folder could belong to a different wedding)
-  function sameName(i) { var k = payFolder(i, []).toLowerCase(); return items.some(function (o) { return o !== i && o.status !== 'Lost' && payFolder(o, []).toLowerCase() === k; }); }
+  function sameName(i) { var k = nameToks(i.name)[0]; return !!k && items.some(function (o) { return o !== i && o.status !== 'Lost' && nameToks(o.name)[0] === k; }); }
   // the client's own folder, plus any link folder whose words all appear in the name (e.g. "Christy Kzy" -> Christy-Kzy)
   function linkCands(i, L) {
     var out = [linkFolder(i)], nt = nameAll(i);
@@ -3082,7 +3082,7 @@
     // second check, only when another work has the same name: the link must be for this wedding date (a link with no readable date is given the benefit of the doubt)
     return !c.some(function (f) { return !FL.linkDate[f] || FL.linkDate[f] === i.date; });
   }
-  function noQuote(i) { return FL.ready && i.status === 'Confirmed' && !!i.date && !FL.sites[wkey(i)] && FL.cloud[wkey(i)] === 0; }
+  function noQuote(i) { return FL.ready && i.status !== 'Lost' && !!i.date && !FL.sites[wkey(i)] && FL.cloud[wkey(i)] === 0; }
   // quote exists only as a Google Site: counted as quoted, but outside vendors cannot be auto-picked from it until it is re-issued as a GitHub quote
   // A saved tick (or an explicit un-tick) always wins. With nothing saved, the wedding timeline shows ticked once its page exists in the timeline repo.
   function isDone(i, t) {
@@ -3152,7 +3152,7 @@
 
   // one call for quote flags + ticks, plus the new-style quote pages of every confirmed work
   function loadFlags() {
-    var conf = items.filter(function (i) { return i.status === 'Confirmed' && i.date; });
+    var conf = items.filter(function (i) { return i.status !== 'Lost' && i.date; });   // every live enquiry (Enquiry, Costing, Blocked, Confirmed) is checked for a quote
     var srv = call('api_flags', pin).then(function (r) { return r; }, function () { return null; });
     var gh = Promise.all(conf.map(function (it) {
       return ghQuotes(it).then(function (qs) { return { it: it, n: qs.length, folder: (qs[0] || {}).folder || '' }; }, function () { return { it: it, n: -1 }; });
@@ -3298,6 +3298,7 @@
     cur = items.filter(function (i) { return i.row === row; })[0];
     if (!cur) return;
     $('#dName').textContent = cur.name;
+    $('#dCode').textContent = cur.id;
     $('#dMeta').textContent = fmt(cur.date) + ' \u00b7 ' + when(cur.date) + (cur.venue ? ' \u00b7 ' + cur.venue : '');
     $('#dBadge').textContent = cur.status; $('#dBadge').className = 'badge s-' + cur.status;
     setTab('quotes');
@@ -3361,6 +3362,27 @@
       btn.disabled = false;
       btn.textContent = 'Save enquiry';
     });
+  });
+
+  // Rename a client at any time: the client code (not the name) finds links, quotes, payments and timelines, so nothing breaks.
+  $('#dRename').addEventListener('click', function (e) {
+    e.preventDefault();
+    if (!cur) return;
+    var nn = (window.prompt('Client name for ' + cur.id, cur.name) || '').trim();
+    if (!nn) return;
+    busy(true);
+    var oldNm = cur.name, itc = cur;
+    // the same name again just re-sends it to the client page (fixes a page that was missed)
+    (nn === cur.name ? Promise.resolve() : call('api_rename', pin, { id: cur.id, name: nn })).then(function () {
+      // the client's own page (intro "Prepared for" and name card) carries the name too
+      return call('api_site_rename', pin, { folder: siteFolder(itc), name: nn, oldName: oldNm }).then(function () { toast('Name changed, client page updated'); }, function (er) { toast('Name changed, but the client page was not updated: ' + er.message, true); });
+    }).then(function () {
+      var row = cur.row;
+      return load(true).then(function () {
+        cur = items.filter(function (i) { return i.row === row; })[0] || cur;
+        $('#dName').textContent = cur.name;
+      });
+    }).catch(function (err) { toast(err.message, true); }).then(function () { busy(false); });
   });
 
   $('#list').addEventListener('change', actToggle);
@@ -3565,6 +3587,7 @@
     return entry.p;
   }
   // Newer quote pages (ivory-packages.pages.dev). Two clients can share a first name, so a quote written for another event date is dropped.
+  function hasCodeFolder(it) { var c = wedCode(it).toLowerCase(); return !!c && !!ghTree && Object.keys(ghTree).some(function (f) { return f.toLowerCase() === c; }); }
   function ghQuotes(it, fresh) {
     return ghTreeGet(fresh ? 90000 : 0).then(function (tree) {
       var full = ' ' + [it.name].concat(String(it.alias || '').split(',')).map(function (n) { return nameToks(n).join(' '); }).filter(Boolean).join(' | ') + ' ';
@@ -3572,12 +3595,12 @@
       var jobs = [];
       Object.keys(tree).forEach(function (f) {
         var fn = ' ' + f.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim() + ' ';
-        if (hasCode ? f.toLowerCase() !== code : full.indexOf(fn) < 0) return;   // code folder wins; the name only finds folders made before codes
+        if (hasCode ? f.toLowerCase() !== code : (sameName(it) || full.indexOf(fn) < 0)) return;   // code folder wins; the name only finds folders made before codes
         tree[f].forEach(function (no) { jobs.push(ghQuote(f, no, fresh).then(function (q) { return q; }, function () { return null; })); });
       });
       return Promise.all(jobs);
     }).then(function (all) {
-      return all.filter(function (q) { return q && (!q.date || q.date === it.date); });
+      return all.filter(function (q) { return q && (hasCodeFolder(it) || (q.date && q.date === it.date)); });
     });
   }
 
@@ -3626,6 +3649,7 @@
   function tlMatches(it, t) {
     var wc = wedCode(it).toLowerCase();
     if (wc && Object.keys(t).some(function (f) { return f.toLowerCase() === wc; })) return true;
+    if (sameName(it)) return false;   // another work shares this name: only the wedding code may match
     var words = {};
     nameAll(it).forEach(function (w) { if (w.length > 2) words[w] = 1; });
     return Object.keys(t).some(function (f) {
@@ -3823,7 +3847,7 @@
   var SITE = {}, ADDED = {};
   var EV_TYPES = { christian: 'Wedding - Christian', pentecost: 'Wedding - Pentecost', engagement: 'Engagement', hindu: 'Reception - Hindu' };
   function linkWa(name, url) {
-    return 'https://wa.me/?text=' + encodeURIComponent('Hello ' + name + ',\nThank you for your enquiry with Ivory Events. Here is our introduction, wedding packages and service checklist for you to look through:\n' + url);
+    return 'https://wa.me/?text=' + encodeURIComponent(url);
   }
   function showLink(name, url, note) {
     $('#lkB').textContent = note || ''; $('#lkUrl').textContent = decodeURIComponent(url.replace('https://', ''));
@@ -3868,7 +3892,7 @@
     var wc = wedCode(it).toLowerCase();
     if (wc && FL.links && FL.links[wc]) return FL.links[wc];   // this wedding's own code folder
     var nf = nameFirsts(it), hit = '';
-    if (FL.links && it.date) Object.keys(FL.links).forEach(function (f) { var ft = nameToks(f); if (!hit && FL.linkDate[f] === it.date && ft.length && nf.indexOf(ft[0]) >= 0) hit = FL.links[f] || f; });
+    if (FL.links && it.date && !sameName(it)) Object.keys(FL.links).forEach(function (f) { var ft = nameToks(f); if (!hit && FL.linkDate[f] === it.date && ft.length && nf.indexOf(ft[0]) >= 0) hit = FL.links[f] || f; });
     return hit || payFolder(it, lastQ);
   }
   /* ---------- move an old name-based link to the wedding code (links already sent keep working: the old address redirects) ---------- */

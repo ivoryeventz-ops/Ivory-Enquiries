@@ -156,29 +156,13 @@ function api_add(pin, p) {
     const cLast = lastRowWith_(cli, 1);
     const eLast = lastRowWith_(enq, 1);
 
-    // A returning client keeps the same ID; a new name gets the next one.
-    let id = '';
-    if (cLast > 1) {
-      cli.getRange(2, 1, cLast - 1, 2).getValues().forEach(function (r) {
-        if (!id && String(r[1]).trim().toLowerCase() === name.toLowerCase()) id = String(r[0]).trim();
-      });
-    }
-
-    if (id && eLast > 1) {
-      enq.getRange(2, 1, eLast - 1, 6).getValues().forEach(function (r) {
-        if (String(r[0]).trim() === id && iso_(r[2]) === date && String(r[5]).trim() !== 'Lost') {
-          throw new Error(name + ' is already listed for that date');
-        }
-      });
-    }
-
-    if (!id) {
-      id = nextId_(ss);
-      const cr = cLast + 1;
-      cloneRow_(cli, cLast, cr, 6);
-      cli.getRange(cr, 1).setValue(id);
-      cli.getRange(cr, 2).setValue(name);
-    }
+    // Every enquiry gets its own new client code (IV-###), even when the name matches an earlier client.
+    // The code, never the name, is what ties a wedding to its link, quotes, payment page and timeline.
+    const id = nextId_(ss);
+    const cr = cLast + 1;
+    cloneRow_(cli, cLast, cr, 6);
+    cli.getRange(cr, 1).setValue(id);
+    cli.getRange(cr, 2).setValue(name);
 
     const r = eLast + 1;
     cloneRow_(enq, eLast, r, 17);
@@ -191,6 +175,34 @@ function api_add(pin, p) {
     }
     SpreadsheetApp.flush();
     return { ok: true, id: id };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+// Changes the client name for one client code. Links, quotes and timelines are found by code, so nothing else needs renaming.
+function api_rename(pin, p) {
+  check_(pin);
+  const name = String(p.name || '').trim();
+  const id = String(p.id || '').trim();
+  if (!name) throw new Error('Name cannot be empty');
+  if (!/^IV-\d+$/.test(id)) throw new Error('Client code missing');
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    const ss = ss_();
+    const cli = ss.getSheetByName(CFG.CLI);
+    const cLast = lastRowWith_(cli, 1);
+    let hit = 0;
+    if (cLast > 1) {
+      cli.getRange(2, 1, cLast - 1, 1).getValues().forEach(function (r, i) {
+        if (!hit && String(r[0]).trim() === id) hit = i + 2;
+      });
+    }
+    if (!hit) throw new Error('Client code ' + id + ' not found');
+    cli.getRange(hit, 2).setValue(name);
+    SpreadsheetApp.flush();
+    return { ok: true, id: id, name: name };
   } finally {
     lock.releaseLock();
   }
@@ -737,6 +749,54 @@ function api_site_migrate(pin, p) {
       call(SITE_REPO, evKey, '/contents/' + enc(SITE_DIR) + '/' + enc(oldF) + '/data.json', 'put', { message: msg + ' (marked as moved)', content: Utilities.base64Encode(Utilities.newBlob(JSON.stringify(oldData, null, 2) + '\n').getBytes()), sha: oldSha, branch: SITE_BRANCH });
     }
     return { ok: true, link: !!oldData, quotes: pk.filter(function (n) { return /^\d{6}\.html$/.test(n); }).map(function (n) { return n.slice(0, 6); }), packages: pk.length, timeline: tl.length };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+// Renames the client on their one link: <Client>/data.json "name" and the name written into <Client>/index.html.
+function api_site_rename(pin, p) {
+  check_(pin);
+  const props = PropertiesService.getScriptProperties();
+  const key = siteKey_(props);
+  if (!key) throw new Error('GitHub key needed');
+  const folder = String(p.folder || '').trim();
+  if (!/^[A-Za-z0-9][A-Za-z0-9 _-]{0,60}$/.test(folder)) throw new Error('Bad client folder name');
+  const name = String(p.name || '').trim();
+  if (!name) throw new Error('Name cannot be empty');
+  const hd = { Authorization: 'Bearer ' + key, Accept: 'application/vnd.github+json' };
+  const api = 'https://api.github.com/repos/' + SITE_REPO + '/contents/';
+  const path = function (f) { return encodeURIComponent(SITE_DIR) + '/' + encodeURIComponent(folder) + '/' + encodeURIComponent(f); };
+  const get = function (pth) {
+    const r = UrlFetchApp.fetch(api + pth + '?ref=' + SITE_BRANCH, { headers: hd, muteHttpExceptions: true });
+    const c = r.getResponseCode();
+    if (c === 200) return JSON.parse(r.getContentText());
+    if (c === 404) return null;
+    throw new Error('GitHub answered ' + c);
+  };
+  const put = function (pth, text, sha, msg) {
+    const body = { message: msg, content: Utilities.base64Encode(Utilities.newBlob(text).getBytes()), branch: SITE_BRANCH, sha: sha };
+    const r = UrlFetchApp.fetch(api + pth, { method: 'put', headers: hd, contentType: 'application/json', payload: JSON.stringify(body), muteHttpExceptions: true });
+    const c = r.getResponseCode();
+    if (c !== 200 && c !== 201) throw new Error('GitHub answered ' + c);
+  };
+  const dec = function (f) { return Utilities.newBlob(Utilities.base64Decode(f.content.replace(/\n/g, ''))).getDataAsString(); };
+  const esc = function (t) { return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); };
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    const dj = get(path('data.json'));
+    if (!dj) return { ok: true, skipped: 'no client link yet' };
+    const data = JSON.parse(dec(dj));
+    const old = String(data.name || p.oldName || '').trim();
+    data.name = name;
+    put(path('data.json'), JSON.stringify(data, null, 2) + '\n', dj.sha, 'Rename client ' + folder);
+    const ix = get(path('index.html'));
+    if (ix && old && old !== name) {
+      const html = dec(ix).split(esc(old)).join(esc(name));
+      put(path('index.html'), html, ix.sha, 'Rename client ' + folder);
+    }
+    return { ok: true, old: old, name: name };
   } finally {
     lock.releaseLock();
   }
