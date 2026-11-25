@@ -4534,7 +4534,7 @@
       return m ? parseInt(m[1].replace(/,/g, ''), 10) : null;
     };
     var addTotal = function (sec, el) {
-      if (el.classList.contains('quote-total')) { M.showTotal = true; M.totalLabel = tx(el.querySelector('.total-row-title')) || 'Total'; return; }   // our own add-ons total: recalculated on save
+      if (el.classList.contains('quote-total')) { M.showTotal = true; M.totalLabel = (tx(el.querySelector('.total-row-title')) || 'Total').replace(/\s+after discount$/i, '') || 'Total'; return; }   // our own add-ons total: recalculated on save
       var a = el.querySelector('.total-row-amount'), t = tx(el.querySelector('.total-row-title'));
       if (/^discounted\s+package/i.test(t)) t = 'Decor Package';   // it is the package rate, not a total
       if (!a || a.classList.contains('struck') || a.querySelector('.strike')) return;
