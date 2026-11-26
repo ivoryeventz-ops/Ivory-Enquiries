@@ -1001,6 +1001,7 @@
         <img src="https://ivory-packages.pages.dev/stages/thumbs/pkg-5-1.jpg" data-full="https://ivory-packages.pages.dev/stages/pkg-5-1.jpg" data-filename="Pkg 5 - 1.jpg" alt="Package 5 - photo 1" loading="lazy" decoding="async">
         <img src="https://ivory-packages.pages.dev/stages/thumbs/pkg-5-2.jpg" data-full="https://ivory-packages.pages.dev/stages/pkg-5-2.jpg" data-filename="Pkg 5 - 2.jpg" alt="Package 5 - photo 2" loading="lazy" decoding="async">
         <img src="https://ivory-packages.pages.dev/stages/thumbs/pkg-5-3.jpg" data-full="https://ivory-packages.pages.dev/stages/pkg-5-3.jpg" data-filename="Pkg 5 - 3.jpg" alt="Package 5 - photo 3" loading="lazy" decoding="async">
+        <img src="https://ivory-packages.pages.dev/stages/thumbs/pkg-5-4.jpg" data-full="https://ivory-packages.pages.dev/stages/pkg-5-4.jpg" data-filename="Pkg 5 - 4.jpg" alt="Package 5 - photo 4" loading="lazy" decoding="async">
       </div>
       <label>
         <input type="radio" name="pkg" data-name="Package 5" data-price="145000">
@@ -1117,6 +1118,7 @@
       <div class="gallery">
         <img src="https://ivory-packages.pages.dev/stages/thumbs/pkg-13-1.jpg" data-full="https://ivory-packages.pages.dev/stages/pkg-13-1.jpg" data-filename="Pkg 13 - 1.jpg" alt="Package 13 - photo 1" loading="lazy" decoding="async">
         <img src="https://ivory-packages.pages.dev/stages/thumbs/pkg-13-2.jpg" data-full="https://ivory-packages.pages.dev/stages/pkg-13-2.jpg" data-filename="Pkg 13 - 2.jpg" alt="Package 13 - photo 2" loading="lazy" decoding="async">
+        <img src="https://ivory-packages.pages.dev/stages/thumbs/pkg-13-3.jpg" data-full="https://ivory-packages.pages.dev/stages/pkg-13-3.jpg" data-filename="Pkg 13 - 3.jpg" alt="Package 13 - photo 3" loading="lazy" decoding="async">
       </div>
       <label>
         <input type="radio" name="pkg" data-name="Package 13" data-price="300000">
@@ -2720,9 +2722,27 @@
     if (keep && works[keep]) sel.value = keep;
   }
 
+  /* package rates for wedding dates from 1 April 2027; earlier dates keep the rates in the page */
+  var APR27 = [80000, 115000, 125000, 140000, 150000, 165000, 180000, 195000, 210000, 225000, 255000, 285000, 315000];
+  function seasonRates() {
+    var late = $id('dt').value >= '2027-04-01';
+    APR27.forEach(function (v, i) {
+      var el = ROOT.querySelector('input[data-name="Package ' + (i + 1) + '"]');
+      if (!el) return;
+      if (!el.hasAttribute('data-base')) el.setAttribute('data-base', el.getAttribute('data-price'));
+      var p = late ? v : Number(el.getAttribute('data-base'));
+      el.setAttribute('data-price', p);
+      var tag = el.closest('.item').querySelector('.price');
+      if (tag) tag.textContent = '\u20B9' + p.toLocaleString('en-IN');
+    });
+  }
+  ['input', 'change'].forEach(function (ev) { $id('dt').addEventListener(ev, function () { seasonRates(); renderBuilder(); }); });
+
   function fill(info, row) {
     $id('nm').value = info.name || '';
     $id('dt').value = info.date || '';
+    seasonRates();
+    renderBuilder();
     $id('vn').value = info.venue || '';
     $id('qn').value = todayNo();
     current = info;
@@ -4507,9 +4527,14 @@
   var QE_INC = ['White flex or carpet on stage', 'Sofa', 'Welcome drink for couple', 'Single layer fresh cream cake', '3 candles', 'Fresh leaves on stage',
     'Stage floral settings artificial', 'Stage lights and facelights', 'Stage sound system', 'Centre carpet along aisle', 'Hall entrance arch artificial',
     'Wedding car decoration fresh', 'Greeting garland and bouquet fresh', 'Wedding signage board', '2 welcome hostesses', 'Manthrakodi basket and ring box returnable'];
-  var QE_STAGES = {"1": 5, "2": 2, "3": 4, "4": 5, "5": 3, "6": 4, "7": 3, "8": 4, "9": 3, "10": 4, "11": 4, "12": 4, "13": 2};   // package number -> number of stage photos (hosted in the packages repo under /stages/)
+  var QE_STAGES = {"1": 5, "2": 2, "3": 4, "4": 5, "5": 4, "6": 4, "7": 3, "8": 4, "9": 3, "10": 4, "11": 4, "12": 4, "13": 3};   // package number -> number of stage photos (hosted in the packages repo under /stages/)
   var QE_STAGE_FILE = { '2': { 2: 3 } };   // Package 2: photo 2 was deleted, so shown photo 2 is the file pkg-2-3.jpg (old files stay in the repo for older quotes)
   function qeStageFile(n, m) { var f = QE_STAGE_FILE[n]; return 'pkg-' + n + '-' + ((f && f[m]) || m) + '.jpg'; }
+  var QE_APR27 = [80000, 115000, 125000, 140000, 150000, 165000, 180000, 195000, 210000, 225000, 255000, 285000, 315000];   // package rates for wedding dates from 1 April 2027
+  function qeRate(c, date) {
+    var m = /^Package (\d+)$/.exec(c.n);
+    return m && date >= '2027-04-01' ? QE_APR27[m[1] - 1] : c.p;
+  }
   var QE_DROP = /grand\s*total|discounted\s*total|^discount\b|^total\b/i;   // sums that would go stale the moment a rate changes
 
   function qeInclusions(pkg) {
@@ -4862,7 +4887,7 @@
       if (!open) return;
       idx.forEach(function (i) {
         var c = QE_CAT[i], on = isPkg ? c.n === Q.pkg : qeAdded(i);
-        h += '<button type="button" class="qci' + (on ? ' on' : '') + '" data-act="cadd" data-ci="' + i + '"><i class="qtick">' + (on ? '&#10003;' : '') + '</i><span>' + esc(c.n) + (c.d ? '<small>' + esc(c.d) + '</small>' : '') + '</span><b>' + (c.p ? inr(c.p) : 'enter rate') + '</b></button>';
+        h += '<button type="button" class="qci' + (on ? ' on' : '') + '" data-act="cadd" data-ci="' + i + '"><i class="qtick">' + (on ? '&#10003;' : '') + '</i><span>' + esc(c.n) + (c.d ? '<small>' + esc(c.d) + '</small>' : '') + '</span><b>' + (c.p ? inr(qeRate(c, Q.date)) : 'enter rate') + '</b></button>';
       });
     });
     return '<div class="qcat"><div class="qcat-top"><input id="qeCatQ" type="search" placeholder="Search services, e.g. church, pathway, cake" value="' + esc(($('#qeCatQ') || {}).value || '') + '">' +
@@ -4872,7 +4897,7 @@
     var h = '<div class="qcat"><div class="note">Tap a photo to use it as the stage design. That package is linked too (its rate goes in the Decor Package rate card).</div><div class="qcl">';
     Object.keys(QE_STAGES).forEach(function (n) {
       var pk = QE_CAT.filter(function (c) { return c.n === 'Package ' + n; })[0];
-      h += '<div class="qcg">Package ' + n + (pk ? ' &middot; ' + inr(pk.p) : '') + '</div><div class="qstg">';
+      h += '<div class="qcg">Package ' + n + (pk ? ' &middot; ' + inr(qeRate(pk, Q.date)) : '') + '</div><div class="qstg">';
       for (var m = 1; m <= QE_STAGES[n]; m++) h += '<button type="button" data-act="stgpick" data-p="' + n + '" data-m="' + m + '"><img loading="lazy" src="' + GH_SITE + '/stages/thumbs/' + qeStageFile(n, m) + '" alt="Package ' + n + ' photo ' + m + '"></button>';
       h += '</div>';
     });
@@ -4881,14 +4906,15 @@
   function qeAddCat(ci) {
     var c = QE_CAT[ci]; if (!c) return;
     if (c.g === 'Choose your package') {
+      var rate = qeRate(c, Q.date);
       Q.pkg = c.n;
       var s = Q.secs.filter(function (x) { return /decor package|^package|stage decoration/i.test(x.title) || x.totals.some(function (t) { return /decor package/i.test(t.title); }); })[0];
       if (!s) { s = qeBlankSec('Decor Package'); Q.secs.unshift(s); }
       var t = s.totals.filter(function (x) { return /package/i.test(x.title); })[0];
-      if (t) t.amount = c.p; else s.totals.push({ title: 'Decor Package', amount: c.p });
+      if (t) t.amount = rate; else s.totals.push({ title: 'Decor Package', amount: rate });
       if (!s.bullets.length) s.bullets = qeInclusions(c.n);
       qeKeepScroll();
-      qeStatus((c.n + ' linked at ' + inr(c.p) + '. Change the rate in the rate card if the stage design is priced differently.'));
+      qeStatus((c.n + ' linked at ' + inr(rate) + '. Change the rate in the rate card if the stage design is priced differently.'));
       return;
     }
     if (qeAdded(ci)) {   // ticking again removes the service
@@ -5074,7 +5100,14 @@
       return;
     }
     if (t.id === 'qeImg') { Q.imgChoice = t.value; $('#qeFile').style.display = t.value === 'up' ? 'block' : 'none'; return; }
-    if (t.id === 'qeDate') { Q.date = t.value; }
+    if (t.id === 'qeDate') {   // moving across 1 April 2027 re-prices a linked package that is still at its standard rate
+      var was = Q.date; Q.date = t.value;
+      var pk = QE_CAT.filter(function (c) { return c.n === Q.pkg; })[0];
+      if (pk && qeRate(pk, was) !== qeRate(pk, Q.date)) {
+        Q.secs.forEach(function (s) { s.totals.forEach(function (x) { if (/package/i.test(x.title) && num(x.amount) === qeRate(pk, was)) x.amount = qeRate(pk, Q.date); }); });
+        qeKeepScroll();
+      }
+    }
   });
 
 
