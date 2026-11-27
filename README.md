@@ -50,6 +50,7 @@ Opens from the **Vendor list** button. Lists, for every confirmed work, each out
 - **Delete quote (v27-Nov-b):** each quote in the **Quotes** tab has **Delete quote** (confirmed first). It takes the quote off the client link, then deletes the page from Ivory-Packages (recoverable from GitHub history). Google Site quotes have no delete button. Needs `Code.gs` (`api_quote_delete`) and `Index.html`.
 - **Client link shows the saved state (v27-Nov-c):** the Client link tab reads `data.json` through the script (`api_site_data`), because `raw.githubusercontent.com` can serve a copy a few minutes old, which made the Packages page button (and "On link" tags) look unchanged after a refresh. Needs `Code.gs` and `Index.html`.
 - **Edit / remove vendors (v27-Nov-d):** every item on a client's Vendors tab has **Edit** (change the item name; vendor name, details and booked tick are kept) and **Remove**. A removed quote item is saved as `- <item>` in the Vendors tab so the quote does not bring it back; it is listed under *Removed from this client* with **Restore**. An edited item is saved as your own (`+ <item>`). The quote itself is never changed. `Index.html` only.
+- **Vendor list editing (v27-Nov-e):** in the main **Vendors** screen, every booking (By vendor) and every item (Not assigned) has **Edit** (item, vendor name, details) and **Remove** (same effect as on the client's Vendors tab). Each vendor card has **Rename vendor**, which changes all its bookings, past ones included, after a confirmation. `Index.html` only.
 
 ## Push notifications: what is due
 

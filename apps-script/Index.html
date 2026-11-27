@@ -829,6 +829,7 @@
 
   .qwrap{flex-wrap:wrap}.qwrap>.qrow{flex:1 0 100%;margin-bottom:6px}.qwrap>.qedit{flex:1 1 0;min-height:40px}.qwrap{margin-bottom:12px}
   .vacts{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 6px}.vacts .retryb{margin:0}.veditbox{grid-column:1/-1;margin-bottom:8px}.veditbox .vname{margin-bottom:6px}
+  .vledit textarea.vname{font:inherit}.vlacts{grid-column:1/-1;flex-basis:100%;width:100%;margin-top:6px}.vledit{grid-column:1/-1;flex-basis:100%;width:100%;margin-top:6px}.vledit label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px}.vledit .vname{display:block;width:100%;box-sizing:border-box;margin-top:2px}.una{flex-wrap:wrap}
 </style>
 </head>
 <body>
@@ -3417,7 +3418,7 @@
 
 
   /* ---------- quotes sent + outside vendors ---------- */
-  var APP_VERSION = 'v27-Nov-d';   // shown under Outside vendors, so you can tell which Index.html is running
+  var APP_VERSION = 'v27-Nov-e';   // shown under Outside vendors, so you can tell which Index.html is running
   var GH_REPO = 'ivoryeventz-ops/Ivory-Packages', GH_BRANCH = 'main', GH_SITE = 'https://ivory-packages.pages.dev';
   // The 12 standard outside vendors (same list as VENDOR_NAMES in Code.gs).
   var VNAMES = ['Garland and Bouquet', 'Wedding cake', 'Confetti', 'Cold Spark', 'Dry Ice', 'Ambiance lighting',
@@ -6939,12 +6940,13 @@
       g.items.sort(function (a, b) { return (a.date || '').localeCompare(b.date || ''); });
       return '<div class="vg"><h4>' + esc(g.name) + '<span>' + g.items.length + (g.items.length === 1 ? ' booking' : ' bookings') + '</span></h4>' +
         g.items.map(function (r) {
-          return '<div class="vi"><div><span class="d">' + fmt(r.date) + '</span> &middot; ' + esc(r.client) +
+          return '<div class="vi" data-id="' + esc(r.id) + '" data-date="' + esc(r.date) + '" data-v="' + esc(r.vendor) + '"><div><span class="d">' + fmt(r.date) + '</span> &middot; ' + esc(r.client) +
             '</div>' +
             '<label class="vtk' + (r.booked ? ' on' : '') + '"><input type="checkbox" class="vbk" data-id="' + esc(r.id) + '" data-date="' + esc(r.date) + '" data-v="' + esc(r.vendor) + '"' + (r.booked ? ' checked' : '') + '><span>' + (r.booked ? 'Booked' : 'Mark as booked') + '</span></label>' +
             ((r.venue || '').trim() ? '<div class="vv">Venue: ' + esc(r.venue) + '</div>' : '') +
-            '<div class="w">' + esc(vLabel(r.vendor)) + ((r.details || '').trim() ? ' <i>&mdash;</i> ' + esc(r.details) : '') + '</div></div>';
+            '<div class="w">' + esc(vLabel(r.vendor)) + ((r.details || '').trim() ? ' <i>&mdash;</i> ' + esc(r.details) : '') + '</div>' + VL_ACTS + '</div>';
         }).join('') +
+        '<div class="vacts" style="margin-top:8px"><button type="button" class="retryb" data-vl="rename" data-sup="' + esc(g.name) + '">Rename vendor</button></div>' +
         '<a class="wa" href="' + esc(waLink(g)) + '" target="_blank" rel="noopener">Share on WhatsApp</a></div>';
     }).join('');
     if (!h) h = '<div class="note">' + (VL.length ? 'Nothing matches.' : 'No vendors entered yet. Type a vendor name in an outside vendor box and it will show here.') + '</div>';
@@ -7019,7 +7021,7 @@
           var s = g.saved[g.base + n], det = s && (s.details || '').trim();
           return '<div class="una" data-row="' + it.row + '" data-id="' + esc(it.id) + '" data-date="' + esc(it.date) + '" data-v="' + esc(n) + '">' +
             '<div class="un">' + esc(vLabel(n)) + (det ? '<div class="ud">' + esc(det) + '</div>' : '') + '</div>' +
-            '<input class="uname" list="unaSup" autocomplete="off" placeholder="Vendor name" aria-label="' + esc(vLabel(n)) + ' - vendor name"></div>';
+            '<input class="uname" list="unaSup" autocomplete="off" placeholder="Vendor name" aria-label="' + esc(vLabel(n)) + ' - vendor name">' + VL_ACTS + '</div>';
         }).join('') + '</div>';
     });
     var sup = {}, supList = [];
@@ -7069,6 +7071,124 @@
         toast('Not saved: ' + err.message, true);
       })
       .then(function () { busy(false); });
+  });
+
+  /* ---------- Vendor list: edit or remove a client's item, and rename a vendor ---------- */
+  var VL_ACTS = '<div class="vacts vlacts"><button type="button" class="retryb" data-vl="edit">Edit</button><button type="button" class="retryb" data-vl="remove" style="color:#a12622">Remove</button></div>';
+  function vlWork(id, date) { return items.filter(function (i) { return i.id === id && i.date === date; })[0]; }
+  function vlFind(id, date, vendor) { return VL.filter(function (r) { return r.id === id && r.date === date && r.vendor === vendor; })[0]; }
+  function vlDrop(it, vendor) { VL = VL.filter(function (r) { return !(r.id === it.id && r.date === it.date && r.vendor === vendor); }); }
+  function vlPut(it, vendor, data) {
+    var hit = vlFind(it.id, it.date, vendor);
+    if (!hit) { hit = { id: it.id, date: it.date, client: it.name, venue: it.venue || '', vendor: vendor, supplier: '', details: '', booked: false }; VL.push(hit); }
+    Object.keys(data).forEach(function (k) { hit[k] = data[k]; });
+  }
+  function vlDone(it) { if (it) delete dCache[wkey(it)]; UNA = null; renderVL(); }
+  function vlTarget(box) {   // the booking a button belongs to
+    var row = box.closest('.vi, .una');
+    var d = { el: row, id: row.getAttribute('data-id'), date: row.getAttribute('data-date'), vendor: row.getAttribute('data-v') };
+    d.it = vlWork(d.id, d.date);
+    d.rec = vlFind(d.id, d.date, d.vendor) || { supplier: '', details: '', booked: false };
+    return d;
+  }
+  function vlEditOpen(t) {
+    if (t.el.querySelector('.vledit')) return;
+    var f = document.createElement('div');
+    f.className = 'vledit';
+    var inp = function (k, label, value) { return '<label>' + label + '<input class="vname" data-k="' + k + '" autocomplete="off"' + (k === 'label' ? ' maxlength="140"' : '') + ' value="' + esc(value) + '"></label>'; };
+    f.innerHTML = inp('label', 'Item', vLabel(t.vendor)) + inp('supplier', 'Vendor name', t.rec.supplier || '') +
+      '<label>Details<textarea class="vname" data-k="details" rows="2">' + esc(t.rec.details || '') + '</textarea></label>' +
+      '<div class="vacts"><button type="button" class="retryb" data-vl="save">Save</button><button type="button" class="retryb" data-vl="cancel">Cancel</button></div>';
+    t.el.appendChild(f);
+    t.el.querySelector('.vlacts').style.display = 'none';
+  }
+  function vlEditSave(t) {
+    var it = t.it, old = t.vendor, form = t.el.querySelector('.vledit');
+    var val = function (k) { return form.querySelector('[data-k="' + k + '"]').value; };
+    var label = val('label').replace(/\s+/g, ' ').trim().replace(/^[+-]\s*/, ''), sup = val('supplier').trim(), det = val('details');
+    if (!label) { toast('Type the item name', true); return; }
+    var renamed = label !== vLabel(old), name = renamed ? VADD + label : old;
+    if (renamed && VL.some(function (r) { return r.id === it.id && r.date === it.date && r.vendor !== old && !isGone(r.vendor) && vLabel(r.vendor).toLowerCase() === label.toLowerCase(); })) { toast(label + ' is already listed for ' + it.name, true); return; }
+    // only what was changed is sent, so a tick or note saved from the other phone is not overwritten
+    var changed = {};
+    if (sup !== (t.rec.supplier || '')) changed.supplier = sup;
+    if (det !== (t.rec.details || '')) changed.details = det;
+    if (!renamed && !Object.keys(changed).length) { renderVL(); return; }
+    var full = { supplier: sup, details: det, booked: !!t.rec.booked };
+    busy(true);
+    var job = !renamed ? vCall(it, old, { fields: changed }) : vCall(it, name, { fields: full }).then(function () {
+      return isAdded(old) || name.toLowerCase() === old.toLowerCase() ? null : vCall(it, VGONE + old, { fields: {} });
+    }).then(function () { return vCall(it, old, { remove: true }); });
+    job.then(function () {
+      if (renamed) {
+        vlDrop(it, old); vlPut(it, name, full);
+        if (!isAdded(old) && name.toLowerCase() !== old.toLowerCase()) vlPut(it, VGONE + old, {});
+      } else vlPut(it, old, changed);
+      toast('Saved');
+      vlDone(it);
+    }).catch(function (e) { toast('Not saved: ' + e.message, true); delete dCache[wkey(it)]; UNA = null; openVL(); })
+      .then(function () { busy(false); });
+  }
+  function vlRemove(t) {
+    var it = t.it, old = t.vendor, own = isAdded(old);
+    askConfirm({ title: 'Remove ' + vLabel(old) + '?', body: vLabel(old) + ' is removed from the vendors of ' + it.name + ' (' + fmt(it.date) + '), with its vendor name, details and booked tick. The quote is not changed.' + (own ? '' : ' You can restore the item from the client\'s Vendors tab, but not what was typed in it.') + ' To take off only the vendor name, use Edit instead.', ok: 'Remove', needKey: false }).then(function (r) {
+      if (!r.ok) return;
+      busy(true);
+      return (own ? Promise.resolve() : vCall(it, VGONE + old, { fields: {} }))
+        .then(function () { return vCall(it, old, { remove: true }); })
+        .then(function () { vlDrop(it, old); if (!own) vlPut(it, VGONE + old, {}); vlDone(it); })
+        .catch(function (e) { toast('Not removed: ' + e.message, true); delete dCache[wkey(it)]; UNA = null; openVL(); })
+        .then(function () { busy(false); });
+    });
+  }
+  // Rename vendor: changes the name on every booking of that vendor, past ones included.
+  function vlRenameOpen(btn) {
+    var card = btn.closest('.vg');
+    if (card.querySelector('.vlren')) return;
+    var f = document.createElement('div');
+    f.className = 'vledit vlren';
+    f.innerHTML = '<label>New vendor name<input class="vname" autocomplete="off" value="' + esc(btn.getAttribute('data-sup')) + '"></label><div class="note">Changes every booking of this vendor, past events included.</div>' +
+      '<div class="vacts"><button type="button" class="retryb" data-vl="rensave" data-sup="' + esc(btn.getAttribute('data-sup')) + '">Save name</button><button type="button" class="retryb" data-vl="cancel">Cancel</button></div>';
+    btn.parentNode.parentNode.insertBefore(f, btn.parentNode.nextSibling);
+    f.querySelector('input').focus();
+  }
+  function vlRenameSave(btn) {
+    var from = btn.getAttribute('data-sup'), to = btn.closest('.vlren').querySelector('input').value.replace(/\s+/g, ' ').trim();
+    if (!to) { toast('Type the vendor name', true); return; }
+    if (to === from) { renderVL(); return; }
+    var rows = VL.filter(function (r) { return (r.supplier || '').trim().toLowerCase() === from.toLowerCase(); });
+    var merge = to.toLowerCase() !== from.toLowerCase() && VL.some(function (r) { return (r.supplier || '').trim().toLowerCase() === to.toLowerCase(); });
+    askConfirm({ title: 'Rename to ' + to + '?', body: from + ' becomes ' + to + ' on ' + rows.length + (rows.length === 1 ? ' booking' : ' bookings') + ', past events included.' + (merge ? ' ' + to + ' is already in the list, so their bookings will show together and cannot be separated in one step.' : ''), ok: 'Rename', needKey: false }).then(function (r) {
+      if (!r.ok) return;
+      var done = 0, skipped = 0, chain = Promise.resolve();
+      busy(true);
+      rows.forEach(function (rec) {
+        var it = vlWork(rec.id, rec.date);
+        if (!it) { skipped++; return; }
+        chain = chain.then(function () {
+          return vCall(it, rec.vendor, { fields: { supplier: to } }).then(function () { rec.supplier = to; delete dCache[wkey(it)]; done++; });
+        });
+      });
+      return chain.then(function () {
+        toast(skipped ? done + ' renamed. ' + skipped + ' could not be matched to a work and kept the old name.' : 'Renamed to ' + to, !!skipped);
+        UNA = null; renderVL();
+      }).catch(function (e) { toast(done + ' of ' + rows.length + ' renamed, then it stopped: ' + e.message, true); UNA = null; openVL(); })
+        .then(function () { busy(false); });
+    });
+  }
+  $('#vlList').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-vl]'); if (!b) return;
+    var act = b.getAttribute('data-vl');
+    if (act === 'rename') { vlRenameOpen(b); return; }
+    if (act === 'rensave') { vlRenameSave(b); return; }
+    if (act === 'cancel') {
+      var form = b.closest('.vledit'), row = form.closest('.vi, .una'), acts = row && row.querySelector('.vlacts');
+      if (acts && !form.classList.contains('vlren')) acts.style.display = '';
+      form.remove(); return;
+    }
+    var t = vlTarget(b);
+    if (!t.it) { toast('Could not find this work. Refresh and try again.', true); return; }
+    if (act === 'edit') vlEditOpen(t); else if (act === 'remove') vlRemove(t); else if (act === 'save') vlEditSave(t);
   });
 
   $('#vlist').addEventListener('click', function () { UNA = null; openVL(); });
