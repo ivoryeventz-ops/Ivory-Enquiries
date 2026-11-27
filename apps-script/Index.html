@@ -3415,7 +3415,7 @@
 
 
   /* ---------- quotes sent + outside vendors ---------- */
-  var APP_VERSION = 'v20-Nov-a';   // shown under Outside vendors, so you can tell which Index.html is running
+  var APP_VERSION = 'v27-Nov-a';   // shown under Outside vendors, so you can tell which Index.html is running
   var GH_REPO = 'ivoryeventz-ops/Ivory-Packages', GH_BRANCH = 'main', GH_SITE = 'https://ivory-packages.pages.dev';
   // The 12 standard outside vendors (same list as VENDOR_NAMES in Code.gs).
   var VNAMES = ['Garland and Bouquet', 'Wedding cake', 'Confetti', 'Cold Spark', 'Dry Ice', 'Ambiance lighting',
@@ -3440,6 +3440,10 @@
   };
   // A line that matches one of these is NOT that vendor: a car decoration is not a wedding car, a band platform is not a live band.
   var VENDOR_NOT = { 'Wedding Car': /decor/i, 'Live Band': /platform/i };
+  // Outside vendors added by hand are saved with a "+ " in front, so they are never removed just because no quote lists them.
+  var VADD = '+ ';
+  function isAdded(n) { return String(n || '').indexOf(VADD) === 0; }
+  function vLabel(n) { return isAdded(n) ? String(n).slice(VADD.length) : String(n || ''); }
   function stdMatch(n, str) { return !!(VENDOR_RE[n] && VENDOR_RE[n].test(str) && !(VENDOR_NOT[n] && VENDOR_NOT[n].test(str))); }
   // Does this quote ask for vendor n? Vendors with an exclusion rule are checked line by line (the quote's own lines), the rest on the whole page text.
   function vHit(n, q) {
@@ -3748,10 +3752,11 @@
   function vRow(name) {
     var s = VS[name] || { supplier: '', details: '', booked: false };
     return '<div class="vrow' + (s.booked ? ' on' : '') + '" data-v="' + esc(name) + '">' +
-      '<label class="vtick"><input type="checkbox"' + (s.booked ? ' checked' : '') + '><span>' + esc(name) + '</span></label>' +
+      '<div><label class="vtick"><input type="checkbox"' + (s.booked ? ' checked' : '') + '><span>' + esc(vLabel(name)) + '</span></label>' +
+      (isAdded(name) ? '<button type="button" class="retryb" data-act="vdel" style="margin:0 0 6px">Remove</button>' : '') + '</div>' +
       '<div class="vfields">' +
-      '<input class="vname" data-f="supplier" list="supList" autocomplete="off" placeholder="Vendor name" aria-label="' + esc(name) + ' - vendor name" value="' + esc(s.supplier || '') + '">' +
-      '<textarea rows="2" data-f="details" placeholder="Details - what is booked" aria-label="' + esc(name) + ' - details">' + esc(s.details || '') + '</textarea>' +
+      '<input class="vname" data-f="supplier" list="supList" autocomplete="off" placeholder="Vendor name" aria-label="' + esc(vLabel(name)) + ' - vendor name" value="' + esc(s.supplier || '') + '">' +
+      '<textarea rows="2" data-f="details" placeholder="Details - what is booked" aria-label="' + esc(vLabel(name)) + ' - details">' + esc(s.details || '') + '</textarea>' +
       '</div></div>';
   }
   function vCount() {
@@ -3762,13 +3767,16 @@
   }
   function renderVendors(it, d, list, gh, fresh) {
     vItem = null; vMainList = [];
-    if (it.status !== 'Confirmed') { $('#dVend').innerHTML = ''; return; }
+    if (it.status === 'Lost') { $('#dVend').innerHTML = ''; return; }
+    var conf = it.status === 'Confirmed';   // vendors are picked from the quote only for Confirmed works; your own can be added to any work
     vItem = it; VS = d.vendors || {};
     var names = (d.vendorList || []).slice();
     VNAMES.forEach(function (n) { if (names.indexOf(n) < 0) names.push(n); });   // new vendor types work even before Code.gs is redeployed
-    var latest = list[0], text = latest && latest.src === 'cloud' ? latest.text : '';
+    var latest = list[0], text = conf && latest && latest.src === 'cloud' ? latest.text : '';
     var main = [], note;
-    if (text) {
+    if (!conf) {
+      note = 'Add any outside vendor for this client below. No quote or costing is needed.';
+    } else if (text) {
       main = names.filter(function (n) { return vHit(n, latest); });
       // other items the quote lists under "Outside Vendors" that are not one of the standard vendors (e.g. Pandhal)
       (latest.outside || []).forEach(function (o) {
@@ -3782,13 +3790,24 @@
     } else if (gh && gh.err) {
       note = 'The quote could not be checked just now, so no vendors are listed. Use Try again above.';
     } else {
-      note = 'No quote found for this work, so there are no outside vendors to list.';
+      note = 'No quote found for this work. Add outside vendors below.';
     }
+    var added = Object.keys(VS).filter(isAdded);
     // The list follows the latest quote. A saved vendor the quote no longer has is dropped (and deleted from the sheet once the quote has been read fresh).
-    if (text && fresh) vPrune(it, Object.keys(VS).filter(function (n) { return main.indexOf(n) < 0; }));
+    if (text && fresh) vPrune(it, Object.keys(VS).filter(function (n) { return !isAdded(n) && main.indexOf(n) < 0; }));
+    // an item added by hand that the quote now lists too is shown once: the quote's empty row gives way to yours
+    main = main.filter(function (n) {
+      var s = VS[n] || {};
+      return s.booked || s.supplier || s.details || !added.some(function (a) { return vLabel(a).toLowerCase() === n.toLowerCase(); });
+    }).concat(added);
     $('#dVend').innerHTML = '<h3>Outside vendors <span class="vcount" id="vcount"></span></h3><div class="note">' + note + ' <span style="opacity:.6">(app ' + APP_VERSION + ')</span></div>' +
       '<div id="vmain">' + main.map(vRow).join('') + '</div>' +
       '<datalist id="supList">' + (d.suppliers || []).map(function (n) { return '<option value="' + esc(n) + '">'; }).join('') + '</datalist>' +
+      '<div class="vrow" id="vaddBox" style="display:block"><b>Add an outside vendor</b>' +
+      '<input class="vname" id="vaddItem" list="vaddList" autocomplete="off" maxlength="140" placeholder="Service, e.g. Wedding cake, Pandhal" aria-label="Service" style="margin:8px 0">' +
+      '<input class="vname" id="vaddSup" list="supList" autocomplete="off" placeholder="Vendor name (optional)" aria-label="Vendor name">' +
+      '<datalist id="vaddList">' + VNAMES.map(function (n) { return '<option value="' + esc(n) + '">'; }).join('') + '</datalist>' +
+      '<button type="button" class="pbtn" data-act="vadd" style="margin-top:8px">+ Add vendor</button></div>' +
       '<div class="vstate" id="vstate"></div>';
     vMainList = main.slice();
     vCount();
@@ -3805,13 +3824,13 @@
   function updateTabs(it) {
     if (!it) return;
     var conf = it.status === 'Confirmed';
-    $('#tabV').hidden = !conf; $('#tabT').hidden = !conf;
+    $('#tabV').hidden = it.status === 'Lost'; $('#tabT').hidden = !conf;
     $('#tbQ').textContent = lastQ.length || '';
     var n = pending(it);
     $('#tbT').textContent = n || ''; $('#tabT').classList.toggle('alert', n > 0);
     var vc = $('#vcount'), m = vc && /(\d+) of (\d+) booked/.exec(vc.textContent || '');
     $('#tbV').textContent = m ? m[1] + '/' + m[2] : '';
-    if (!conf && (curTab === 'vendors' || curTab === 'tasks')) setTab('quotes');
+    if ((!conf && curTab === 'tasks') || (it.status === 'Lost' && curTab === 'vendors')) setTab('quotes');
   }
   $('#dTabs').addEventListener('click', function (e) {
     var b = e.target.closest('.dtab'); if (!b || b.hidden) return;
@@ -4118,7 +4137,7 @@
       sdBuild(q.stage, q.extras, q).forEach(function (r) { items.push({ section: 'Stage and decor', item: r.t, details: '', qty: ckQty(r.t), on: !r.opt }); });
     }
     if (vItem === it) vMainList.forEach(function (n) {
-      items.push({ section: 'Outside vendors', item: n, details: '', qty: '', on: true });   // staff sheet lists the item only, no vendor names
+      items.push({ section: 'Outside vendors', item: vLabel(n), details: '', qty: '', on: true });   // staff sheet lists the item only, no vendor names
     });
     ckS = { it: it, q: q, items: items, done: false };
     $('#ckMeta').textContent = it.name + ' - ' + fmt(it.date) + (it.venue ? ' - ' + it.venue : '') + (q && q.src === 'cloud' ? ' - items from quote #' + q.no : '');
@@ -4234,8 +4253,41 @@
   });
   $('#dVend').addEventListener('click', function (e) {
     var b = e.target.closest('[data-act]'); if (!b) return;
-    if (b.getAttribute('data-act') === 'vretry') vSend();
+    var act = b.getAttribute('data-act');
+    if (act === 'vretry') vSend();
+    else if (act === 'vadd') vAddOwn();
+    else if (act === 'vdel' && vItem) vDelOwn(vItem, b.closest('.vrow').getAttribute('data-v'));
   });
+  function vRedraw() {
+    var h = vMainList.map(vRow).join('');
+    $('#vmain').innerHTML = h;
+    vCount();
+  }
+  function vAddOwn() {
+    if (!vItem) return;
+    var item = $('#vaddItem').value.replace(/\s+/g, ' ').trim().replace(/^\+\s*/, ''), sup = $('#vaddSup').value.trim();
+    if (!item) { toast('Type the service first', true); $('#vaddItem').focus(); return; }
+    if (vMainList.some(function (n) { return vLabel(n).toLowerCase() === item.toLowerCase(); })) { toast(item + ' is already listed - type the vendor name in its box', true); return; }
+    var name = VADD + item;
+    vMainList.push(name);
+    VS[name] = { supplier: sup, details: '', booked: false };
+    delete dCache[wkey(vItem)];
+    vRedraw();
+    $('#vaddItem').value = ''; $('#vaddSup').value = '';
+    vQueue(vItem, name, { supplier: sup });
+  }
+  function vDelOwn(it, name) {
+    askConfirm({ title: 'Remove this vendor?', body: vLabel(name) + ' will be removed from ' + it.name + ', with its vendor name, details and booked tick.', ok: 'Remove', needKey: false }).then(function (r) {
+      if (!r.ok) return;
+      delete vPend[it.id + '|' + it.date + '|' + name];
+      busy(true);
+      return call('api_vendor', pin, { row: it.row, id: it.id, date: it.date, vendor: name, remove: true }).then(function () {
+        delete dCache[wkey(it)];
+        VL = VL.filter(function (x) { return !(x.id === it.id && x.date === it.date && x.vendor === name); });
+        if (vItem === it) { delete VS[name]; vMainList = vMainList.filter(function (n) { return n !== name; }); vRedraw(); }
+      }).catch(function (e) { toast('Not removed: ' + e.message, true); }).then(function () { busy(false); });
+    });
+  }
   $('#dVend').addEventListener('change', function (e) {
     var row = e.target.closest('.vrow'); if (!row || !vItem) return;
     var name = row.getAttribute('data-v'), f = e.target.getAttribute('data-f');
@@ -4351,7 +4403,7 @@
   }
 
   function payFromQuote(list) {
-    var q = (list || []).filter(function (x) { return x.src === 'cloud' && x.items; })[0];
+    var q = (list || []).filter(function (x) { return x.src === 'cloud' && x.items && x.items.length; })[0];
     var out = q ? q.items.map(function (r) { return { name: r.name, amount: r.amount }; }) : [];
     return withDecor(out);
   }
@@ -4550,6 +4602,7 @@
   function qeParse(raw) {
     var doc = new DOMParser().parseFromString(raw, 'text/html'), M = { name: '', date: '', venue: '', img: '', secs: [], dropped: [], options: [], showTotal: false, totalLabel: 'Total' };
     var cont = doc.querySelector('.container') || doc.body;
+    M.svcOnly = !!(cont.classList && cont.classList.contains('svc-only'));
     var tx = function (el) { return ((el && el.textContent) || '').replace(/\s+/g, ' ').trim(); };
     var each = function (list, fn) { Array.prototype.forEach.call(list, fn); };
     var amt = function (el) {
@@ -4651,9 +4704,43 @@
   }
 
   // The new quote page: same theme and layout as the Abraham quote pages, never a grand total.
+  // Services list only: no packages, rates, totals or photos - just what is provided, as a tick list.
+  var QE_SVC_CSS = '\n.svc-only .line-item-box{justify-content:flex-start}\n.svc-only ul.item-list{list-style:none;padding-left:0}\n.svc-only ul.item-list>li{position:relative;padding-left:28px}\n.svc-only ul.item-list>li::before{content:"\\2713";position:absolute;left:2px;color:#9e7b39;font-weight:700}\n.svc-only .line-item-name::before{content:"\\2713";margin-right:10px;color:#9e7b39}\n';
+  function qeNoRate(t) {   // takes any amount written inside a description off the text
+    return String(t || '').replace(/\([^()]*(?:\u20b9|\bRs\b\.?|\bINR\b)[^()]*\)/gi, '')
+      .replace(/(?:[-\u2013\u2014:@]\s*)?(?:\u20b9|\bRs\b\.?|\bINR\b)\s*\d[\d,]*(?:\s*\/-)?/gi, '').replace(/\s+/g, ' ').trim();
+  }
+  function qeSvcTitle(t) {
+    t = qeNoRate(t);
+    if (/^additional items$/i.test(t)) return 'Additional Services';
+    return /^(decor\s*)?package(\s*\d+)?$|^discounted package/i.test(t) ? 'Stage Decoration' : t.replace(/\bpackage\s*\d+\b/gi, '').replace(/\s+/g, ' ').trim();
+  }
+  function qeSvcSecs(secs) {
+    return secs.map(function (s) {
+      var clean = function (a) { return (a || []).map(qeNoRate).filter(Boolean); };
+      var lines = s.lines.filter(function (l) { return String(l.name || '').trim() && !/^(decor\s*)?package(\s*\d+)?$/i.test(String(l.name).trim()); }).map(function (l) {
+        return { name: qeNoRate(qeLineName(l)), subs: clean(l.subs), note: /\u20b9|\bRs\b|\brate|\bprice|\bcharge|\bcost|\bextra\b/i.test(l.note || '') ? '' : l.note };
+      });
+      var bullets = clean(s.bullets);
+      return { title: bullets.length || lines.length ? qeSvcTitle(s.title) : '', bullets: bullets, lines: lines };
+    }).filter(function (s) { return s.bullets.length || s.lines.length; });
+  }
+  function qeSvcCard(s) {
+    var c = ['    <div class="section-card">'];
+    if (s.title) c.push('      <div class="section-header">\n        <span class="section-title">' + esc(s.title) + '</span>\n      </div>');
+    if (s.bullets.length) c.push('      <ul class="item-list">\n' + s.bullets.map(function (b) { return '        <li>' + esc(b) + '</li>'; }).join('\n') + '\n      </ul>');
+    if (s.lines.length) c.push('      <div class="line-item-group">\n' + s.lines.map(function (l) {
+      return '        <div class="line-item-box">\n          <div class="line-item-info">\n            <div class="line-item-name">' + esc(l.name) + '</div>' +
+        (l.subs.length ? '\n            <ul class="line-item-sublist">\n' + l.subs.map(function (x) { return '              <li>' + esc(x) + '</li>'; }).join('\n') + '\n            </ul>' : '') +
+        (String(l.note || '').trim() ? '\n            <div class="line-item-note">' + esc(l.note.trim()) + '</div>' : '') + '\n          </div>\n        </div>';
+    }).join('\n') + '\n      </div>');
+    c.push('    </div>');
+    return c.join('\n');
+  }
   function qeHtml(Q, css) {
     var dateStr = Q.date ? toDate(Q.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : '';
-    var title = 'Decor Quote - ' + Q.name;
+    var head = Q.svcOnly ? 'Wedding Services' : 'Decor Quote';
+    var title = head + ' - ' + Q.name;
     var pageUrl = GH_SITE + '/' + encodeURIComponent(Q.folder) + '/' + Q.no;
     var isPkg1 = Q.pkg === 'Package 1' || Q.secs.some(function (s) { return /^package 1$/i.test(s.title); });
     var all = Q.secs.concat([Q.custom]);
@@ -4662,16 +4749,23 @@
     h.push('<!DOCTYPE html>\n<html lang="en">\n<head>\n  <meta charset="UTF-8" />\n  <meta name="viewport" content="width=device-width, initial-scale=1.0" />\n  <meta name="robots" content="noindex" />');
     h.push('  <title>' + esc(title) + '</title>');
     h.push('  <meta property="og:type" content="website" />\n  <meta property="og:site_name" content="Ivory Events" />\n  <meta property="og:title" content="' + esc(title) + '" />');
-    h.push('  <meta property="og:description" content="' + esc('Ivory Events wedding decor quote - ' + dateStr + (Q.venue ? ', ' + Q.venue : '')) + '" />');
+    h.push('  <meta property="og:description" content="' + esc((Q.svcOnly ? 'Ivory Events wedding services - ' : 'Ivory Events wedding decor quote - ') + dateStr + (Q.venue ? ', ' + Q.venue : '')) + '" />');
     h.push('  <meta property="og:url" content="' + esc(pageUrl) + '" />\n  <meta property="og:image" content="' + GH_SITE + '/ivory-logo.jpg" />\n  <meta property="og:image:alt" content="Ivory Events logo" />');
     h.push('  <meta name="twitter:card" content="summary" />\n  <meta name="twitter:image" content="' + GH_SITE + '/ivory-logo.jpg" />');
     h.push('  <link rel="preconnect" href="https://fonts.googleapis.com">\n  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>');
     h.push('  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">');
-    h.push('  <style>' + css + '</style>\n</head>\n<body>\n\n  <div class="container">');
-    h.push('    <div class="header-card">\n      <h1 class="brand-title">Decor Quote</h1>\n      <p class="sub-title">Wedding Decor</p>\n      <div class="draft-note">Decor Quote - ' + esc(Q.no) + '</div>\n\n      <div class="info-grid">');
+    h.push('  <style>' + css + (Q.svcOnly ? QE_SVC_CSS : '') + '</style>\n</head>\n<body>\n\n  <div class="container' + (Q.svcOnly ? ' svc-only' : '') + '">');
+    h.push('    <div class="header-card">\n      <h1 class="brand-title">' + head + '</h1>\n      <p class="sub-title">' + (Q.svcOnly ? 'Services Provided' : 'Wedding Decor') + '</p>\n      <div class="draft-note">' + head + ' - ' + esc(Q.no) + '</div>\n\n      <div class="info-grid">');
     h.push('        <div class="info-item"><div class="info-label">Name</div><div class="info-value">' + esc(Q.name) + '</div></div>');
     h.push('        <div class="info-item"><div class="info-label">Date</div><div class="info-value">' + esc(dateStr) + '</div></div>');
     h.push('        <div class="info-item"><div class="info-label">Venue</div><div class="info-value">' + esc(Q.venue) + '</div></div>\n      </div>\n    </div>');
+    if (Q.svcOnly) {
+      h.push('<!-- Decor Quote: services list only -->');
+      qeSvcSecs(all).forEach(function (s) { h.push(qeSvcCard(s)); });
+      h.push(qeComplimentary(isPkg1, hasAnchor));
+      h.push('  </div>\n\n</body>\n</html>\n');
+      return h.join('\n');
+    }
     if (Q.img) {
       h.push('    <div class="image-card">\n      <div class="image-title">Stage Design Concept &amp; Reference</div>\n      <div class="image-wrapper">\n        <img src="' + esc(Q.img) +
         '" alt="' + esc('Reference photograph of the proposed wedding stage design - ' + Q.name) + '" loading="lazy" decoding="async" />\n      </div>\n    </div>');
@@ -4733,6 +4827,7 @@
     var M = src && src.raw ? qeParse(src.raw) : { name: '', date: '', venue: '', img: '', secs: [], dropped: [], options: [] };
     Q = { it: it, list: list, folder: folder, base: src ? src.no : '', name: M.name || it.name || '', date: M.date || it.date || '', venue: M.venue || (src && src.venue) || it.venue || '',
       img: M.img, imgChoice: 'keep', upload: null, discount: '', secs: M.secs, dropped: M.dropped, custom: qeBlankSec('Additional Items'), pkg: null, no: qeTodayNo(), replace: false, options: M.options || [], optBase: src ? src.no : '' };
+    Q.svcOnly = !!M.svcOnly;
     Q.showTotal = !!M.showTotal; Q.totalLabel = M.totalLabel || 'Total';
     Q.secs = Q.secs.filter(function (x) {   // an old "Additional Items" section becomes the add-ons area, so ticked services and typed ones sit together after the package
       if (!/^additional items$/i.test(x.title) || x.totals.length || x.bullets.length) return true;
@@ -4802,6 +4897,7 @@
   function qeSum() {
     var T = qeTotal(Q), el = $('#qeSum');
     if (!el) return;
+    if (Q.svcOnly) { el.textContent = 'Services list only: no rates, totals, discount or photo will be shown.'; return; }
     var dsc = Math.min(num(Q.discount), T.sum);
     el.textContent = T.sum ? 'Decor Package ' + inr(T.pkg) + ' + add-ons ' + inr(T.add) + ' = ' + inr(T.sum) + (dsc ? ' - discount ' + inr(dsc) + ' = ' + inr(T.sum - dsc) : '') + (Q.showTotal ? ' (this total is shown on the quote)' : ' (not shown on the quote - tick the box above to show it)') : '';
   }
@@ -4823,6 +4919,8 @@
       '<label for="qeVenue">Venue</label><input id="qeVenue" data-d="venue" value="' + esc(Q.venue) + '">' +
       '<div class="qtaken" id="qeTaken"' + (tk ? '' : ' style="display:none"') + '><label class="tlchk"><input type="checkbox" id="qeRep"' + (Q.replace ? ' checked' : '') + '> Quote #' + esc(Q.no) +
       ' already exists for this client - tick to replace it (the old page is overwritten)</label></div>' +
+      '<div class="qtotbox"><label class="tlchk"><input type="checkbox" id="qeSvc"' + (Q.svcOnly ? ' checked' : '') + '> Services list only - no packages, rates or photos</label>' +
+      '<div class="note">The client sees only the services provided, stage decoration included, as a tick list.</div></div>' +
       '<h4>Stage design</h4><button type="button" class="pbtn" data-act="stg" style="margin:0 0 8px">Choose a stage design</button><div id="qeStg" style="display:none"></div><select id="qeImg" data-d="img">' + qeImgOptions() + '</select><input type="file" id="qeFile" accept="image/*" style="display:' + (Q.imgChoice === 'up' ? 'block' : 'none') + ';margin-top:8px"><div class="note" id="qeFileNote" style="display:' + (Q.imgChoice === 'up' && Q.upload ? 'block' : 'none') + '">' + (Q.upload ? 'Photo chosen: ' + esc(Q.upload.name || 'photo') + ' - it is added when you save. Tap Choose File to pick another.' : '') + '</div>' +
       qeOptPanel() +
       '<h4>Services from the quote builder</h4><div class="note">Open a group and tick what the client wants - church decoration, pathway stands, cake, band, cars and the rest. Tick again to remove. Everything can be edited below.</div>' +
@@ -4942,6 +5040,7 @@
     if (!Q.date) return 'Pick the wedding date.';
     if (!/^\d{6}$/.test(Q.no)) return 'The quote number is 6 digits (YYMMDD).';
     if (qeTaken(Q.no) && !Q.replace) return 'Quote #' + Q.no + ' already exists - tick the box to replace it, or pick another number.';
+    if (Q.svcOnly) return qeSvcSecs(Q.secs.concat([Q.custom])).length ? '' : 'Add at least one service or stage decoration item.';
     if (num(Q.discount) > qeTotal(Q).sum) return 'The discount is more than the total.';
     var priced = Q.secs.concat([Q.custom]).some(function (s) { return s.lines.some(function (l) { return String(l.name || '').trim() && qeLineAmount(l); }) || s.totals.some(function (t) { return num(t.amount); }); });
     if (!priced) return 'Add at least one priced service or package.';
@@ -4989,7 +5088,7 @@
     return Promise.resolve({ img: Q.img, up: null });
   }
   function qeDone() {
-    var url = GH_SITE + '/' + encodeURIComponent(Q.folder) + '/' + Q.no, wa = 'https://wa.me/?text=' + encodeURIComponent('Decor quote - ' + Q.name + '\n' + url);
+    var url = GH_SITE + '/' + encodeURIComponent(Q.folder) + '/' + Q.no, wa = 'https://wa.me/?text=' + encodeURIComponent((Q.svcOnly ? 'Services list - ' : 'Decor quote - ') + Q.name + '\n' + url);
     if (ghTree) { ghTree[Q.folder] = ghTree[Q.folder] || []; if (ghTree[Q.folder].indexOf(Q.no) < 0) ghTree[Q.folder].push(Q.no); }
     qeStatus('Saved as quote #' + esc(Q.no) + '. The page is live in a minute or so.');
     $('#qeShare').innerHTML = '<a class="wa" href="' + esc(wa) + '" target="_blank" rel="noopener">Send on WhatsApp</a> <a class="pbtn" style="display:inline-block;text-decoration:none" href="' + esc(url) + '" target="_blank" rel="noopener">Open page</a>';
@@ -5000,7 +5099,7 @@
     var ki = $('#qeKey'), typed = ki ? ki.value.trim() : '', tok = Q, btn = $('#qeSave');
     if (qeSrv === 'nokey' && !typed) { qeStatus('Paste the GitHub key first.', true); return; }
     btn.disabled = true; qeStatus('Saving...');
-    qeFinalImg().then(function (fi) {
+    (Q.svcOnly ? Promise.resolve({ img: Q.img, up: null }) : qeFinalImg()).then(function (fi) {
       Q.img = fi.img;
       var args = { folder: Q.folder, no: Q.no, html: qeHtml(Q, qeCss()), replace: !!Q.replace, key: typed, message: 'Quote ' + Q.folder + '/' + Q.no + (Q.base ? ' (from ' + Q.base + ')' : '') };
       if (fi.up) args.img = fi.up;
@@ -5092,6 +5191,7 @@
   $('#qe').addEventListener('change', function (e) {
     var t = e.target; if (!Q) return;
     if (t.id === 'qeRep') { Q.replace = t.checked; return; }
+    if (t.id === 'qeSvc') { Q.svcOnly = t.checked; $('#qePrev').style.display = 'none'; qeSum(); return; }
     if (t.id === 'qeShowTot') { Q.showTotal = t.checked; $('#qeTotLabel').style.display = t.checked ? '' : 'none'; qeSum(); return; }
     if (t.id === 'qeFile') {
       Q.upload = (t.files && t.files[0]) || null;
@@ -6643,7 +6743,7 @@
         var latest = x.qs.slice().sort(function (a, b) { return b.no.localeCompare(a.no); })[0];
         if (!latest || !latest.text) return;
         var it = x.it, allowed = quoteVendors(latest);
-        var gone = VL.filter(function (r) { return r.id === it.id && r.date === it.date && allowed.indexOf(r.vendor) < 0; }).map(function (r) { return r.vendor; });
+        var gone = VL.filter(function (r) { return r.id === it.id && r.date === it.date && !isAdded(r.vendor) && allowed.indexOf(r.vendor) < 0; }).map(function (r) { return r.vendor; });
         if (!gone.length) return;
         VL = VL.filter(function (r) { return !(r.id === it.id && r.date === it.date && gone.indexOf(r.vendor) >= 0); });
         removed += gone.length;
@@ -6657,7 +6757,7 @@
     var blocks = [], idx = {};
     g.items.forEach(function (r) {
       var head = fmt(r.date) + ((r.venue || '').trim() ? ': ' + r.venue.trim() : '');
-      var line = r.vendor + ((r.details || '').trim() ? ' - ' + r.details.trim() : '');   // item name + Details exactly as typed
+      var line = vLabel(r.vendor) + ((r.details || '').trim() ? ' - ' + r.details.trim() : '');   // item name + Details exactly as typed
       if (idx[head] === undefined) { idx[head] = blocks.length; blocks.push([head]); }
       blocks[idx[head]].push(line);
     });
@@ -6696,7 +6796,7 @@
             '</div>' +
             '<label class="vtk' + (r.booked ? ' on' : '') + '"><input type="checkbox" class="vbk" data-id="' + esc(r.id) + '" data-date="' + esc(r.date) + '" data-v="' + esc(r.vendor) + '"' + (r.booked ? ' checked' : '') + '><span>' + (r.booked ? 'Booked' : 'Mark as booked') + '</span></label>' +
             ((r.venue || '').trim() ? '<div class="vv">Venue: ' + esc(r.venue) + '</div>' : '') +
-            '<div class="w">' + esc(r.vendor) + ((r.details || '').trim() ? ' <i>&mdash;</i> ' + esc(r.details) : '') + '</div></div>';
+            '<div class="w">' + esc(vLabel(r.vendor)) + ((r.details || '').trim() ? ' <i>&mdash;</i> ' + esc(r.details) : '') + '</div></div>';
         }).join('') +
         '<a class="wa" href="' + esc(waLink(g)) + '" target="_blank" rel="noopener">Share on WhatsApp</a></div>';
     }).join('');
@@ -6739,7 +6839,9 @@
         var qs = x.qs.slice().sort(function (a, b) { return b.no.localeCompare(a.no); });   // latest quote first
         var names = quoteVendors(qs[0]);
         if (x.err) failed = true;
-        if (!qs.length && !names.length) { unreadable.push(it.name); return; }
+        var own = VL.filter(function (r) { return r.id === it.id && r.date === it.date && isAdded(r.vendor); }).map(function (r) { return r.vendor; });
+        if (!qs.length && !names.length && !own.length) { unreadable.push(it.name); return; }
+        names = names.concat(own);
         var lines = names.filter(function (n) {
           var k = base + n, s = saved[k];
           if (named[k]) return false;                                      // already has a vendor name
@@ -6768,8 +6870,8 @@
         g.lines.map(function (n) {
           var s = g.saved[g.base + n], det = s && (s.details || '').trim();
           return '<div class="una" data-row="' + it.row + '" data-id="' + esc(it.id) + '" data-date="' + esc(it.date) + '" data-v="' + esc(n) + '">' +
-            '<div class="un">' + esc(n) + (det ? '<div class="ud">' + esc(det) + '</div>' : '') + '</div>' +
-            '<input class="uname" list="unaSup" autocomplete="off" placeholder="Vendor name" aria-label="' + esc(n) + ' - vendor name"></div>';
+            '<div class="un">' + esc(vLabel(n)) + (det ? '<div class="ud">' + esc(det) + '</div>' : '') + '</div>' +
+            '<input class="uname" list="unaSup" autocomplete="off" placeholder="Vendor name" aria-label="' + esc(vLabel(n)) + ' - vendor name"></div>';
         }).join('') + '</div>';
     });
     var sup = {}, supList = [];
