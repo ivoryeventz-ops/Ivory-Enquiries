@@ -828,6 +828,7 @@
   .ivory-stack-overlay{position:fixed;inset:0;overflow-y:auto;-webkit-overflow-scrolling:touch;z-index:65;padding:0 1rem 3rem}
 
   .qwrap{flex-wrap:wrap}.qwrap>.qrow{flex:1 0 100%;margin-bottom:6px}.qwrap>.qedit{flex:1 1 0;min-height:40px}.qwrap{margin-bottom:12px}
+  .vacts{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 6px}.vacts .retryb{margin:0}.veditbox{grid-column:1/-1;margin-bottom:8px}.veditbox .vname{margin-bottom:6px}
 </style>
 </head>
 <body>
@@ -3416,7 +3417,7 @@
 
 
   /* ---------- quotes sent + outside vendors ---------- */
-  var APP_VERSION = 'v27-Nov-c';   // shown under Outside vendors, so you can tell which Index.html is running
+  var APP_VERSION = 'v27-Nov-d';   // shown under Outside vendors, so you can tell which Index.html is running
   var GH_REPO = 'ivoryeventz-ops/Ivory-Packages', GH_BRANCH = 'main', GH_SITE = 'https://ivory-packages.pages.dev';
   // The 12 standard outside vendors (same list as VENDOR_NAMES in Code.gs).
   var VNAMES = ['Garland and Bouquet', 'Wedding cake', 'Confetti', 'Cold Spark', 'Dry Ice', 'Ambiance lighting',
@@ -3444,6 +3445,9 @@
   // Outside vendors added by hand are saved with a "+ " in front, so they are never removed just because no quote lists them.
   var VADD = '+ ';
   function isAdded(n) { return String(n || '').indexOf(VADD) === 0; }
+  // A quote item removed from a client's vendors is remembered as "- <item>", so the quote does not bring it back. It can be restored.
+  var VGONE = '- ';
+  function isGone(n) { return String(n || '').indexOf(VGONE) === 0; }
   function vLabel(n) { return isAdded(n) ? String(n).slice(VADD.length) : String(n || ''); }
   function stdMatch(n, str) { return !!(VENDOR_RE[n] && VENDOR_RE[n].test(str) && !(VENDOR_NOT[n] && VENDOR_NOT[n].test(str))); }
   // Does this quote ask for vendor n? Vendors with an exclusion rule are checked line by line (the quote's own lines), the rest on the whole page text.
@@ -3755,7 +3759,8 @@
     var s = VS[name] || { supplier: '', details: '', booked: false };
     return '<div class="vrow' + (s.booked ? ' on' : '') + '" data-v="' + esc(name) + '">' +
       '<div><label class="vtick"><input type="checkbox"' + (s.booked ? ' checked' : '') + '><span>' + esc(vLabel(name)) + '</span></label>' +
-      (isAdded(name) ? '<button type="button" class="retryb" data-act="vdel" style="margin:0 0 6px">Remove</button>' : '') + '</div>' +
+      '<div class="vacts"><button type="button" class="retryb" data-act="vedit" aria-label="Edit ' + esc(vLabel(name)) + '">Edit</button>' +
+      '<button type="button" class="retryb" data-act="vdel" aria-label="Remove ' + esc(vLabel(name)) + '" style="color:#a12622">Remove</button></div></div>' +
       '<div class="vfields">' +
       '<input class="vname" data-f="supplier" list="supList" autocomplete="off" placeholder="Vendor name" aria-label="' + esc(vLabel(name)) + ' - vendor name" value="' + esc(s.supplier || '') + '">' +
       '<textarea rows="2" data-f="details" placeholder="Details - what is booked" aria-label="' + esc(vLabel(name)) + ' - details">' + esc(s.details || '') + '</textarea>' +
@@ -3795,8 +3800,9 @@
       note = 'No quote found for this work. Add outside vendors below.';
     }
     var added = Object.keys(VS).filter(isAdded);
+    main = main.filter(function (n) { return !VS[VGONE + n]; });   // removed by hand
     // The list follows the latest quote. A saved vendor the quote no longer has is dropped (and deleted from the sheet once the quote has been read fresh).
-    if (text && fresh) vPrune(it, Object.keys(VS).filter(function (n) { return !isAdded(n) && main.indexOf(n) < 0; }));
+    if (text && fresh) vPrune(it, Object.keys(VS).filter(function (n) { return !isAdded(n) && !isGone(n) && main.indexOf(n) < 0; }));
     // an item added by hand that the quote now lists too is shown once: the quote's empty row gives way to yours
     main = main.filter(function (n) {
       var s = VS[n] || {};
@@ -3805,6 +3811,7 @@
     $('#dVend').innerHTML = '<h3>Outside vendors <span class="vcount" id="vcount"></span></h3><div class="note">' + note + ' <span style="opacity:.6">(app ' + APP_VERSION + ')</span></div>' +
       '<div id="vmain">' + main.map(vRow).join('') + '</div>' +
       '<datalist id="supList">' + (d.suppliers || []).map(function (n) { return '<option value="' + esc(n) + '">'; }).join('') + '</datalist>' +
+      '<div id="vgone">' + vGoneHtml() + '</div>' +
       '<div class="vrow" id="vaddBox" style="display:block"><b>Add an outside vendor</b>' +
       '<input class="vname" id="vaddItem" list="vaddList" autocomplete="off" maxlength="140" placeholder="Service, e.g. Wedding cake, Pandhal" aria-label="Service" style="margin:8px 0">' +
       '<input class="vname" id="vaddSup" list="supList" autocomplete="off" placeholder="Vendor name (optional)" aria-label="Vendor name">' +
@@ -4308,7 +4315,11 @@
     var act = b.getAttribute('data-act');
     if (act === 'vretry') vSend();
     else if (act === 'vadd') vAddOwn();
-    else if (act === 'vdel' && vItem) vDelOwn(vItem, b.closest('.vrow').getAttribute('data-v'));
+    else if (act === 'vdel' && vItem) vDel(vItem, b.closest('.vrow'));
+    else if (act === 'vedit') vEdit(b.closest('.vrow'));
+    else if (act === 'vcancel') b.closest('.veditbox').remove();
+    else if (act === 'vsave' && vItem) vRename(vItem, b.closest('.vrow'));
+    else if (act === 'vrestore' && vItem) vRestore(vItem, b.getAttribute('data-n'));
   });
   function vRedraw() {
     var h = vMainList.map(vRow).join('');
@@ -4328,17 +4339,101 @@
     $('#vaddItem').value = ''; $('#vaddSup').value = '';
     vQueue(vItem, name, { supplier: sup });
   }
-  function vDelOwn(it, name) {
-    askConfirm({ title: 'Remove this vendor?', body: vLabel(name) + ' will be removed from ' + it.name + ', with its vendor name, details and booked tick.', ok: 'Remove', needKey: false }).then(function (r) {
+  function vGoneHtml() {
+    var g = Object.keys(VS).filter(isGone);
+    if (!g.length) return '';
+    return '<div class="note">Removed from this client:' + g.map(function (n) {
+      var nm = n.slice(VGONE.length);
+      return '<div>' + esc(nm) + '<button type="button" class="retryb" data-act="vrestore" data-n="' + esc(nm) + '">Restore</button></div>';
+    }).join('') + '</div>';
+  }
+  function vCall(it, name, extra) {
+    var p = { row: it.row, id: it.id, date: it.date, vendor: name };
+    Object.keys(extra).forEach(function (k) { p[k] = extra[k]; });
+    return call('api_vendor', pin, p);
+  }
+  function vForget(it, name) {   // drop a saved row from what is held on this phone
+    VL = VL.filter(function (x) { return !(x.id === it.id && x.date === it.date && x.vendor === name); });
+    if (vItem === it) delete VS[name];
+  }
+  // Typing not yet saved on a row is sent (or dropped) before the row is renamed or removed, so it cannot bring the old row back.
+  function vSettle(row) {
+    clearTimeout(row._tsupplier); clearTimeout(row._tdetails);
+    return vSend();
+  }
+  function vRedrawAll() {
+    vRedraw();
+    var g = $('#vgone'); if (g) g.innerHTML = vGoneHtml();
+  }
+  function vFail(it, what, e) {
+    toast(what + ': ' + e.message, true);
+    delete dCache[wkey(it)];
+    if (cur === it) loadDetail(it);   // show what is really saved
+  }
+  function vDel(it, row) {
+    var name = row.getAttribute('data-v'), own = isAdded(name);
+    askConfirm({ title: 'Remove ' + vLabel(name) + '?', body: vLabel(name) + ' is removed from the vendors of ' + it.name + ', with its vendor name, details and booked tick. The quote is not changed.' + (own ? '' : ' You can restore the item later, but not what was typed in it.'), ok: 'Remove', needKey: false }).then(function (r) {
       if (!r.ok) return;
-      delete vPend[it.id + '|' + it.date + '|' + name];
       busy(true);
-      return call('api_vendor', pin, { row: it.row, id: it.id, date: it.date, vendor: name, remove: true }).then(function () {
+      return vSettle(row).then(function () {
+        delete vPend[it.id + '|' + it.date + '|' + name];
+        return own ? null : vCall(it, VGONE + name, { fields: {} });
+      }).then(function () { return vCall(it, name, { remove: true }); }).then(function () {
         delete dCache[wkey(it)];
-        VL = VL.filter(function (x) { return !(x.id === it.id && x.date === it.date && x.vendor === name); });
-        if (vItem === it) { delete VS[name]; vMainList = vMainList.filter(function (n) { return n !== name; }); vRedraw(); }
-      }).catch(function (e) { toast('Not removed: ' + e.message, true); }).then(function () { busy(false); });
+        vForget(it, name);
+        if (vItem !== it) return;
+        if (!own) VS[VGONE + name] = { supplier: '', details: '', booked: false };
+        vMainList = vMainList.filter(function (n) { return n !== name; });
+        vRedrawAll();
+      }).catch(function (e) { vFail(it, 'Not removed', e); }).then(function () { busy(false); });
     });
+  }
+  function vRestore(it, label) {
+    busy(true);
+    vCall(it, VGONE + label, { remove: true }).then(function () {
+      delete dCache[wkey(it)];
+      vForget(it, VGONE + label);
+      if (cur === it) loadDetail(it);
+    }).catch(function (e) { toast('Not restored: ' + e.message, true); }).then(function () { busy(false); });
+  }
+  // Edit: change the name of the item. Vendor name and details are typed straight into their boxes.
+  function vEdit(row) {
+    var open = row.querySelector('.veditbox');
+    if (open) { open.querySelector('input').focus(); return; }
+    var box = document.createElement('div');
+    box.className = 'veditbox';
+    box.innerHTML = '<input class="vname" maxlength="140" aria-label="Item name" value="' + esc(vLabel(row.getAttribute('data-v'))) + '">' +
+      '<div class="vacts"><button type="button" class="retryb" data-act="vsave">Save name</button><button type="button" class="retryb" data-act="vcancel">Cancel</button></div>';
+    row.insertBefore(box, row.firstChild);
+    box.querySelector('input').focus();
+  }
+  function vRename(it, row) {
+    var old = row.getAttribute('data-v'), inp = row.querySelector('.veditbox input');
+    var label = inp.value.replace(/\s+/g, ' ').trim().replace(/^[+-]\s*/, '');
+    if (!label) { toast('Type the item name', true); inp.focus(); return; }
+    if (label === vLabel(old)) { row.querySelector('.veditbox').remove(); return; }
+    var same = function (n) { return n !== old && vLabel(n).toLowerCase() === label.toLowerCase(); };
+    if (vMainList.some(same)) { toast(label + ' is already listed', true); return; }
+    var name = VADD + label;   // an edited item is kept as your own, so a later quote cannot change it back
+    var data = { supplier: row.querySelector('[data-f="supplier"]').value.trim(), details: row.querySelector('[data-f="details"]').value, booked: row.querySelector('.vtick input').checked };
+    var caseOnly = name.toLowerCase() === old.toLowerCase();
+    busy(true);
+    vSettle(row).then(function () {
+      delete vPend[it.id + '|' + it.date + '|' + old];
+      return vCall(it, name, { fields: data });   // the new row is saved first, so nothing typed can be lost
+    }).then(function () {
+      // a quote item stays hidden under its old name
+      return isAdded(old) || caseOnly ? null : vCall(it, VGONE + old, { fields: {} });
+    }).then(function () { return vCall(it, old, { remove: true }); }).then(function () {
+      delete dCache[wkey(it)];
+      vForget(it, old);
+      VL.push({ id: it.id, date: it.date, client: it.name, venue: it.venue || '', vendor: name, supplier: data.supplier, details: data.details, booked: data.booked });
+      if (vItem !== it) return;
+      VS[name] = data;
+      if (!isAdded(old)) VS[VGONE + old] = { supplier: '', details: '', booked: false };
+      vMainList = vMainList.map(function (n) { return n === old ? name : n; });
+      vRedrawAll();
+    }).catch(function (e) { vFail(it, 'Not changed', e); }).then(function () { busy(false); });
   }
   $('#dVend').addEventListener('change', function (e) {
     var row = e.target.closest('.vrow'); if (!row || !vItem) return;
@@ -6795,7 +6890,7 @@
         var latest = x.qs.slice().sort(function (a, b) { return b.no.localeCompare(a.no); })[0];
         if (!latest || !latest.text) return;
         var it = x.it, allowed = quoteVendors(latest);
-        var gone = VL.filter(function (r) { return r.id === it.id && r.date === it.date && !isAdded(r.vendor) && allowed.indexOf(r.vendor) < 0; }).map(function (r) { return r.vendor; });
+        var gone = VL.filter(function (r) { return r.id === it.id && r.date === it.date && !isAdded(r.vendor) && !isGone(r.vendor) && allowed.indexOf(r.vendor) < 0; }).map(function (r) { return r.vendor; });
         if (!gone.length) return;
         VL = VL.filter(function (r) { return !(r.id === it.id && r.date === it.date && gone.indexOf(r.vendor) >= 0); });
         removed += gone.length;
@@ -6896,6 +6991,7 @@
         names = names.concat(own);
         var lines = names.filter(function (n) {
           var k = base + n, s = saved[k];
+          if (saved[base + VGONE + n]) return false;                       // removed from this client's vendors
           if (named[k]) return false;                                      // already has a vendor name
           if (s && /included\s+in\s+package/i.test(s.details || '')) return false;   // supplied inside the package
           return true;
