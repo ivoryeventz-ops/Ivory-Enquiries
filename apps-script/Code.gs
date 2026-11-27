@@ -29,6 +29,7 @@ const VENDOR_NAMES = ['Garland and Bouquet', 'Wedding cake', 'Confetti', 'Cold S
   'Parking Security', 'Live Band', 'Wedding Car', 'Generator', 'Pagoda', 'Table & Chair covers', 'Anchor / MC', 'LED Wall', 'Tall Men Security'];
 const VENDOR_TAB = 'Vendors';
 const QUOTE_TAB = 'Quotes';
+const ADVANCE_TAB = 'Advances';
 
 /* ---------- web app ---------- */
 
@@ -221,6 +222,8 @@ function api_status(pin, p) {
       throw new Error('The sheet has changed. Refresh and try again.');
     }
     const old = String(row[5]).trim();
+    // the advance (if typed when confirming) is saved first, so the status never changes without it
+    const adv = p.advance ? advanceSave_(ss_(), p, row[1], p.advance) : null;
     sh.getRange(r, CFG.C_STATUS).setValue(p.status);
     if (p.status === 'Costing' && old !== 'Costing') {
       sh.getRange(r, CFG.C_SINCE).setValue(parse_(today_())).setNumberFormat('d mmm yyyy');
@@ -229,7 +232,67 @@ function api_status(pin, p) {
       sh.getRange(r, CFG.C_SINCE, 1, 2).clearContent();
     }
     SpreadsheetApp.flush();
-    return { ok: true };
+    return { ok: true, advance: adv };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/* ---------- advance received, noted when a work is confirmed. Kept in an "Advances" tab, one row per work ---------- */
+function advanceRow_(sh, key) {
+  const last = sh ? lastRowWith_(sh, 1) : 1;
+  if (last > 1) {
+    const keys = sh.getRange(2, 1, last - 1, 1).getValues();
+    for (let i = 0; i < keys.length; i++) if (String(keys[i][0]) === key) return i + 2;
+  }
+  return 0;
+}
+function advanceGet_(ss, key) {
+  const sh = ss.getSheetByName(ADVANCE_TAB);
+  const r = advanceRow_(sh, key);
+  if (!r) return null;
+  const v = sh.getRange(r, 4, 1, 3).getValues()[0];
+  return { amount: Number(v[0]) || 0, on: isoAny_(v[1]), at: String(v[2]) };
+}
+function advanceSave_(ss, p, client, a) {
+  const amount = Math.round(Number(a.amount));
+  if (!(amount > 0) || amount > 1000000000) throw new Error('Enter the advance amount');
+  const on = String(a.on || today_());
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(on)) throw new Error('Check the date the advance was received');
+  let sh = ss.getSheetByName(ADVANCE_TAB);
+  if (!sh) {
+    sh = ss.insertSheet(ADVANCE_TAB);
+    sh.getRange(1, 1, 1, 6).setValues([['Key', 'Client', 'Event date', 'Amount', 'Received on', 'Updated']]);
+    sh.setFrozenRows(1);
+    sh.getRange('A:C').setNumberFormat('@');
+    sh.getRange('E:F').setNumberFormat('@');
+  }
+  const key = p.id + '|' + p.date;
+  const r = advanceRow_(sh, key) || lastRowWith_(sh, 1) + 1;
+  const at = String(new Date().getTime());   // changes on every save, so the payment screen knows the figure is new
+  sh.getRange(r, 1, 1, 3).setNumberFormat('@');
+  sh.getRange(r, 5, 1, 2).setNumberFormat('@');
+  sh.getRange(r, 1, 1, 6).setValues([[key, String(client), String(p.date), amount, on, at]]);
+  return { amount: amount, on: on, at: at };
+}
+// Enter, correct or remove the advance later, from the work itself.
+function api_advance(pin, p) {
+  check_(pin);
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    const ss = ss_();
+    const row = checkRow_(ss.getSheetByName(CFG.ENQ), p);
+    let adv = null;
+    if (p.remove) {
+      const sh = ss.getSheetByName(ADVANCE_TAB);
+      const r = advanceRow_(sh, p.id + '|' + p.date);
+      if (r) sh.deleteRow(r);
+    } else {
+      adv = advanceSave_(ss, p, row[1], p);
+    }
+    SpreadsheetApp.flush();
+    return { ok: true, advance: adv };
   } finally {
     lock.releaseLock();
   }
@@ -314,7 +377,7 @@ function api_detail(pin, p) {
     });
   }
   suppliers.sort(function (a, b) { return a.toLowerCase().localeCompare(b.toLowerCase()); });
-  return { sites: sites, vendors: vendors, vendorList: VENDOR_NAMES, suppliers: suppliers };
+  return { sites: sites, vendors: vendors, vendorList: VENDOR_NAMES, suppliers: suppliers, advance: advanceGet_(ss, key) };
 }
 
 function api_vendor(pin, p) {

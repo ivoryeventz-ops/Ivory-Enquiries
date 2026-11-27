@@ -831,6 +831,8 @@
   .vacts{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 6px}.vacts .retryb{margin:0}.veditbox{grid-column:1/-1;margin-bottom:8px}.veditbox .vname{margin-bottom:6px}
   .vledit textarea.vname{font:inherit}.vlacts{grid-column:1/-1;flex-basis:100%;width:100%;margin-top:6px}.vledit{grid-column:1/-1;flex-basis:100%;width:100%;margin-top:6px}.vledit label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px}.vledit .vname{display:block;width:100%;box-sizing:border-box;margin-top:2px}.una{flex-wrap:wrap}
   .vwarn{grid-column:1/-1;flex-basis:100%;width:100%;box-sizing:border-box;margin:4px 0 6px;padding:8px 10px;border-radius:10px;background:#fff4d6;border:1px solid #e3b94f;color:#6b4a00;font-size:13px;line-height:1.4}.vwarn .retryb{display:block;margin:6px 0 0}
+  .dadv{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:8px 0 0;font-size:15px}.dadv:empty{display:none}.dadv .retryb{margin:0;white-space:nowrap}
+  #am{overflow-y:auto}.amlab{display:block;font-size:13px;font-weight:600;margin:8px 0 4px}#am input{width:100%;box-sizing:border-box;font:inherit;font-size:17px;padding:11px 12px;border:1px solid var(--line);border-radius:12px;background:#fff;color:var(--ink);min-height:46px}#am .primary{margin-top:14px}.amalt{display:block;width:100%;margin-top:10px;padding:12px;border:1px solid var(--line);border-radius:14px;background:#fff;color:var(--burgundy);font-size:15px;font-weight:600}.amerr{color:#a12622;font-size:13px;margin-top:8px}.amerr:empty{display:none}
 </style>
 </head>
 <body>
@@ -1651,6 +1653,7 @@
     <button class="st" data-s="Confirmed">Confirmed</button>
     <button class="st lost" data-s="Lost">Lost - remove from list</button>
   </div>
+  <div class="dadv" id="dAdv"></div>
   <button type="button" class="dbuild" id="dBuild">&#127912; Build a new quote for this client</button>
   <div class="dtabs" id="dTabs" role="tablist">
     <button class="dtab on" type="button" data-t="quotes">Quotes<em id="tbQ"></em></button>
@@ -1763,6 +1766,21 @@
     <p id="cfB"></p>
     <div id="cfKeyBox" style="display:none"><div class="note" id="cfKeyNote"></div><input id="cfKey" type="password" autocomplete="off" placeholder="Paste GitHub key"></div>
     <div class="mbtns"><button class="ghost" id="cfNo" type="button">Not now</button><button class="primary" id="cfYes" type="button">Confirm</button></div>
+  </div>
+</div>
+
+<div class="modal" id="am" role="dialog" aria-modal="true" aria-labelledby="amT">
+  <div class="mbox">
+    <h4 id="amT">Advance received</h4>
+    <p id="amB"></p>
+    <label class="amlab" for="amAmt">Amount (&#8377;)</label>
+    <input id="amAmt" inputmode="numeric" autocomplete="off" placeholder="e.g. 50,000">
+    <label class="amlab" for="amOn">Received on</label>
+    <input id="amOn" type="date">
+    <div class="amerr" id="amErr" role="alert"></div>
+    <button class="primary" id="amSave" type="button">Save</button>
+    <button class="amalt" id="amAlt" type="button"></button>
+    <button class="link" id="amNo" type="button">Cancel</button>
   </div>
 </div>
 
@@ -3308,6 +3326,7 @@
       s.classList.toggle('cur', s.getAttribute('data-s') === cur.status);
     });
     openSheet('#detail');
+    renderAdv(cur);
     renderActsDetail(cur);
     loadDetail(cur);
     $('#dSite').innerHTML = '';
@@ -3322,12 +3341,73 @@
     if (st === cur.status) { closeSheets(); return; }
     if (st === 'Lost' && !confirm('Mark ' + cur.name + ' as Lost and remove from the list?')) return;
     var it = cur;
+    if (it.status === 'Blocked' && st === 'Confirmed') {
+      advAsk({ title: 'Advance received', body: it.name + ' is moving to Confirmed. Enter the advance amount received.', save: 'Save & confirm', alt: 'Confirm without advance' }).then(function (r) {
+        if (r) changeStatus(it, st, r.alt ? null : { amount: r.amount, on: r.on });
+      });
+      return;
+    }
+    changeStatus(it, st, null);
+  });
+  function changeStatus(it, st, advance) {
     closeSheets();
     busy(true);
-    call('api_status', pin, { row: it.row, id: it.id, date: it.date, status: st })
-      .then(function () { toast(it.name + ' is now ' + st); return load(true); })
+    var req = { row: it.row, id: it.id, date: it.date, status: st };
+    if (advance) req.advance = advance;
+    call('api_status', pin, req)
+      .then(function (res) {
+        delete dCache[wkey(it)];
+        if (advance && !(res && res.advance)) { delete ADV[wkey(it)]; alert(it.name + ' is now ' + st + ', but the advance was NOT saved. Paste the new Code.gs into Apps Script, deploy a new version, then enter the advance from the work.'); }
+        else { if (advance) ADV[wkey(it)] = res.advance; toast(it.name + ' is now ' + st + (advance ? ' - advance ' + inr(res.advance.amount) + ' saved' : '')); }
+        return load(true);
+      })
       .catch(function (err) { toast(err.message, true); return load(true); })
       .then(function () { busy(false); });
+  }
+
+  /* ---------- advance received ---------- */
+  var ADV = {};   // wkey -> {amount, on, at}, or null when none is saved. Unknown until the work's details have loaded.
+  var amRes = null;
+  function advAsk(o) {   // resolves {amount, on}, {alt:true}, or null when cancelled
+    return new Promise(function (res) {
+      $('#amT').textContent = o.title; $('#amB').textContent = o.body; $('#amSave').textContent = o.save;
+      $('#amAlt').textContent = o.alt || ''; $('#amAlt').style.display = o.alt ? '' : 'none';
+      $('#amAmt').value = o.amount ? Number(o.amount).toLocaleString('en-IN') : '';
+      $('#amOn').value = o.on || today; $('#amErr').textContent = '';
+      $('#am').classList.add('show');
+      amRes = function (v) { $('#am').classList.remove('show'); amRes = null; res(v); };
+    });
+  }
+  $('#amSave').addEventListener('click', function () {
+    if (!amRes) return;
+    var raw = $('#amAmt').value.trim().replace(/^(\u20b9|rs\.?)\s*/i, '').replace(/\/-$/, '').replace(/[,\s]/g, '');
+    if (!/^\d+$/.test(raw) || !+raw || +raw > 1000000000) { $('#amErr').textContent = 'Type the amount in rupees, numbers only (for example 50000).'; $('#amAmt').focus(); return; }
+    if (!$('#amOn').value) { $('#amErr').textContent = 'Choose the date it was received.'; return; }
+    amRes({ amount: +raw, on: $('#amOn').value });
+  });
+  $('#amAlt').addEventListener('click', function () { if (amRes) amRes({ alt: true }); });
+  $('#amNo').addEventListener('click', function () { if (amRes) amRes(null); });
+  function renderAdv(it) {
+    var el = $('#dAdv'), a = ADV[wkey(it)];
+    if (a === undefined || (!a && it.status !== 'Confirmed')) { el.innerHTML = ''; return; }
+    el.innerHTML = '<span>' + (a ? 'Advance received: <b>' + inr(a.amount) + '</b>' + (a.on ? ' on ' + esc(fmt(a.on)) : '') : 'Advance received: not entered') + '</span>' +
+      '<button type="button" class="retryb" data-act="advedit">' + (a ? 'Edit' : 'Enter amount') + '</button>';
+  }
+  $('#dAdv').addEventListener('click', function (e) {
+    if (!e.target.closest('[data-act="advedit"]') || !cur) return;
+    var it = cur, a = ADV[wkey(it)];
+    advAsk({ title: 'Advance received', body: it.name + ' - ' + fmt(it.date), save: 'Save', alt: a ? 'Remove this advance' : '', amount: a && a.amount, on: a && a.on }).then(function (r) {
+      if (!r) return;
+      if (r.alt && !confirm('Remove the advance of ' + inr(a.amount) + ' noted for ' + it.name + '? A payment page already published is not changed.')) return;
+      var req = { row: it.row, id: it.id, date: it.date };
+      if (r.alt) req.remove = true; else { req.amount = r.amount; req.on = r.on; }
+      busy(true);
+      call('api_advance', pin, req).then(function (res) {
+        ADV[wkey(it)] = res.advance; delete dCache[wkey(it)];
+        toast(r.alt ? 'Advance removed' : 'Advance saved');
+        if (cur === it) { renderAdv(it); loadDetail(it); }
+      }).catch(function (err) { toast('Not saved: ' + err.message, true); }).then(function () { busy(false); });
+    });
   });
 
   // add
@@ -3419,7 +3499,7 @@
 
 
   /* ---------- quotes sent + outside vendors ---------- */
-  var APP_VERSION = 'v27-Nov-f';   // shown under Outside vendors, so you can tell which Index.html is running
+  var APP_VERSION = 'v28-Nov-a';   // shown under Outside vendors, so you can tell which Index.html is running
   var GH_REPO = 'ivoryeventz-ops/Ivory-Packages', GH_BRANCH = 'main', GH_SITE = 'https://ivory-packages.pages.dev';
   // The 12 standard outside vendors (same list as VENDOR_NAMES in Code.gs).
   var VNAMES = ['Garland and Bouquet', 'Wedding cake', 'Confetti', 'Cold Spark', 'Dry Ice', 'Ambiance lighting',
@@ -3709,6 +3789,7 @@
       if (tok !== dTok) return;
       var same = cached && detailSig(cached.d, cached.gh) === detailSig(res[0], res[1]);
       dCache[ck] = { d: res[0], gh: res[1] };
+      if (res[0].advance !== undefined) { ADV[ck] = res[0].advance; if (cur && wkey(cur) === ck) renderAdv(cur); }
       if (same) return;
       // never redraw the vendor boxes under someone who is typing or has an unsaved change
       var editing = cached && (Object.keys(vPend).length || ($('#dVend').contains(document.activeElement) && document.activeElement !== $('#dVend')));
@@ -4581,13 +4662,24 @@
   function openPay(it, list) {
     var folder = payFolder(it, list), q = (list || []).filter(function (x) { return x.src === 'cloud'; })[0];
     P = { it: it, list: list, folder: folder, name: it.name, date: it.date, venue: (q && q.venue) || it.venue || '',
-      items: payFromQuote(list), total: null, totalAuto: true, discount: 0, adv: [{ label: 'Advance Received', amount: 0 }] };
+      items: payFromQuote(list), total: null, totalAuto: true, discount: 0, adv: [{ label: 'Advance Received', amount: 0 }], advSeen: '' };
     $('#payMeta').textContent = it.name + ' - ' + fmt(it.date) + (P.venue ? ' - ' + P.venue : '') + '  (saves to ' + folder + '/payment) - app ' + APP_VERSION;
     payRender();
     payAskServer();
     openSheet('#pay');
     payStatus('Checking for saved payment details...');
-    var tok = P;
+    var tok = P, advNote = '';
+    // the advance noted in the app (asked for if the work's details have not loaded yet)
+    var advP = ADV[wkey(it)] !== undefined ? Promise.resolve() :
+      call('api_detail', pin, { row: it.row, id: it.id, date: it.date }).then(function (d) { if (d.advance !== undefined) ADV[wkey(it)] = d.advance; }, function () {});
+    var done = function (msg) {
+      advP.then(function () {
+        if (P !== tok) return;
+        advNote = payAddAdvance(ADV[wkey(it)]);
+        if (advNote) payRender();
+        payStatus(msg + (advNote ? ' ' + esc(advNote) : ''), decorMissing());
+      });
+    };
     fetch('https://raw.githubusercontent.com/' + GH_REPO + '/' + GH_BRANCH + '/' + encodeURIComponent(folder) + '/payment.html?t=' + Date.now())
       .then(function (r) { if (!r.ok) throw new Error('none'); return r.text(); })
       .then(function (html) {
@@ -4596,11 +4688,26 @@
         if (o.items && o.items.length) P.items = withDecor(o.items);
         P.discount = num(o.discount);
         if (o.adv && o.adv.length) P.adv = o.adv;
+        P.advSeen = String(o.advSeen || '');
         if (o.total != null) { P.total = o.total; P.totalAuto = (o.total === itemsSum()); }
         payRender();
-        payStatus(decorMissing() ? 'Saved details loaded. Decor package rate is blank - type it in the first row, or tap Pick rates again from quote.' : 'Loaded the saved payment details.', decorMissing());
+        done(decorMissing() ? 'Saved details loaded. Decor package rate is blank - type it in the first row, or tap Pick rates again from quote.' : 'Loaded the saved payment details.');
       })
-      .catch(function () { if (P === tok) payStatus(decorMissing() ? 'The decor package rate is not in the quote as one price - type it in the first row.' : 'Rates picked up from the latest quote.', decorMissing()); });
+      .catch(function () { if (P === tok) done(decorMissing() ? 'The decor package rate is not in the quote as one price - type it in the first row.' : 'Rates picked up from the latest quote.'); });
+  }
+  // Puts the noted advance into the payment rows once. Returns what to tell the person.
+  // advSeen is saved with the page, so a row that was later changed or deleted here by hand is not brought back.
+  function payAddAdvance(a) {
+    if (!a || !a.amount || P.advSeen === a.at) return '';
+    var label = 'Advance Received' + (a.on ? ' on ' + toDate(a.on).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : '');
+    var mine = P.adv.filter(function (r) { return r.conf; })[0];
+    P.advSeen = a.at;
+    if (mine) { mine.label = label; mine.amount = a.amount; return 'The advance was updated to ' + inr(a.amount) + '. Tap Save & publish to update the client\u2019s page.'; }
+    if (P.adv.some(function (r) { return num(r.amount) === a.amount; })) return 'Check: ' + inr(a.amount) + ' is already listed as a payment, so the advance noted in the app was not added again.';
+    var blank = P.adv.filter(function (r) { return !num(r.amount); })[0];
+    if (blank) { blank.label = label; blank.amount = a.amount; blank.conf = 1; }
+    else P.adv.push({ label: label, amount: a.amount, conf: 1 });
+    return 'Advance of ' + inr(a.amount) + ' added from the app. Tap Save & publish to put it on the client\u2019s page.';
   }
 
   function payHtml() {
@@ -4622,7 +4729,7 @@
     var advs = P.adv.filter(function (r) { return num(r.amount); });
     advs.forEach(function (r) { sum += '    <div class="sum-row"><span>' + esc((r.label || '').trim() || 'Advance Received') + '</span><span class="amount">' + R(num(r.amount)) + '</span></div>\n'; });
     if (advs.length > 1) sum += '    <div class="sum-row strong"><span>Paid So Far</span><span class="amount">' + R(c.paid) + '</span></div>\n';
-    var data = JSON.stringify({ items: P.items, total: c.total, discount: c.discount, adv: P.adv }).replace(/</g, '\\u003c');
+    var data = JSON.stringify({ items: P.items, total: c.total, discount: c.discount, adv: P.adv, advSeen: P.advSeen }).replace(/</g, '\\u003c');
     var desc = 'Ivory Events payment details' + (d ? ' - ' + d : '') + (P.venue ? ', ' + P.venue : '');
     return '<!DOCTYPE html>\n<html lang="en">\n<head>\n<meta charset="UTF-8" />\n<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />\n' +
       '<title>Payment Details - ' + esc(P.name) + '</title>\n' +
