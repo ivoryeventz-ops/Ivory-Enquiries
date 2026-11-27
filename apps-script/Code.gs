@@ -611,6 +611,90 @@ function api_site_tab(pin, p) {
   }
 }
 
+// How this client's Packages tab looks: 'rates' (photos and rates, the usual page) or 'list' (tick list, no photos or rates).
+// Only "packagesView" in data.json changes; the Packages page itself reads it.
+function api_site_view(pin, p) {
+  check_(pin);
+  if (p.confirmed !== true) throw new Error('Not confirmed');
+  const key = siteKey_(PropertiesService.getScriptProperties());
+  if (!key) throw new Error('GitHub key needed');
+  const folder = String(p.folder || '').trim();
+  if (!/^[A-Za-z0-9][A-Za-z0-9 _-]{0,60}$/.test(folder)) throw new Error('Bad client folder name');
+  const view = String(p.view || '');
+  if (view !== 'list' && view !== 'rates') throw new Error('Unknown view');
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    const f = siteData_(key, folder);
+    if (!f) throw new Error('Make the client link first');
+    if (view === 'list') f.data.packagesView = 'list'; else delete f.data.packagesView;
+    siteSave_(key, f, 'Packages view ' + folder + ': ' + view);
+    return { ok: true, view: view };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function siteData_(key, folder) {   // the client's data.json, or null when there is no client link
+  const url = 'https://api.github.com/repos/' + SITE_REPO + '/contents/' + encodeURIComponent(SITE_DIR) + '/' + encodeURIComponent(folder) + '/data.json';
+  const g = UrlFetchApp.fetch(url + '?ref=' + SITE_BRANCH, { headers: { Authorization: 'Bearer ' + key, Accept: 'application/vnd.github+json' }, muteHttpExceptions: true });
+  const c = g.getResponseCode();
+  if (c === 404) return null;
+  if (c !== 200) throw new Error('GitHub key does not reach Ivory-Events (GitHub answered ' + c + ')');
+  const cur = JSON.parse(g.getContentText());
+  return { url: url, sha: cur.sha, data: JSON.parse(Utilities.newBlob(Utilities.base64Decode(cur.content.replace(/\n/g, ''))).getDataAsString()) };
+}
+function siteSave_(key, f, message) {
+  const body = { message: message, content: Utilities.base64Encode(Utilities.newBlob(JSON.stringify(f.data, null, 2) + '\n').getBytes()), sha: f.sha, branch: SITE_BRANCH };
+  const r = UrlFetchApp.fetch(f.url, { method: 'put', headers: { Authorization: 'Bearer ' + key, Accept: 'application/vnd.github+json' }, contentType: 'application/json', payload: JSON.stringify(body), muteHttpExceptions: true });
+  const c = r.getResponseCode();
+  if (c !== 200 && c !== 201) throw new Error('GitHub answered ' + c);
+}
+
+// Deletes ONE quote: first its tab on the client link (so the client never sees a broken tab), then the quote page itself.
+// Stage photos, the payment page and the timeline are left alone. GitHub keeps the history, so a deleted page can be recovered.
+function api_quote_delete(pin, p) {
+  check_(pin);
+  if (p.confirmed !== true) throw new Error('Not confirmed');
+  const props = PropertiesService.getScriptProperties();
+  if (p.key) props.setProperty('GH_KEY', String(p.key).trim());
+  const key = props.getProperty('GH_KEY');
+  if (!key) throw new Error('GitHub key needed');
+  const folder = String(p.folder || '').trim(), linkFolder = String(p.linkFolder || folder).trim();
+  const okName = /^[A-Za-z0-9][A-Za-z0-9 _-]{0,60}$/;
+  if (!okName.test(folder) || !okName.test(linkFolder)) throw new Error('Bad client folder name');
+  const no = String(p.no || '');
+  if (!/^\d{6}$/.test(no)) throw new Error('Bad quote number');
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    const siteKey = siteKey_(props);
+    const link = siteData_(siteKey, linkFolder);
+    if (link && link.data.quotes) {
+      const mine = '/' + encodeURIComponent(folder) + '/' + no;
+      const left = link.data.quotes.filter(function (q) {   // only the tab that opens THIS page
+        return !(String(q.id) === no && (!q.url || String(q.url).replace(/\.html$/, '').slice(-mine.length) === mine));
+      });
+      if (left.length !== link.data.quotes.length) { link.data.quotes = left; siteSave_(siteKey, link, 'Remove quote ' + no + ' tab ' + linkFolder); }
+    }
+    const url = 'https://api.github.com/repos/' + PAY_REPO + '/contents/' + encodeURIComponent(folder) + '/' + no + '.html';
+    const hd = { Authorization: 'Bearer ' + key, Accept: 'application/vnd.github+json' };
+    const bad = function (c) {
+      if (c === 401 || c === 403) { props.deleteProperty('GH_KEY'); return new Error('GitHub key not accepted - paste it again'); }
+      return new Error('GitHub answered ' + c);
+    };
+    const g = UrlFetchApp.fetch(url + '?ref=' + PAY_BRANCH, { headers: hd, muteHttpExceptions: true });
+    if (g.getResponseCode() === 404) return { ok: true, already: true };
+    if (g.getResponseCode() !== 200) throw bad(g.getResponseCode());
+    const r = UrlFetchApp.fetch(url, { method: 'delete', headers: hd, contentType: 'application/json',
+      payload: JSON.stringify({ message: 'Delete quote ' + folder + '/' + no, sha: JSON.parse(g.getContentText()).sha, branch: PAY_BRANCH }), muteHttpExceptions: true });
+    if (r.getResponseCode() !== 200) throw bad(r.getResponseCode());
+    return { ok: true };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
 // Takes ONE item (a quote, the timeline or the payment page) off the client's link again, after a confirm in the app.
 // Only the tab is removed from data.json; the quote / timeline / payment page itself stays where it is and can be added back.
 function api_site_untab(pin, p) {

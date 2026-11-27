@@ -827,6 +827,7 @@
   /* stage photo picker: full-screen, scrolls inside */
   .ivory-stack-overlay{position:fixed;inset:0;overflow-y:auto;-webkit-overflow-scrolling:touch;z-index:65;padding:0 1rem 3rem}
 
+  .qwrap{flex-wrap:wrap}.qwrap>.qrow{flex:1 0 100%;margin-bottom:6px}.qwrap>.qedit{flex:1 1 0;min-height:40px}.qwrap{margin-bottom:12px}
 </style>
 </head>
 <body>
@@ -3415,7 +3416,7 @@
 
 
   /* ---------- quotes sent + outside vendors ---------- */
-  var APP_VERSION = 'v27-Nov-a';   // shown under Outside vendors, so you can tell which Index.html is running
+  var APP_VERSION = 'v27-Nov-b';   // shown under Outside vendors, so you can tell which Index.html is running
   var GH_REPO = 'ivoryeventz-ops/Ivory-Packages', GH_BRANCH = 'main', GH_SITE = 'https://ivory-packages.pages.dev';
   // The 12 standard outside vendors (same list as VENDOR_NAMES in Code.gs).
   var VNAMES = ['Garland and Bouquet', 'Wedding cake', 'Confetti', 'Cold Spark', 'Dry Ice', 'Ambiance lighting',
@@ -3711,7 +3712,8 @@
           (q.src === 'site' ? ' &middot; Google Site' : (q.venue ? ' &middot; ' + esc(q.venue) : '')) + '</span></span>';
         if (q.src === 'cloud' && q.raw) {
           return '<div class="qwrap"><a class="qrow" href="' + esc(q.url) + '" target="_blank" rel="noopener">' + inner + '<span class="go">Open &rsaquo;</span></a>' +
-            '<button type="button" class="qedit" data-act="qedit" data-no="' + esc(q.no) + '">Edit as new quote</button></div>';
+            '<button type="button" class="qedit" data-act="qedit" data-no="' + esc(q.no) + '">Edit as new quote</button>' +
+            '<button type="button" class="qedit" data-act="qdel" data-no="' + esc(q.no) + '" style="color:#a12622">Delete quote</button></div>';
         }
         return q.url
           ? '<a class="qrow" href="' + esc(q.url) + '" target="_blank" rel="noopener">' + inner + '<span class="go">Open &rsaquo;</span></a>'
@@ -3970,6 +3972,11 @@
     var opts = '<option value="">Choose...</option>' + Object.keys(EV_TYPES).map(function (k) { return '<option value="' + k + '"' + (k === curType ? ' selected' : '') + '>' + esc(EV_TYPES[k]) + '</option>'; }).join('');
     h += sRow('Event type', 'Decides which Packages and Checklist pages the client sees', false,
       '<select class="evsel" id="evType">' + opts + '</select><button type="button" class="sbtn" data-lk="save">' + (any ? 'Change' : 'Make link') + '</button>');
+    if (d) {
+      var isList = d.packagesView === 'list';
+      h += sRow('Packages page', isList ? 'Tick list - no photos or rates' : 'With photos and rates', isList,
+        '<button type="button" class="sbtn' + (isList ? ' alt' : '') + '" data-pv="' + (isList ? 'rates' : 'list') + '">' + (isList ? 'Show photos and rates' : 'Change to tick list') + '</button>');
+    }
     if (any) h += sRow('Send the link', 'Introduction, packages and service checklist', false,
       '<a class="sbtn alt" href="' + esc(linkWa(it.name, SITE_URL + encodeURIComponent(f) + '/')) + '" target="_blank" rel="noopener">Send on WhatsApp</a>');
     if (st.err) h += '<div class="note warn">Could not read the client link (' + esc(st.err) + ').</div>';
@@ -4043,6 +4050,23 @@
       });
     });
   }
+  function siteView(it, view) {
+    var f = siteFolder(it), list = view === 'list';
+    return askConfirm({ title: list ? 'Change the Packages page to a tick list?' : 'Show photos and rates again?',
+      body: (list ? 'On ' + it.name + "'s link, the Packages tab will show the stage decoration inclusions and additional services to tick, with no photos or rates. Quote tabs on the link still show their rates." : 'On ' + it.name + "'s link, the Packages tab will show the packages with photos and rates.") + ' The change takes a minute or so.', ok: list ? 'Change to tick list' : 'Show them', needKey: false }).then(function (r) {
+      if (!r.ok) return;
+      busy(true);
+      return call('api_site_view', pin, { confirmed: true, folder: f, view: view }).then(function () {
+        if (SITE[f] && SITE[f].data) { if (list) SITE[f].data.packagesView = 'list'; else delete SITE[f].data.packagesView; }
+        toast(list ? 'Packages page is now a tick list' : 'Packages page shows photos and rates');
+        if (cur === it) renderSite(it);
+      }).catch(function (e) {
+        var m = e.message || String(e);
+        if (/not a function|is not defined/i.test(m)) m = 'Paste the new Code.gs into Apps Script (it has the new Packages page switch), then Deploy a new version.';
+        toast(m, true);
+      }).then(function () { busy(false); });
+    });
+  }
   function siteRemove(it, kind, no) {
     var f = siteFolder(it), what = kind === 'quote' ? 'quote #' + no : (kind === 'timeline' ? 'the wedding timeline' : 'the payment details');
     return askConfirm({ title: 'Remove from the client link?', body: 'The tab for ' + what + ' is taken off ' + it.name + "'s link, so the client no longer sees it. The page itself is not deleted - you can add it back with Add to link.", ok: 'Remove from link', needKey: false }).then(function (r) {
@@ -4065,6 +4089,8 @@
   }
   $('#dSite').addEventListener('click', function (e) {
     if (!cur) return;
+    var pv = e.target.closest('[data-pv]');
+    if (pv) { siteView(cur, pv.getAttribute('data-pv')); return; }
     var mb = e.target.closest('[data-mv]');
     if (mb) {
       var kind = mb.getAttribute('data-mv'), list = kind === 'all' ? moveAllList() : [cur], it1 = cur;
@@ -4248,9 +4274,33 @@
     if (e.target.closest('[data-act="sd"]') && cur) { sdOpen(cur, lastQ); return; }
     var qe = e.target.closest('[data-act="qedit"]');
     if (qe && cur) { var no = qe.getAttribute('data-no'); qeOpen(cur, lastQ, lastQ.filter(function (x) { return x.no === no && x.src === 'cloud'; })[0] || null); return; }
+    var qd = e.target.closest('[data-act="qdel"]');
+    if (qd && cur) { var dn = qd.getAttribute('data-no'); qDelete(cur, lastQ.filter(function (x) { return x.no === dn && x.src === 'cloud'; })[0]); return; }
     if (e.target.closest('[data-act="qnew"]') && cur) { qeOpen(cur, lastQ, null); return; }
     if (e.target.closest('[data-act="reload"]') && cur) loadDetail(cur);
   });
+  function qDelete(it, q) {
+    if (!q) return;
+    var linkFolder = siteFolder(it);
+    return askConfirm({ title: 'Delete quote #' + q.no + '?', body: 'The quote dated ' + sentLabel(q.no) + ' for ' + it.name + ' is deleted and taken off the client link. Links to it that were already sent will stop working. Outside vendors will then follow the latest quote that is left. This cannot be undone from the app.', ok: 'Delete quote', needKey: false }).then(function (r) {
+      if (!r.ok) return;
+      busy(true);
+      return call('api_quote_delete', pin, { confirmed: true, folder: q.folder, linkFolder: linkFolder, no: q.no }).then(function () {
+        if (ghTree && ghTree[q.folder]) ghTree[q.folder] = ghTree[q.folder].filter(function (n) { return n !== q.no; });
+        delete ghCache[q.folder + '/' + q.no];
+        delete dCache[wkey(it)];
+        delete ADDED[linkFolder + '|quote|' + q.no];
+        var d = SITE[linkFolder] && SITE[linkFolder].data;
+        if (d && d.quotes) d.quotes = d.quotes.filter(function (x) { return String(x.id) !== String(q.no); });
+        toast('Quote #' + q.no + ' deleted');
+        if (cur === it) loadDetail(it);
+      }).catch(function (e) {
+        var m = e.message || String(e);
+        if (/not a function|is not defined/i.test(m)) m = 'Paste the new Code.gs into Apps Script (it has the new Delete quote), then Deploy a new version.';
+        toast('Not deleted: ' + m, true);
+      }).then(function () { busy(false); });
+    });
+  }
   $('#dVend').addEventListener('click', function (e) {
     var b = e.target.closest('[data-act]'); if (!b) return;
     var act = b.getAttribute('data-act');
