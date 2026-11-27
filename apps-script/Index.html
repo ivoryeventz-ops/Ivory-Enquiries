@@ -3416,7 +3416,7 @@
 
 
   /* ---------- quotes sent + outside vendors ---------- */
-  var APP_VERSION = 'v27-Nov-b';   // shown under Outside vendors, so you can tell which Index.html is running
+  var APP_VERSION = 'v27-Nov-c';   // shown under Outside vendors, so you can tell which Index.html is running
   var GH_REPO = 'ivoryeventz-ops/Ivory-Packages', GH_BRANCH = 'main', GH_SITE = 'https://ivory-packages.pages.dev';
   // The 12 standard outside vendors (same list as VENDOR_NAMES in Code.gs).
   var VNAMES = ['Garland and Bouquet', 'Wedding cake', 'Confetti', 'Cold Spark', 'Dry Ice', 'Ambiance lighting',
@@ -3941,12 +3941,14 @@
   function siteLoad(it) {
     var f = siteFolder(it);
     renderSite(it);
-    var rd = fetch(SITE_RAW + encodeURIComponent(f) + '/data.json?t=' + Date.now())
-      .then(function (r) {
+    // read through the script, which always gets the saved copy; the direct address (can be minutes old) is only the fallback
+    var rd = call('api_site_data', pin, { folder: f }).then(function (r) { return r.data; }).catch(function () {
+      return fetch(SITE_RAW + encodeURIComponent(f) + '/data.json?t=' + Date.now()).then(function (r) {
         if (r.status === 404) return null;
         if (!r.ok) throw new Error('GitHub answered ' + r.status);
         return r.json();
-      })
+      });
+    })
       .then(function (d) { SITE[f] = { data: d }; }, function (e) { SITE[f] = { err: e.message, data: (SITE[f] || {}).data }; });
     return Promise.all([rd, tlGet().then(function () {}, function () {})]).then(function () { if (cur === it && curTab === 'site') renderSite(it); });
   }

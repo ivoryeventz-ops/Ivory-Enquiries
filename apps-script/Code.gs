@@ -635,6 +635,17 @@ function api_site_view(pin, p) {
   }
 }
 
+// The client's data.json as saved right now. The app's own direct read (raw.githubusercontent.com) can be a few minutes old.
+function api_site_data(pin, p) {
+  check_(pin);
+  const key = siteKey_(PropertiesService.getScriptProperties());
+  if (!key) throw new Error('GitHub key needed');
+  const folder = String(p.folder || '').trim();
+  if (!/^[A-Za-z0-9][A-Za-z0-9 _-]{0,60}$/.test(folder)) throw new Error('Bad client folder name');
+  const f = siteData_(key, folder);
+  return { data: f ? f.data : null };
+}
+
 function siteData_(key, folder) {   // the client's data.json, or null when there is no client link
   const url = 'https://api.github.com/repos/' + SITE_REPO + '/contents/' + encodeURIComponent(SITE_DIR) + '/' + encodeURIComponent(folder) + '/data.json';
   const g = UrlFetchApp.fetch(url + '?ref=' + SITE_BRANCH, { headers: { Authorization: 'Bearer ' + key, Accept: 'application/vnd.github+json' }, muteHttpExceptions: true });
