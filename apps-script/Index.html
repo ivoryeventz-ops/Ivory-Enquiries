@@ -833,6 +833,8 @@
   .vwarn{grid-column:1/-1;flex-basis:100%;width:100%;box-sizing:border-box;margin:4px 0 6px;padding:8px 10px;border-radius:10px;background:#fff4d6;border:1px solid #e3b94f;color:#6b4a00;font-size:13px;line-height:1.4}.vwarn .retryb{display:block;margin:6px 0 0}
   .dadv{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:8px 0 0;font-size:15px}.dadv:empty{display:none}.dadv .retryb{margin:0;white-space:nowrap}
   #am{overflow-y:auto}.amlab{display:block;font-size:13px;font-weight:600;margin:8px 0 4px}#am input{width:100%;box-sizing:border-box;font:inherit;font-size:17px;padding:11px 12px;border:1px solid var(--line);border-radius:12px;background:#fff;color:var(--ink);min-height:46px}#am .primary{margin-top:14px}.amalt{display:block;width:100%;margin-top:10px;padding:12px;border:1px solid var(--line);border-radius:14px;background:#fff;color:var(--burgundy);font-size:15px;font-weight:600}.amerr{color:#a12622;font-size:13px;margin-top:8px}.amerr:empty{display:none}
+  #listWa{display:block;text-align:center;margin:0 0 12px}#listWa[hidden]{display:none}
+  .ddec{margin:8px 0 0}.ddec:empty{display:none}.decb{font:inherit;font-size:15px;background:#e3f4e8;color:#14532d;border:1px solid #9fd3ae;border-radius:999px;padding:8px 14px;max-width:100%;text-align:left}.decb.none{background:#fff;border-style:dashed}.decf{display:flex;gap:6px;flex-wrap:wrap;align-items:center}.decf .vname{flex:1 1 160px;min-width:0;margin:0}.decf .retryb{margin:0}
 </style>
 </head>
 <body>
@@ -870,6 +872,7 @@
 
 <main>
   <div class="listbar"><div class="count" id="count"></div><label class="past"><input type="checkbox" id="showPast"> Past events</label></div>
+  <a class="wa" id="listWa" href="#" target="_blank" rel="noopener" hidden>Share list on WhatsApp</a>
   <div id="list"><div class="skl"></div><div class="skl"></div><div class="skl"></div><div class="skl"></div></div>
 </main>
 
@@ -1653,6 +1656,7 @@
     <button class="st" data-s="Confirmed">Confirmed</button>
     <button class="st lost" data-s="Lost">Lost - remove from list</button>
   </div>
+  <div class="ddec" id="dDecor"></div>
   <div class="dadv" id="dAdv"></div>
   <button type="button" class="dbuild" id="dBuild">&#127912; Build a new quote for this client</button>
   <div class="dtabs" id="dTabs" role="tablist">
@@ -3152,6 +3156,26 @@
     return out ? '<div class="acts">' + out + '</div>' : '';
   }
 
+  // The list on screen (chosen status, search and Past events included) as a WhatsApp message.
+  function listText(list) {
+    var line = function (i, n) { return n + '. ' + i.name + ' - ' + fmt(i.date) + ((i.venue || '').trim() ? ' - ' + i.venue.trim() : ''); };
+    var block = function (title, l) { return '*' + title + ' (' + l.length + ')*\n' + l.map(function (i, k) { return line(i, k + 1); }).join('\n'); };
+    if (filter !== 'All') return block('Ivory Events - ' + filter, list);
+    var order = ['Enquiry', 'Costing', 'Blocked', 'Confirmed'];
+    list.forEach(function (i) { if (order.indexOf(i.status) < 0) order.push(i.status); });
+    return '*Ivory Events - all works (' + list.length + ')*\n\n' + order.map(function (st) {
+      var l = list.filter(function (i) { return i.status === st; });
+      return l.length ? block(st, l) : '';
+    }).filter(Boolean).join('\n\n');
+  }
+  function listShare(list) {
+    var a = $('#listWa'), ok = ['All', 'Enquiry', 'Costing', 'Blocked', 'Confirmed'].indexOf(filter) >= 0 && list.length > 0;
+    a.hidden = !ok;
+    if (!ok) { a.removeAttribute('href'); return; }
+    a.href = 'https://wa.me/?text=' + encodeURIComponent(listText(list));
+    a.textContent = 'Share ' + (filter === 'All' ? 'full' : filter) + ' list on WhatsApp (' + list.length + ')';
+  }
+
   function render() {
     var ql = q.trim().toLowerCase();
     var cutoff = today ? isoAdd(today, -LOOKBACK) : '';
@@ -3164,6 +3188,7 @@
       return true;
     });
     $('#sub').textContent = list.length + ' shown';
+    listShare(list);
     $('#count').textContent = (showPast ? 'Oldest first' : 'Upcoming, soonest first') +
       (FL.ready ? '' : ' - quote flags and reminders need the updated Code.gs');
     if (!list.length) {
@@ -3327,6 +3352,7 @@
     });
     openSheet('#detail');
     renderAdv(cur);
+    renderDecor(cur);
     renderActsDetail(cur);
     loadDetail(cur);
     $('#dSite').innerHTML = '';
@@ -3364,6 +3390,52 @@
       .catch(function (err) { toast(err.message, true); return load(true); })
       .then(function () { busy(false); });
   }
+
+  /* ---------- decor vendor: the green bubble under the status ---------- */
+  var DEC = {};   // wkey -> decor vendor name ('' = none). Unknown until the work's details have loaded.
+  function renderDecor(it) {
+    var el = $('#dDecor'), n = DEC[wkey(it)];
+    if (n === undefined || it.status === 'Lost') { el.innerHTML = ''; return; }
+    el.innerHTML = '<button type="button" class="decb' + (n ? '' : ' none') + '" data-act="decedit">' + (n ? 'Decor vendor: <b>' + esc(n) + '</b> &#9998;' : '+ Add Decor Package vendor') + '</button>';
+  }
+  function decorEdit(it) {
+    var sup = ((dCache[wkey(it)] || {}).d || {}).suppliers || [];
+    $('#dDecor').innerHTML = '<div class="decf"><input class="vname" id="decIn" list="decList" autocomplete="off" maxlength="80" placeholder="Vendor name" aria-label="Decor Package vendor name" value="' + esc(DEC[wkey(it)] || '') + '">' +
+      '<datalist id="decList">' + sup.map(function (n) { return '<option value="' + esc(n) + '">'; }).join('') + '</datalist>' +
+      '<button type="button" class="retryb" data-act="decsave">Save</button><button type="button" class="retryb" data-act="deccancel">Cancel</button></div>';
+    $('#decIn').focus();
+  }
+  function decorSave(it) {
+    var name = $('#decIn').value.trim(), k = wkey(it);
+    if (name === (DEC[k] || '')) { renderDecor(it); return; }
+    // a change still waiting from the Vendors tab goes first, so it cannot overwrite this one
+    var row = vItem === it ? document.querySelector('#vmain .vrow[data-v="' + DECOR + '"]') : null;
+    busy(true);
+    (row ? vSettle(row) : Promise.resolve()).then(function () {
+      delete vPend[it.id + '|' + it.date + '|' + DECOR];
+      return call('api_vendor', pin, { row: it.row, id: it.id, date: it.date, vendor: DECOR, fields: { supplier: name } });
+    }).then(function () {
+      DEC[k] = name;
+      var c = (dCache[k] || {}).d;
+      if (c && c.vendors) { c.vendors[DECOR] = c.vendors[DECOR] || { details: '', booked: false }; c.vendors[DECOR].supplier = name; }
+      if (vItem === it) {
+        VS[DECOR] = VS[DECOR] || { details: '', booked: false }; VS[DECOR].supplier = name;
+        var box = document.querySelector('#vmain .vrow[data-v="' + DECOR + '"] [data-f="supplier"]'); if (box) box.value = name;
+      }
+      var hit = VL.filter(function (r) { return r.id === it.id && r.date === it.date && r.vendor === DECOR; })[0];
+      if (hit) hit.supplier = name;
+      else VL.push({ id: it.id, date: it.date, client: it.name, venue: it.venue || '', vendor: DECOR, supplier: name, details: '', booked: false });
+      UNA = null;
+      toast(name ? 'Decor vendor saved' : 'Decor vendor cleared');
+      if (cur === it) renderDecor(it);
+    }).catch(function (e) { toast('Not saved: ' + e.message, true); }).then(function () { busy(false); });
+  }
+  $('#dDecor').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-act]'); if (!b || !cur) return;
+    var a = b.getAttribute('data-act');
+    if (a === 'decedit') decorEdit(cur); else if (a === 'decsave') decorSave(cur); else renderDecor(cur);
+  });
+  $('#dDecor').addEventListener('keydown', function (e) { if (e.key === 'Enter' && e.target.id === 'decIn' && cur) { e.preventDefault(); decorSave(cur); } });
 
   /* ---------- advance received ---------- */
   var ADV = {};   // wkey -> {amount, on, at}, or null when none is saved. Unknown until the work's details have loaded.
@@ -3499,7 +3571,7 @@
 
 
   /* ---------- quotes sent + outside vendors ---------- */
-  var APP_VERSION = 'v28-Nov-a';   // shown under Outside vendors, so you can tell which Index.html is running
+  var APP_VERSION = 'v28-Nov-b';   // shown under Outside vendors, so you can tell which Index.html is running
   var GH_REPO = 'ivoryeventz-ops/Ivory-Packages', GH_BRANCH = 'main', GH_SITE = 'https://ivory-packages.pages.dev';
   // The 12 standard outside vendors (same list as VENDOR_NAMES in Code.gs).
   var VNAMES = ['Garland and Bouquet', 'Wedding cake', 'Confetti', 'Cold Spark', 'Dry Ice', 'Ambiance lighting',
@@ -3530,6 +3602,7 @@
   // The latest quote always wins: whatever it lists is shown. When a quote item was removed or renamed by hand, that is remembered
   // in a "- <item>" row (details: "removed" or "edited:<new name>") and shown as a warning on the item.
   var VGONE = '- ';
+  var DECOR = 'Decor Package';   // the decor vendor: one fixed vendor line on every work, whatever the quote says
   function isGone(n) { return String(n || '').indexOf(VGONE) === 0; }
   function vLabel(n) { return isAdded(n) ? String(n).slice(VADD.length) : String(n || ''); }
   // look(name) gives the saved row of one work; names is every saved name of that work
@@ -3789,6 +3862,10 @@
       if (tok !== dTok) return;
       var same = cached && detailSig(cached.d, cached.gh) === detailSig(res[0], res[1]);
       dCache[ck] = { d: res[0], gh: res[1] };
+      if (!Object.keys(vPend).length && !document.getElementById('decIn')) {
+        DEC[ck] = String(((res[0].vendors || {})[DECOR] || {}).supplier || '');
+        if (cur && wkey(cur) === ck) renderDecor(cur);
+      }
       if (res[0].advance !== undefined) { ADV[ck] = res[0].advance; if (cur && wkey(cur) === ck) renderAdv(cur); }
       if (same) return;
       // never redraw the vendor boxes under someone who is typing or has an unsaved change
@@ -3867,8 +3944,8 @@
     var s = VS[name] || { supplier: '', details: '', booked: false };
     return '<div class="vrow' + (s.booked ? ' on' : '') + '" data-v="' + esc(name) + '">' +
       '<div><label class="vtick"><input type="checkbox"' + (s.booked ? ' checked' : '') + '><span>' + esc(vLabel(name)) + '</span></label>' +
-      '<div class="vacts"><button type="button" class="retryb" data-act="vedit" aria-label="Edit ' + esc(vLabel(name)) + '">Edit</button>' +
-      '<button type="button" class="retryb" data-act="vdel" aria-label="Remove ' + esc(vLabel(name)) + '" style="color:#a12622">Remove</button></div>' + vTabWarn(name) + '</div>' +
+      (name === DECOR ? '' : '<div class="vacts"><button type="button" class="retryb" data-act="vedit" aria-label="Edit ' + esc(vLabel(name)) + '">Edit</button>' +
+      '<button type="button" class="retryb" data-act="vdel" aria-label="Remove ' + esc(vLabel(name)) + '" style="color:#a12622">Remove</button></div>') + vTabWarn(name) + '</div>' +
       '<div class="vfields">' +
       '<input class="vname" data-f="supplier" list="supList" autocomplete="off" placeholder="Vendor name" aria-label="' + esc(vLabel(name)) + ' - vendor name" value="' + esc(s.supplier || '') + '">' +
       '<textarea rows="2" data-f="details" placeholder="Details - what is booked" aria-label="' + esc(vLabel(name)) + ' - details">' + esc(s.details || '') + '</textarea>' +
@@ -3909,12 +3986,13 @@
     }
     var added = Object.keys(VS).filter(isAdded);
     // The list follows the latest quote. A saved vendor the quote no longer has is dropped (and deleted from the sheet once the quote has been read fresh).
-    if (text && fresh) vPrune(it, Object.keys(VS).filter(function (n) { return !isAdded(n) && !isGone(n) && main.indexOf(n) < 0; }));
+    if (text && fresh) vPrune(it, Object.keys(VS).filter(function (n) { return n !== DECOR && !isAdded(n) && !isGone(n) && main.indexOf(n) < 0; }));
     // an item added by hand that the quote now lists too is shown once: the quote's empty row gives way to yours
     main = main.filter(function (n) {
       var s = VS[n] || {};
-      return s.booked || s.supplier || s.details || !added.some(function (a) { return vLabel(a).toLowerCase() === n.toLowerCase(); });
+      return n !== DECOR && (s.booked || s.supplier || s.details || !added.some(function (a) { return vLabel(a).toLowerCase() === n.toLowerCase(); }));
     }).concat(added);
+    main.unshift(DECOR);
     $('#dVend').innerHTML = '<h3>Outside vendors <span class="vcount" id="vcount"></span></h3><div class="note">' + note + ' <span style="opacity:.6">(app ' + APP_VERSION + ')</span></div>' +
       '<div id="vmain">' + main.map(vRow).join('') + '</div>' +
       '<datalist id="supList">' + (d.suppliers || []).map(function (n) { return '<option value="' + esc(n) + '">'; }).join('') + '</datalist>' +
@@ -4278,13 +4356,46 @@
       sdBuild(q.stage, q.extras, q).forEach(function (r) { items.push({ section: 'Stage and decor', item: r.t, details: '', qty: ckQty(r.t), on: !r.opt }); });
     }
     if (vItem === it) vMainList.forEach(function (n) {
+      if (n === DECOR) return;   // the decor vendor is not a job for the staff list
       items.push({ section: 'Outside vendors', item: vLabel(n), details: '', qty: '', on: true });   // staff sheet lists the item only, no vendor names
     });
-    ckS = { it: it, q: q, items: items, done: false };
+    var add = function (names, on) {
+      names.forEach(function (t) {
+        if (!ckS.items.some(function (x) { return x.item.toLowerCase() === t.toLowerCase(); })) ckS.items.push({ section: 'Standard items', item: t, details: '', qty: '', on: on !== false });
+      });
+    };
+    ckS = { it: it, q: q, items: items, done: false, waiting: true, note: '' };
+    add(CK_ALL);
+    var words = ckQuoteWords(q);
+    if (/welcome\s*drink/i.test(words)) add(CK_DRINK);
+    if (/\bcandles?\b/i.test(words)) add(CK_CANDLE);
+    if (/\bcakes?\b(?!\s*stand)/i.test(words)) add(CK_CAKE);
+    var S0 = ckS;
+    ckEventType(it).then(function (type) {
+      if (ckS !== S0) return;
+      S0.waiting = false;
+      if (type === 'christian' || type === 'pentecost') add(CK_CHRISTIAN);
+      else if (!type) { add(CK_CHRISTIAN, false); S0.note = 'The event type could not be read from the client link. Tick Manthrakodi Basket, Ring Box and Saree Hanger if this is a Christian wedding.'; }
+      ckRender();
+    });
     $('#ckMeta').textContent = it.name + ' - ' + fmt(it.date) + (it.venue ? ' - ' + it.venue : '') + (q && q.src === 'cloud' ? ' - items from quote #' + q.no : '');
     $('#ckState').textContent = ''; $('#ckShare').innerHTML = '';
     ckRender();
     openSheet('#ck');
+  }
+  var CK_ALL = ['Masking Tape (Clear & White)', 'Reserved Boards', 'Reserved Priest Boards', 'Ivory Light Stand'];
+  var CK_DRINK = ['Appy Fizz', 'Wine Glass', 'Tray'];
+  var CK_CANDLE = ['Candles (3)', 'Karpooram', 'Long candle', 'Lighter'];
+  var CK_CAKE = ['Knife', 'Knife Tray', 'Tissue', 'Cake Topper'];
+  var CK_CHRISTIAN = ['Manthrakodi Basket', 'Ring Box', 'Saree Hanger'];
+  function ckQuoteWords(q) {   // everything the latest quote offers: stage items, additional items and outside vendors
+    if (!q) return '';
+    var w = (q.stage || []).slice().concat(q.outside || []);
+    (q.extras || []).forEach(function (x) { w.push(x.name); w = w.concat(x.subs || []); });
+    return w.join('\n');
+  }
+  function ckEventType(it) {   // set when the client link was made; '' when it cannot be read
+    return call('api_site_data', pin, { folder: siteFolder(it) }).then(function (r) { return (r && r.data && r.data.type) || ''; }, function () { return ''; });
   }
   function ckRender() {
     var S = ckS, groups = {}, order = [], h = '';
@@ -4292,6 +4403,7 @@
     if (!S.q) h += '<div class="note warn">No quote was found for this work, so add the items yourself below.</div>';
     else if (S.q.src !== 'cloud') h += '<div class="note warn">The latest quote is a Google Site and cannot be read here, so add the items yourself below.</div>';
     else h += '<div class="note">Untick anything staff do not need to check. Add your own items at the bottom.</div>';
+    if (S.note) h += '<div class="note warn">' + esc(S.note) + '</div>';
     order.forEach(function (g) {
       h += '<div class="ckg">' + esc(g) + '</div>' + groups[g].map(function (i) {
         var x = S.items[i];
@@ -4305,7 +4417,7 @@
   function ckCount() {
     var n = ckS.items.filter(function (x) { return x.on; }).length;
     $('#ckGo').textContent = 'Create Google Sheet (' + n + ' item' + (n === 1 ? '' : 's') + ')';
-    $('#ckGo').disabled = !n || ckS.done;
+    $('#ckGo').disabled = !n || ckS.done || ckS.waiting;
   }
   $('#ckBody').addEventListener('change', function (e) {
     var cb = e.target.closest('input[data-i]'); if (!cb || !ckS) return;
@@ -4376,6 +4488,7 @@
       });
   }
   function vQueue(it, name, fields) {
+    if (name === DECOR && 'supplier' in fields) { DEC[wkey(it)] = String(fields.supplier).trim(); if (cur === it) renderDecor(it); }
     if (vItem === it) { VS[name] = VS[name] || { details: '', booked: false }; for (var f in fields) VS[name][f] = fields[f]; }
     var k = it.id + '|' + it.date + '|' + name;
     var p = vPend[k] = vPend[k] || { row: it.row, id: it.id, date: it.date, vendor: name, fields: {} };
@@ -7017,7 +7130,7 @@
         var latest = x.qs.slice().sort(function (a, b) { return b.no.localeCompare(a.no); })[0];
         if (!latest || !latest.text) return;
         var it = x.it, allowed = quoteVendors(latest);
-        var gone = VL.filter(function (r) { return r.id === it.id && r.date === it.date && !isAdded(r.vendor) && !isGone(r.vendor) && allowed.indexOf(r.vendor) < 0; }).map(function (r) { return r.vendor; });
+        var gone = VL.filter(function (r) { return r.id === it.id && r.date === it.date && r.vendor !== DECOR && !isAdded(r.vendor) && !isGone(r.vendor) && allowed.indexOf(r.vendor) < 0; }).map(function (r) { return r.vendor; });
         if (!gone.length) return;
         VL = VL.filter(function (r) { return !(r.id === it.id && r.date === it.date && gone.indexOf(r.vendor) >= 0); });
         removed += gone.length;
@@ -7116,8 +7229,8 @@
         var names = quoteVendors(qs[0]);
         if (x.err) failed = true;
         var own = VL.filter(function (r) { return r.id === it.id && r.date === it.date && isAdded(r.vendor); }).map(function (r) { return r.vendor; });
-        if (!qs.length && !names.length && !own.length) { unreadable.push(it.name); return; }
-        names = names.concat(own);
+        if (!qs.length && !names.length && !own.length) unreadable.push(it.name);   // only the decor line and your own can be listed
+        names = [DECOR].concat(names.filter(function (n) { return n !== DECOR; }), own);
         var lines = names.filter(function (n) {
           var k = base + n, s = saved[k];
           if (named[k]) return false;                                      // already has a vendor name
@@ -7156,7 +7269,7 @@
     var head = '<div class="note"><b>' + total + '</b> outside-vendor ' + (total === 1 ? 'item has' : 'items have') + ' no vendor name yet. Type the name next to an item and it saves straight away.</div>';
     if (!total) head = '<div class="note">' + (UNA.groups.length ? 'Nothing matches.' : 'Every outside vendor has a name. Nothing left to assign.') + '</div>';
     h = head + h + '<datalist id="unaSup">' + supList.map(function (n) { return '<option value="' + esc(n) + '">'; }).join('') + '</datalist>';
-    if (UNA.unreadable.length) h += '<div class="note warn">No readable quote for ' + esc(UNA.unreadable.join(', ')) + ', so their vendors are not listed. Open the work to check.</div>';
+    if (UNA.unreadable.length) h += '<div class="note warn">No readable quote for ' + esc(UNA.unreadable.join(', ')) + ', so only the Decor Package and vendors you added are listed for them. Open the work to check.</div>';
     if (UNA.failed) h += '<div class="note warn">Some quotes could not be loaded just now.<button class="retryb" id="vlRetry">Try again</button></div>';
     $('#vlList').innerHTML = h;
   }
@@ -7226,6 +7339,7 @@
       '<label>Details<textarea class="vname" data-k="details" rows="2">' + esc(t.rec.details || '') + '</textarea></label>' +
       '<div class="vacts"><button type="button" class="retryb" data-vl="save">Save</button><button type="button" class="retryb" data-vl="cancel">Cancel</button></div>';
     t.el.appendChild(f);
+    if (t.vendor === DECOR) f.querySelector('[data-k="label"]').readOnly = true;   // the decor line keeps its name
     t.el.querySelector('.vlacts').style.display = 'none';
   }
   function vlEditSave(t) {
@@ -7258,11 +7372,11 @@
       .then(function () { busy(false); });
   }
   function vlRemove(t) {
-    var it = t.it, old = t.vendor, own = isAdded(old);
+    var it = t.it, old = t.vendor, own = isAdded(old) || old === DECOR;   // no "removed earlier" mark for these
     askConfirm({ title: 'Remove ' + vLabel(old) + '?', body: 'The vendor name, details and booked tick of ' + vLabel(old) + ' are removed for ' + it.name + ' (' + fmt(it.date) + ').' + (own ? '' : ' If the latest quote lists this item, it stays blank under Not assigned (Confirmed works) and on the client\'s Vendors tab, with a "Removed earlier" warning.') + ' The quote is not changed.', ok: 'Remove', needKey: false }).then(function (r) {
       if (!r.ok) return;
       var saved = VL.filter(function (x) { return x.id === it.id && x.date === it.date; }).map(function (x) { return x.vendor; });
-      var back = own ? vMarksTo(vLabel(old), saved, function (n) { return vlFind(it.id, it.date, n); }) : [VGONE + old];
+      var back = old === DECOR ? [] : own ? vMarksTo(vLabel(old), saved, function (n) { return vlFind(it.id, it.date, n); }) : [VGONE + old];
       busy(true);
       return back.reduce(function (p, m) { return p.then(function () { return vCall(it, m, { fields: { details: 'removed' } }); }); }, Promise.resolve())
         .then(function () { return vCall(it, old, { remove: true }); })

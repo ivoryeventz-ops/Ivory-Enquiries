@@ -30,6 +30,10 @@ const VENDOR_NAMES = ['Garland and Bouquet', 'Wedding cake', 'Confetti', 'Cold S
 const VENDOR_TAB = 'Vendors';
 const QUOTE_TAB = 'Quotes';
 const ADVANCE_TAB = 'Advances';
+// The Decor Package vendor is one more line in the Vendors tab. Names typed earlier were kept in a "Work Vendor Names" tab
+// (Key, Client, Event date, Vendor name, Updated); they are still read, and move to the Vendors tab when next changed.
+const DECOR = 'Decor Package';
+const WORK_VENDOR_TAB = 'Work Vendor Names';
 
 /* ---------- web app ---------- */
 
@@ -342,6 +346,26 @@ function vendorTab_(ss) {
   return sh;
 }
 
+function oldDecorNames_(ss) {
+  const out = {};
+  const sh = ss.getSheetByName(WORK_VENDOR_TAB);
+  const last = sh ? lastRowWith_(sh, 1) : 1;
+  if (last > 1) {
+    sh.getRange(2, 1, last - 1, 4).getValues().forEach(function (r) {
+      const key = String(r[0]), name = String(r[3] || '').trim();
+      if (key && name) out[key] = { name: name, client: String(r[1]), date: isoAny_(r[2]) || key.split('|')[1] || '' };
+    });
+  }
+  return out;
+}
+function oldDecorDrop_(ss, key) {
+  const sh = ss.getSheetByName(WORK_VENDOR_TAB);
+  const last = sh ? lastRowWith_(sh, 1) : 1;
+  if (last < 2) return;
+  const keys = sh.getRange(2, 1, last - 1, 1).getValues();
+  for (let i = keys.length - 1; i >= 0; i--) if (String(keys[i][0]) === key) sh.deleteRow(i + 2);
+}
+
 function api_detail(pin, p) {
   check_(pin);
   const ss = ss_();
@@ -376,6 +400,12 @@ function api_detail(pin, p) {
       vendors[String(r[3])] = { supplier: sup, details: String(r[4] || ''), booked: r[5] === true || String(r[5]).toLowerCase() === 'true' };
     });
   }
+  const old = oldDecorNames_(ss);
+  if (!vendors[DECOR] && old[key]) vendors[DECOR] = { supplier: old[key].name, details: '', booked: false };
+  Object.keys(old).forEach(function (k) {
+    const n = old[k].name;
+    if (!seenSup[n.toLowerCase()]) { seenSup[n.toLowerCase()] = 1; suppliers.push(n); }
+  });
   suppliers.sort(function (a, b) { return a.toLowerCase().localeCompare(b.toLowerCase()); });
   return { sites: sites, vendors: vendors, vendorList: VENDOR_NAMES, suppliers: suppliers, advance: advanceGet_(ss, key) };
 }
@@ -402,6 +432,7 @@ function api_vendor(pin, p) {
     }
     if (p.remove === true) {          // the latest quote no longer lists this item: delete its row
       if (r > 0) sh.deleteRow(r);
+      if (vendor === DECOR) oldDecorDrop_(ss, key);
       SpreadsheetApp.flush();
       return { ok: true, removed: r > 0 };
     }
@@ -409,12 +440,17 @@ function api_vendor(pin, p) {
       r = last + 1;
       sh.getRange(r, 1, 1, 5).setNumberFormat('@').setValues([[key, String(row[1]), String(p.date), vendor, '']]);
       sh.getRange(r, 6).insertCheckboxes().setValue(false);
+      if (vendor === DECOR && !('supplier' in f)) {   // keep the name typed earlier
+        const was = oldDecorNames_(ss)[key];
+        if (was) sh.getRange(r, 8).setNumberFormat('@').setValue(was.name);
+      }
     }
     // only the field that changed is written, so one person's tick never wipes the other's note
     if ('details' in f) sh.getRange(r, 5).setNumberFormat('@').setValue(String(f.details));
     if ('supplier' in f) sh.getRange(r, 8).setNumberFormat('@').setValue(String(f.supplier).trim());
     if ('booked' in f) sh.getRange(r, 6).insertCheckboxes().setValue(f.booked === true);
     sh.getRange(r, 7).setValue(new Date()).setNumberFormat('d mmm yyyy h:mm AM/PM');
+    if (vendor === DECOR) oldDecorDrop_(ss, key);   // this line now holds it
     SpreadsheetApp.flush();
     return { ok: true };
   } finally {
@@ -449,6 +485,14 @@ function api_vendors(pin) {
       });
     });
   }
+  const have = {};
+  rows.forEach(function (x) { if (x.vendor === DECOR) have[x.id + '|' + x.date] = 1; });
+  const old = oldDecorNames_(ss);
+  Object.keys(old).forEach(function (key) {
+    if (lost[key] || have[key] || !(key in venues)) return;
+    rows.push({ id: key.split('|')[0], date: old[key].date, client: old[key].client, venue: venues[key] || '', vendor: DECOR,
+      details: '', supplier: old[key].name, booked: false });
+  });
   return { rows: rows };
 }
 
