@@ -1740,10 +1740,15 @@
     <label for="fType">Event type</label>
     <select id="fType" required>
       <option value="">Choose...</option>
-      <option value="christian">Wedding - Christian</option>
-      <option value="pentecost">Wedding - Pentecost</option>
+      <option value="marthoma">Marthoma</option>
+      <option value="orthodox">Orthodox</option>
+      <option value="pentecost">Pentecost</option>
+      <option value="csi">CSI</option>
       <option value="engagement">Engagement</option>
-      <option value="hindu">Reception - Hindu</option>
+      <option value="mylanchi">Maduramveppu/Mylanchi</option>
+      <option value="creception">Christian - Reception</option>
+      <option value="hindumandap">Hindu - Mandap</option>
+      <option value="hindu">Hindu - Reception</option>
     </select>
     <label for="fStatus">Status</label>
     <select id="fStatus">
@@ -3588,7 +3593,7 @@
 
 
   /* ---------- quotes sent + outside vendors ---------- */
-  var APP_VERSION = 'v28-Nov-c';   // shown under Outside vendors, so you can tell which Index.html is running
+  var APP_VERSION = 'v28-Nov-d';   // shown under Outside vendors, so you can tell which Index.html is running
   var GH_REPO = 'ivoryeventz-ops/Ivory-Packages', GH_BRANCH = 'main', GH_SITE = 'https://ivory-packages.pages.dev';
   // The 12 standard outside vendors (same list as VENDOR_NAMES in Code.gs).
   var VNAMES = ['Garland and Bouquet', 'Wedding cake', 'Confetti', 'Cold Spark', 'Dry Ice', 'Ambiance lighting',
@@ -4073,7 +4078,7 @@
   var SITE_RAW = 'https://raw.githubusercontent.com/ivoryeventz-ops/Ivory-Events/main/New%20A/';
   var SITE_URL = 'https://ivory-events.pages.dev/New%20A/';
   var SITE = {}, ADDED = {};
-  var EV_TYPES = { christian: 'Wedding - Christian', pentecost: 'Wedding - Pentecost', engagement: 'Engagement', hindu: 'Reception - Hindu' };
+  var EV_TYPES = { marthoma: 'Marthoma', orthodox: 'Orthodox', pentecost: 'Pentecost', csi: 'CSI', engagement: 'Engagement', mylanchi: 'Maduramveppu/Mylanchi', creception: 'Christian - Reception', hindumandap: 'Hindu - Mandap', hindu: 'Hindu - Reception' };
   function linkWa(name, url) {
     return 'https://wa.me/?text=' + encodeURIComponent(url);
   }
@@ -4181,7 +4186,8 @@
     else if (st.data === undefined && !st.err && !SITE[f]) h += '<div class="note">Checking the client link...</div>';
     else h += '<div class="note warn">No client link yet. Choose the event type and make it.</div>';
     var curType = (d && d.type) || (any ? 'christian' : '');
-    var opts = '<option value="">Choose...</option>' + Object.keys(EV_TYPES).map(function (k) { return '<option value="' + k + '"' + (k === curType ? ' selected' : '') + '>' + esc(EV_TYPES[k]) + '</option>'; }).join('');
+    var oldType = curType === 'christian';   // made before the church types: shows the same pages until one is picked
+    var opts = '<option value="">' + (oldType ? 'Christian - choose church' : 'Choose...') + '</option>' + Object.keys(EV_TYPES).map(function (k) { return '<option value="' + k + '"' + (k === curType ? ' selected' : '') + '>' + esc(EV_TYPES[k]) + '</option>'; }).join('');
     h += sRow('Event type', 'Decides which Packages and Checklist pages the client sees', false,
       '<select class="evsel" id="evType">' + opts + '</select><button type="button" class="sbtn" data-lk="save">' + (any ? 'Change' : 'Make link') + '</button>');
     if (d) {
@@ -4393,7 +4399,7 @@
     ckEventType(it).then(function (type) {
       if (ckS !== S0) return;
       S0.waiting = false;
-      if (type === 'christian' || type === 'pentecost') add(CK_CHRISTIAN);
+      if (['christian', 'marthoma', 'orthodox', 'pentecost', 'csi'].indexOf(type) >= 0) add(CK_CHRISTIAN);
       else if (!type) { add(CK_CHRISTIAN, false); S0.note = 'The event type could not be read from the client link. Tick Manthrakodi Basket, Ring Box and Saree Hanger if this is a Christian wedding.'; }
       ckRender();
     });

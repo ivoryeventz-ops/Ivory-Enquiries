@@ -633,7 +633,7 @@ const SITE_REPO = 'ivoryeventz-ops/Ivory-Events';
 const SITE_BRANCH = 'main';
 const SITE_DIR = 'New A';
 // Event types: what the client link shows under Packages and Service Checklist (pages live in Ivory-Events > New A > parts/<folder>).
-const SITE_TYPES = { christian: 'Wedding - Christian', pentecost: 'Wedding - Pentecost', engagement: 'Engagement', hindu: 'Reception - Hindu' };
+const SITE_TYPES = { marthoma: 'Marthoma', orthodox: 'Orthodox', pentecost: 'Pentecost', csi: 'CSI', engagement: 'Engagement', mylanchi: 'Maduramveppu/Mylanchi', creception: 'Christian - Reception', hindumandap: 'Hindu - Mandap', hindu: 'Hindu - Reception' };
 
 function siteKey_(props) { return props.getProperty('SITE_KEY') || props.getProperty('TL_KEY') || props.getProperty('GH_KEY') || ''; }
 
