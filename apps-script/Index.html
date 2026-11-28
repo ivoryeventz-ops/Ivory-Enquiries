@@ -3393,47 +3393,64 @@
 
   /* ---------- decor vendor: the green bubble under the status ---------- */
   var DEC = {};   // wkey -> decor vendor name ('' = none). Unknown until the work's details have loaded.
+  // "No decor package" (e.g. only a premium car for an engagement): kept on this work's Decor Package line as its details, with no vendor name.
+  // It belongs to one client code + date, so the same client's other works are not affected.
+  var NODEC = {}, NO_DECOR = 'No decor package';
+  function isNoDecor(rec) { return !!rec && !String(rec.supplier || '').trim() && String(rec.details || '').trim() === NO_DECOR; }
   function renderDecor(it) {
     var el = $('#dDecor'), n = DEC[wkey(it)];
     if (n === undefined || it.status === 'Lost') { el.innerHTML = ''; return; }
-    el.innerHTML = '<button type="button" class="decb' + (n ? '' : ' none') + '" data-act="decedit">' + (n ? 'Decor vendor: <b>' + esc(n) + '</b> &#9998;' : '+ Add Decor Package vendor') + '</button>';
+    var label = n ? 'Decor vendor: <b>' + esc(n) + '</b> &#9998;' : NODEC[wkey(it)] ? NO_DECOR + ' &#9998;' : '+ Add Decor Package vendor';
+    el.innerHTML = '<button type="button" class="decb' + (n ? '' : ' none') + '" data-act="decedit">' + label + '</button>';
   }
   function decorEdit(it) {
     var sup = ((dCache[wkey(it)] || {}).d || {}).suppliers || [];
     $('#dDecor').innerHTML = '<div class="decf"><input class="vname" id="decIn" list="decList" autocomplete="off" maxlength="80" placeholder="Vendor name" aria-label="Decor Package vendor name" value="' + esc(DEC[wkey(it)] || '') + '">' +
       '<datalist id="decList">' + sup.map(function (n) { return '<option value="' + esc(n) + '">'; }).join('') + '</datalist>' +
-      '<button type="button" class="retryb" data-act="decsave">Save</button><button type="button" class="retryb" data-act="deccancel">Cancel</button></div>';
+      '<button type="button" class="retryb" data-act="decsave">Save</button>' +
+      '<button type="button" class="retryb" data-act="' + (NODEC[wkey(it)] ? 'decundo">Undo no decor package' : 'decnone">' + NO_DECOR) + '</button>' +
+      '<button type="button" class="retryb" data-act="deccancel">Cancel</button></div>';
     $('#decIn').focus();
   }
-  function decorSave(it) {
-    var name = $('#decIn').value.trim(), k = wkey(it);
-    if (name === (DEC[k] || '')) { renderDecor(it); return; }
+  // mode: undefined = save the typed name, 'none' = no decor package, 'undo' = take that mark off
+  function decorSave(it, mode) {
+    var name = mode ? '' : $('#decIn').value.trim(), k = wkey(it), none = mode === 'none';
+    if (!mode && name === (DEC[k] || '')) { renderDecor(it); return; }
+    var fields = { supplier: name };
+    if (mode || NODEC[k]) fields.details = none ? NO_DECOR : '';
+    if (none) fields.booked = false;
     // a change still waiting from the Vendors tab goes first, so it cannot overwrite this one
     var row = vItem === it ? document.querySelector('#vmain .vrow[data-v="' + DECOR + '"]') : null;
     busy(true);
     (row ? vSettle(row) : Promise.resolve()).then(function () {
       delete vPend[it.id + '|' + it.date + '|' + DECOR];
-      return call('api_vendor', pin, { row: it.row, id: it.id, date: it.date, vendor: DECOR, fields: { supplier: name } });
+      return call('api_vendor', pin, { row: it.row, id: it.id, date: it.date, vendor: DECOR, fields: fields });
     }).then(function () {
-      DEC[k] = name;
+      var wasNone = !!NODEC[k];
+      DEC[k] = name; NODEC[k] = none;
+      var put = function (o) { Object.keys(fields).forEach(function (f) { o[f] = fields[f]; }); };
       var c = (dCache[k] || {}).d;
-      if (c && c.vendors) { c.vendors[DECOR] = c.vendors[DECOR] || { details: '', booked: false }; c.vendors[DECOR].supplier = name; }
+      if (c && c.vendors) { c.vendors[DECOR] = c.vendors[DECOR] || { details: '', booked: false }; put(c.vendors[DECOR]); }
       if (vItem === it) {
-        VS[DECOR] = VS[DECOR] || { details: '', booked: false }; VS[DECOR].supplier = name;
+        VS[DECOR] = VS[DECOR] || { details: '', booked: false }; put(VS[DECOR]);
         var box = document.querySelector('#vmain .vrow[data-v="' + DECOR + '"] [data-f="supplier"]'); if (box) box.value = name;
       }
       var hit = VL.filter(function (r) { return r.id === it.id && r.date === it.date && r.vendor === DECOR; })[0];
-      if (hit) hit.supplier = name;
-      else VL.push({ id: it.id, date: it.date, client: it.name, venue: it.venue || '', vendor: DECOR, supplier: name, details: '', booked: false });
+      if (!hit) { hit = { id: it.id, date: it.date, client: it.name, venue: it.venue || '', vendor: DECOR, supplier: '', details: '', booked: false }; VL.push(hit); }
+      put(hit);
       UNA = null;
-      toast(name ? 'Decor vendor saved' : 'Decor vendor cleared');
-      if (cur === it) renderDecor(it);
+      toast(none ? 'Saved with no decor package' : mode ? 'Decor vendor line is back' : name ? 'Decor vendor saved' : 'Decor vendor cleared');
+      if (cur === it) {
+        renderDecor(it);
+        // the Vendors tab hides or shows its Decor Package line
+        if (wasNone !== none) { var e = dCache[k]; if (e && e.gh) renderDetail(it, e.d, e.gh); else loadDetail(it); }
+      }
     }).catch(function (e) { toast('Not saved: ' + e.message, true); }).then(function () { busy(false); });
   }
   $('#dDecor').addEventListener('click', function (e) {
     var b = e.target.closest('[data-act]'); if (!b || !cur) return;
     var a = b.getAttribute('data-act');
-    if (a === 'decedit') decorEdit(cur); else if (a === 'decsave') decorSave(cur); else renderDecor(cur);
+    if (a === 'decedit') decorEdit(cur); else if (a === 'decsave') decorSave(cur); else if (a === 'decnone') decorSave(cur, 'none'); else if (a === 'decundo') decorSave(cur, 'undo'); else renderDecor(cur);
   });
   $('#dDecor').addEventListener('keydown', function (e) { if (e.key === 'Enter' && e.target.id === 'decIn' && cur) { e.preventDefault(); decorSave(cur); } });
 
@@ -3571,7 +3588,7 @@
 
 
   /* ---------- quotes sent + outside vendors ---------- */
-  var APP_VERSION = 'v28-Nov-b';   // shown under Outside vendors, so you can tell which Index.html is running
+  var APP_VERSION = 'v28-Nov-c';   // shown under Outside vendors, so you can tell which Index.html is running
   var GH_REPO = 'ivoryeventz-ops/Ivory-Packages', GH_BRANCH = 'main', GH_SITE = 'https://ivory-packages.pages.dev';
   // The 12 standard outside vendors (same list as VENDOR_NAMES in Code.gs).
   var VNAMES = ['Garland and Bouquet', 'Wedding cake', 'Confetti', 'Cold Spark', 'Dry Ice', 'Ambiance lighting',
@@ -3864,6 +3881,7 @@
       dCache[ck] = { d: res[0], gh: res[1] };
       if (!Object.keys(vPend).length && !document.getElementById('decIn')) {
         DEC[ck] = String(((res[0].vendors || {})[DECOR] || {}).supplier || '');
+        NODEC[ck] = isNoDecor((res[0].vendors || {})[DECOR]);
         if (cur && wkey(cur) === ck) renderDecor(cur);
       }
       if (res[0].advance !== undefined) { ADV[ck] = res[0].advance; if (cur && wkey(cur) === ck) renderAdv(cur); }
@@ -3992,7 +4010,8 @@
       var s = VS[n] || {};
       return n !== DECOR && (s.booked || s.supplier || s.details || !added.some(function (a) { return vLabel(a).toLowerCase() === n.toLowerCase(); }));
     }).concat(added);
-    main.unshift(DECOR);
+    if (!isNoDecor(VS[DECOR])) main.unshift(DECOR);
+    else note = NO_DECOR + ' for this work. ' + note;
     $('#dVend').innerHTML = '<h3>Outside vendors <span class="vcount" id="vcount"></span></h3><div class="note">' + note + ' <span style="opacity:.6">(app ' + APP_VERSION + ')</span></div>' +
       '<div id="vmain">' + main.map(vRow).join('') + '</div>' +
       '<datalist id="supList">' + (d.suppliers || []).map(function (n) { return '<option value="' + esc(n) + '">'; }).join('') + '</datalist>' +
@@ -4488,7 +4507,7 @@
       });
   }
   function vQueue(it, name, fields) {
-    if (name === DECOR && 'supplier' in fields) { DEC[wkey(it)] = String(fields.supplier).trim(); if (cur === it) renderDecor(it); }
+    if (name === DECOR && 'supplier' in fields) { DEC[wkey(it)] = String(fields.supplier).trim(); if (DEC[wkey(it)]) NODEC[wkey(it)] = false; if (cur === it) renderDecor(it); }
     if (vItem === it) { VS[name] = VS[name] || { details: '', booked: false }; for (var f in fields) VS[name][f] = fields[f]; }
     var k = it.id + '|' + it.date + '|' + name;
     var p = vPend[k] = vPend[k] || { row: it.row, id: it.id, date: it.date, vendor: name, fields: {} };
@@ -4763,19 +4782,19 @@
     $('#paySum').innerHTML = h;
   }
 
-  function payFromQuote(list) {
+  function payFromQuote(list, it) {
     var q = (list || []).filter(function (x) { return x.src === 'cloud' && x.items && x.items.length; })[0];
     var out = q ? q.items.map(function (r) { return { name: r.name, amount: r.amount }; }) : [];
-    return withDecor(out);
+    return withDecor(out, it);
   }
   // The decor package is always the first row; left blank (and flagged) when the quote has no single package rate.
   function hasDecor(a) { return a.some(function (r) { return /decor\s*package|package/i.test(r.name || ''); }); }
-  function withDecor(a) { if (!hasDecor(a)) a.unshift({ name: 'Decor Package', amount: 0 }); return a; }
+  function withDecor(a, it) { if (!(it && NODEC[wkey(it)]) && !hasDecor(a)) a.unshift({ name: 'Decor Package', amount: 0 }); return a; }
   function decorMissing() { return P.items.some(function (r) { return /decor\s*package/i.test(r.name || '') && !num(r.amount); }); }
   function openPay(it, list) {
     var folder = payFolder(it, list), q = (list || []).filter(function (x) { return x.src === 'cloud'; })[0];
     P = { it: it, list: list, folder: folder, name: it.name, date: it.date, venue: (q && q.venue) || it.venue || '',
-      items: payFromQuote(list), total: null, totalAuto: true, discount: 0, adv: [{ label: 'Advance Received', amount: 0 }], advSeen: '' };
+      items: payFromQuote(list, it), total: null, totalAuto: true, discount: 0, adv: [{ label: 'Advance Received', amount: 0 }], advSeen: '' };
     $('#payMeta').textContent = it.name + ' - ' + fmt(it.date) + (P.venue ? ' - ' + P.venue : '') + '  (saves to ' + folder + '/payment) - app ' + APP_VERSION;
     payRender();
     payAskServer();
@@ -4798,7 +4817,7 @@
       .then(function (html) {
         if (P !== tok) return;
         var o = parseSavedPayment(html);
-        if (o.items && o.items.length) P.items = withDecor(o.items);
+        if (o.items && o.items.length) P.items = withDecor(o.items, P.it);
         P.discount = num(o.discount);
         if (o.adv && o.adv.length) P.adv = o.adv;
         P.advSeen = String(o.advSeen || '');
@@ -4938,7 +4957,7 @@
     var a = b.getAttribute('data-act'), row = b.closest('.prow');
     if (a === 'pdel') { P.items.splice(+row.getAttribute('data-i'), 1); payRender(); }
     else if (a === 'padd') { P.items.push({ name: '', amount: 0 }); payRender(); }
-    else if (a === 'preload') { P.items = payFromQuote(P.list); P.totalAuto = true; payRender(); payStatus(decorMissing() ? 'The decor package rate is not in the quote as one price - type it in the first row.' : 'Rates picked up again from the latest quote.', decorMissing()); }
+    else if (a === 'preload') { P.items = payFromQuote(P.list, P.it); P.totalAuto = true; payRender(); payStatus(decorMissing() ? 'The decor package rate is not in the quote as one price - type it in the first row.' : 'Rates picked up again from the latest quote.', decorMissing()); }
     else if (a === 'adel') { P.adv.splice(+row.getAttribute('data-a'), 1); payRender(); }
     else if (a === 'aadd') { P.adv.push({ label: 'Advance Received on ', amount: 0 }); payRender(); }
     else if (a === 'psave') payPublish();
@@ -7166,7 +7185,7 @@
       if (isGone(r.vendor)) return;
       var nm = (r.supplier || '').trim();
       if (!past && r.date && r.date < today) return;
-      if (!nm) { if (r.booked || (r.details || '').trim()) unnamed++; return; }
+      if (!nm) { if (!(r.vendor === DECOR && isNoDecor(r)) && (r.booked || (r.details || '').trim())) unnamed++; return; }
       if (vlF === 'Booked' && !r.booked) return;
       if (vlF === 'Not booked' && r.booked) return;
       if (ql && (nm + ' ' + r.client + ' ' + r.vendor + ' ' + r.details + ' ' + r.venue).toLowerCase().indexOf(ql) < 0) return;
@@ -7234,6 +7253,7 @@
         var lines = names.filter(function (n) {
           var k = base + n, s = saved[k];
           if (named[k]) return false;                                      // already has a vendor name
+          if (n === DECOR && isNoDecor(s)) return false;                   // saved as no decor package
           if (s && /included\s+in\s+package/i.test(s.details || '')) return false;   // supplied inside the package
           return true;
         });
