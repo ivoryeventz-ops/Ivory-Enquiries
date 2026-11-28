@@ -3224,13 +3224,13 @@
     var tl = tlGet().then(function (t) { return t; }, function () { return null; });
     var lk = ghTreeFetch('ivoryeventz-ops/Ivory-Events', 'main').then(function (j) {
       var L = {};
-      (j.tree || []).forEach(function (x) { var m = /^New A\/([^\/]+)\/(?:data\.json|index\.html)$/.exec(x.path); if (m) L[m[1].toLowerCase()] = m[1]; });
+      (j.tree || []).forEach(function (x) { var m = /^(New [AEP])\/([^\/]+)\/(?:data\.json|index\.html)$/.exec(x.path); if (m) { L[m[2].toLowerCase()] = m[2]; setSiteDir(m[2], m[1]); } });
       // same-name works: read the wedding date saved in each candidate link, so the dates can be compared
       var need = {};
       items.forEach(function (i) { if (i.status !== 'Lost' && i.date && String(i.name || '').trim() && sameName(i)) linkCands(i, L).forEach(function (f) { need[f] = 1; }); var t0s = nameFirsts(i); Object.keys(L).forEach(function (f) { if (t0s.indexOf(nameToks(f)[0]) >= 0) need[f] = 1; }); });
       var D = {};
       return Promise.all(Object.keys(need).map(function (f) {
-        return fetch(SITE_RAW + encodeURIComponent(L[f]) + '/data.json?t=' + Date.now())
+        return fetch(siteRaw(L[f]) + encodeURIComponent(L[f]) + '/data.json?t=' + Date.now())
           .then(function (r) { return r.ok ? r.json() : null; })
           .then(function (d) { D[f] = (d && d.wedding_date) || ''; }, function () { D[f] = ''; });
       })).then(function () { return { L: L, D: D }; });
@@ -3593,7 +3593,7 @@
 
 
   /* ---------- quotes sent + outside vendors ---------- */
-  var APP_VERSION = 'v28-Nov-d';   // shown under Outside vendors, so you can tell which Index.html is running
+  var APP_VERSION = 'v28-Nov-e';   // shown under Outside vendors, so you can tell which Index.html is running
   var GH_REPO = 'ivoryeventz-ops/Ivory-Packages', GH_BRANCH = 'main', GH_SITE = 'https://ivory-packages.pages.dev';
   // The 12 standard outside vendors (same list as VENDOR_NAMES in Code.gs).
   var VNAMES = ['Garland and Bouquet', 'Wedding cake', 'Confetti', 'Cold Spark', 'Dry Ice', 'Ambiance lighting',
@@ -4073,10 +4073,14 @@
   $('#cfNo').addEventListener('click', function () { if (cfRes) cfRes(false); });
   $('#cf').addEventListener('click', function (e) { if (e.target === $('#cf') && cfRes) cfRes(false); });
 
-  /* ---------- client link: the client's one page (Ivory-Events > New A > <Client>) ----------
+  /* ---------- client link: the client's one page (Ivory-Events > New A, New E or New P > <Client>) ----------
      Its tabs: quotes by date (latest first), then Wedding timeline, then Payment. This screen adds ONE item per tap, after a confirm. */
-  var SITE_RAW = 'https://raw.githubusercontent.com/ivoryeventz-ops/Ivory-Events/main/New%20A/';
-  var SITE_URL = 'https://ivory-events.pages.dev/New%20A/';
+  // Client links live on three sites (New A, New E, New P). SITE_DIR_OF remembers which one holds each link folder; New A when not known.
+  var SITE_DIR_OF = {};
+  function setSiteDir(f, dir) { if (f && dir) SITE_DIR_OF[String(f).toLowerCase()] = dir; }
+  function siteDirPath(f) { return encodeURIComponent(SITE_DIR_OF[String(f).toLowerCase()] || 'New A') + '/'; }
+  function siteRaw(f) { return 'https://raw.githubusercontent.com/ivoryeventz-ops/Ivory-Events/main/' + siteDirPath(f); }
+  function siteUrl(f) { return 'https://ivory-events.pages.dev/' + siteDirPath(f); }
   var SITE = {}, ADDED = {};
   var EV_TYPES = { marthoma: 'Marthoma', orthodox: 'Orthodox', pentecost: 'Pentecost', csi: 'CSI', engagement: 'Engagement', mylanchi: 'Maduramveppu/Mylanchi', creception: 'Christian - Reception', hindumandap: 'Hindu - Mandap', hindu: 'Hindu - Reception' };
   function linkWa(name, url) {
@@ -4110,7 +4114,7 @@
         var p = { folder: f, name: it.name, date: it.date, venue: it.venue, type: type, change: !!change };
         if (key) p.key = key;
         busy(true);
-        return call('api_site_create', pin, p).then(function (r) { busy(false); delete SITE[f]; if (FL.links) { FL.links[String(f).toLowerCase()] = String(f); FL.linkDate[String(f).toLowerCase()] = it.date || ''; render(); } return r; }, function (e) { busy(false); throw e; });
+        return call('api_site_create', pin, p).then(function (r) { busy(false); delete SITE[f]; setSiteDir(f, r.dir); if (FL.links) { FL.links[String(f).toLowerCase()] = String(f); FL.linkDate[String(f).toLowerCase()] = it.date || ''; render(); } return r; }, function (e) { busy(false); throw e; });
       };
       if (has) return go('');
       return askConfirm({ title: 'Make the client link', body: 'The link for ' + it.name + ' is made on the Ivory-Events site.', ok: 'Make link', needKey: true,
@@ -4140,6 +4144,7 @@
     if (!old) return Promise.resolve(false);
     return call('api_site_migrate', pin, { oldFolder: old, code: code, name: it.name, date: it.date, venue: it.venue }).then(function (r) {
       FL.links[code.toLowerCase()] = code; FL.linkDate[code.toLowerCase()] = it.date || '';
+      setSiteDir(code, SITE_DIR_OF[String(old).toLowerCase()]);
       if (ghTree) ghTree[code] = (r.quotes || []).slice();
       delete SITE[old]; delete SITE[code]; tlDates = null;
       Object.keys(ghCache).forEach(function (k) { delete ghCache[k]; });
@@ -4157,8 +4162,8 @@
     var f = siteFolder(it);
     renderSite(it);
     // read through the script, which always gets the saved copy; the direct address (can be minutes old) is only the fallback
-    var rd = call('api_site_data', pin, { folder: f }).then(function (r) { return r.data; }).catch(function () {
-      return fetch(SITE_RAW + encodeURIComponent(f) + '/data.json?t=' + Date.now()).then(function (r) {
+    var rd = call('api_site_data', pin, { folder: f }).then(function (r) { setSiteDir(f, r.dir); return r.data; }).catch(function () {
+      return fetch(siteRaw(f) + encodeURIComponent(f) + '/data.json?t=' + Date.now()).then(function (r) {
         if (r.status === 404) return null;
         if (!r.ok) throw new Error('GitHub answered ' + r.status);
         return r.json();
@@ -4182,7 +4187,7 @@
     var onLinkTxt = '<span class="onlink">&#10003; On link</span>';
     var onLink = function (kind, no) { return onLinkTxt + '<button type="button" class="sbtn alt" data-sr="' + kind + '"' + (no ? ' data-no="' + esc(no) + '"' : '') + '>Remove</button>'; };
     var h = '<h3>Client link</h3><div class="note">One page for ' + esc(it.name) + '. Quotes show as dated tabs, latest first, with the wedding timeline in front of the latest quote and payment in front of the timeline. Nothing is added until you confirm that item.</div>';
-    if (any) h += '<div class="lnk"><span>' + esc(decodeURIComponent(SITE_URL.replace('https://', '')) + f + '/') + '</span><a href="' + esc(SITE_URL + encodeURIComponent(f) + '/') + '" target="_blank" rel="noopener">Open</a></div>';
+    if (any) h += '<div class="lnk"><span>' + esc(decodeURIComponent(siteUrl(f).replace('https://', '')) + f + '/') + '</span><a href="' + esc(siteUrl(f) + encodeURIComponent(f) + '/') + '" target="_blank" rel="noopener">Open</a></div>';
     else if (st.data === undefined && !st.err && !SITE[f]) h += '<div class="note">Checking the client link...</div>';
     else h += '<div class="note warn">No client link yet. Choose the event type and make it.</div>';
     var curType = (d && d.type) || (any ? 'christian' : '');
@@ -4196,7 +4201,7 @@
         '<button type="button" class="sbtn' + (isList ? ' alt' : '') + '" data-pv="' + (isList ? 'rates' : 'list') + '">' + (isList ? 'Show photos and rates' : 'Change to tick list') + '</button>');
     }
     if (any) h += sRow('Send the link', 'Introduction, packages and service checklist', false,
-      '<a class="sbtn alt" href="' + esc(linkWa(it.name, SITE_URL + encodeURIComponent(f) + '/')) + '" target="_blank" rel="noopener">Send on WhatsApp</a>');
+      '<a class="sbtn alt" href="' + esc(linkWa(it.name, siteUrl(f) + encodeURIComponent(f) + '/')) + '" target="_blank" rel="noopener">Send on WhatsApp</a>');
     if (st.err) h += '<div class="note warn">Could not read the client link (' + esc(st.err) + ').</div>';
 
     var mvOld = moveOld(it), mvAll = moveAllList();
@@ -4260,7 +4265,8 @@
         var p = { confirmed: true, kind: kind, folder: f, url: url, name: it.name, date: it.date, venue: it.venue, key: r.key };
         Object.keys(extra).forEach(function (k) { p[k] = extra[k]; });
         busy(true);
-        return call('api_site_tab', pin, p).then(function () {
+        return call('api_site_tab', pin, p).then(function (res) {
+          setSiteDir(f, res && res.dir);
           ADDED[f + '|' + kind + (kind === 'quote' ? '|' + no : '')] = 1;
           toast('Added to the client link');
           if (cur === it) renderSite(it);

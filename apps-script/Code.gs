@@ -631,7 +631,26 @@ function api_tl_publish(pin, p) {
 // The app adds ONE item per call, and only after Navin has confirmed that item on screen. Uses SITE_KEY, else TL_KEY, else GH_KEY.
 const SITE_REPO = 'ivoryeventz-ops/Ivory-Events';
 const SITE_BRANCH = 'main';
-const SITE_DIR = 'New A';
+// Three client sites. A NEW link goes to the site of its event type (New A for Marthoma, Orthodox and CSI);
+// an existing link always stays where it is, so links already sent keep working.
+const SITE_DIRS = ['New A', 'New E', 'New P'];
+const SITE_TYPE_DIR = { pentecost: 'New P', engagement: 'New E', mylanchi: 'New E', creception: 'New E', hindumandap: 'New E', hindu: 'New E' };
+function newSiteDir_(type) { return SITE_TYPE_DIR[type] || 'New A'; }
+// The site that already holds this client's folder, or '' when there is no link yet.
+function siteDirOf_(key, folder) {
+  const reqs = SITE_DIRS.map(function (d) {
+    return { url: 'https://api.github.com/repos/' + SITE_REPO + '/contents/' + encodeURIComponent(d) + '/' + encodeURIComponent(folder) + '/data.json?ref=' + SITE_BRANCH,
+      headers: { Authorization: 'Bearer ' + key, Accept: 'application/vnd.github+json' }, muteHttpExceptions: true };
+  });
+  const codes = UrlFetchApp.fetchAll(reqs).map(function (r) { return r.getResponseCode(); });
+  codes.forEach(function (c) {
+    if (c === 200 || c === 404) return;
+    if (c === 401) PropertiesService.getScriptProperties().deleteProperty('SITE_KEY');
+    throw new Error('GitHub key does not reach Ivory-Events (GitHub answered ' + c + ')');
+  });
+  const i = codes.indexOf(200);
+  return i < 0 ? '' : SITE_DIRS[i];
+}
 // Event types: what the client link shows under Packages and Service Checklist (pages live in Ivory-Events > New A > parts/<folder>).
 const SITE_TYPES = { marthoma: 'Marthoma', orthodox: 'Orthodox', pentecost: 'Pentecost', csi: 'CSI', engagement: 'Engagement', mylanchi: 'Maduramveppu/Mylanchi', creception: 'Christian - Reception', hindumandap: 'Hindu - Mandap', hindu: 'Hindu - Reception' };
 
@@ -659,7 +678,8 @@ function api_site_tab(pin, p) {
 
   const hd = { Authorization: 'Bearer ' + key, Accept: 'application/vnd.github+json' };
   const api = 'https://api.github.com/repos/' + SITE_REPO + '/contents/';
-  const path = function (f) { return encodeURIComponent(SITE_DIR) + '/' + (f ? encodeURIComponent(folder) + '/' + encodeURIComponent(f) : encodeURIComponent('client-shell.html')); };
+  let dir = '';   // set inside the lock
+  const path = function (f) { return encodeURIComponent(dir) + '/' + (f ? encodeURIComponent(folder) + '/' + encodeURIComponent(f) : encodeURIComponent('client-shell.html')); };
   const noReach = function (code) {
     if (code === 401) props.deleteProperty('SITE_KEY');
     return new Error('GitHub key does not reach Ivory-Events (GitHub answered ' + code + ')');
@@ -686,6 +706,7 @@ function api_site_tab(pin, p) {
   const lock = LockService.getScriptLock();
   lock.waitLock(20000);
   try {
+    dir = siteDirOf_(key, folder) || newSiteDir_(String(p.type || ''));
     let cur = get(path('data.json'));
     let data, sha = null;
     if (cur) {
@@ -696,7 +717,7 @@ function api_site_tab(pin, p) {
       const name = String(p.name || '').trim(), venue = String(p.venue || '').trim(), wd = String(p.date || '');
       if (!name || !/^\d{4}-\d{2}-\d{2}$/.test(wd)) throw new Error('Client name and wedding date are needed to start this client link');
       const shell = get(path(''));
-      if (!shell) throw new Error('client-shell.html not found in the New A site');
+      if (!shell) throw new Error('client-shell.html not found in the ' + dir + ' site');
       let html = Utilities.newBlob(Utilities.base64Decode(shell.content.replace(/\n/g, ''))).getDataAsString();
       const longDate = Utilities.formatDate(Utilities.parseDate(wd, tz_(), 'yyyy-MM-dd'), tz_(), 'd MMMM yyyy');
       html = html.split('__NAME__').join(esc(name)).split('__WEDDING_DATE__').join(longDate).split('__VENUE__').join(esc(venue)).split('__FOLDER__').join(folder);
@@ -706,13 +727,13 @@ function api_site_tab(pin, p) {
     }
     data.quotes = data.quotes || [];
     if (kind === 'quote') {
-      if (data.quotes.some(function (q) { return String(q.id) === String(p.no); })) return { ok: true, already: true };
+      if (data.quotes.some(function (q) { return String(q.id) === String(p.no); })) return { ok: true, already: true, dir: dir };
       data.quotes.push({ id: String(p.no), created: String(p.created), url: tabUrl });
     } else {
       data[kind] = { url: tabUrl, added: today_() };
     }
     put(path('data.json'), JSON.stringify(data, null, 2) + '\n', sha, 'Add ' + kind + ' tab ' + folder);
-    return { ok: true };
+    return { ok: true, dir: dir };
   } finally {
     lock.releaseLock();
   }
@@ -750,17 +771,19 @@ function api_site_data(pin, p) {
   const folder = String(p.folder || '').trim();
   if (!/^[A-Za-z0-9][A-Za-z0-9 _-]{0,60}$/.test(folder)) throw new Error('Bad client folder name');
   const f = siteData_(key, folder);
-  return { data: f ? f.data : null };
+  return { data: f ? f.data : null, dir: f ? f.dir : '' };
 }
 
 function siteData_(key, folder) {   // the client's data.json, or null when there is no client link
-  const url = 'https://api.github.com/repos/' + SITE_REPO + '/contents/' + encodeURIComponent(SITE_DIR) + '/' + encodeURIComponent(folder) + '/data.json';
+  const dir = siteDirOf_(key, folder);
+  if (!dir) return null;
+  const url = 'https://api.github.com/repos/' + SITE_REPO + '/contents/' + encodeURIComponent(dir) + '/' + encodeURIComponent(folder) + '/data.json';
   const g = UrlFetchApp.fetch(url + '?ref=' + SITE_BRANCH, { headers: { Authorization: 'Bearer ' + key, Accept: 'application/vnd.github+json' }, muteHttpExceptions: true });
   const c = g.getResponseCode();
   if (c === 404) return null;
   if (c !== 200) throw new Error('GitHub key does not reach Ivory-Events (GitHub answered ' + c + ')');
   const cur = JSON.parse(g.getContentText());
-  return { url: url, sha: cur.sha, data: JSON.parse(Utilities.newBlob(Utilities.base64Decode(cur.content.replace(/\n/g, ''))).getDataAsString()) };
+  return { dir: dir, url: url, sha: cur.sha, data: JSON.parse(Utilities.newBlob(Utilities.base64Decode(cur.content.replace(/\n/g, ''))).getDataAsString()) };
 }
 function siteSave_(key, f, message) {
   const body = { message: message, content: Utilities.base64Encode(Utilities.newBlob(JSON.stringify(f.data, null, 2) + '\n').getBytes()), sha: f.sha, branch: SITE_BRANCH };
@@ -827,7 +850,7 @@ function api_site_untab(pin, p) {
   if (['quote', 'timeline', 'payment'].indexOf(kind) < 0) throw new Error('Unknown tab');
   if (kind === 'quote' && !/^\d{6}$/.test(String(p.no || ''))) throw new Error('Bad quote number');
   const hd = { Authorization: 'Bearer ' + key, Accept: 'application/vnd.github+json' };
-  const url = 'https://api.github.com/repos/' + SITE_REPO + '/contents/' + encodeURIComponent(SITE_DIR) + '/' + encodeURIComponent(folder) + '/data.json';
+  const url = 'https://api.github.com/repos/' + SITE_REPO + '/contents/' + encodeURIComponent(siteDirOf_(key, folder) || 'New A') + '/' + encodeURIComponent(folder) + '/data.json';
   const lock = LockService.getScriptLock();
   lock.waitLock(20000);
   try {
@@ -917,16 +940,16 @@ function api_site_migrate(pin, p) {
   try {
     const msg = 'Move ' + oldF + ' to ' + code;
     // 1. the client link
-    const evBase = SITE_DIR + '/';
-    const od = call(SITE_REPO, evKey, '/contents/' + enc(SITE_DIR) + '/' + enc(oldF) + '/data.json?ref=' + SITE_BRANCH);
+    const dir = siteDirOf_(evKey, oldF) || 'New A';   // the code folder is made on the same site as the old one
+    const od = call(SITE_REPO, evKey, '/contents/' + enc(dir) + '/' + enc(oldF) + '/data.json?ref=' + SITE_BRANCH);
     let oldData = null, oldSha = null;
     if (od.code === 200) { const j = JSON.parse(od.text); oldSha = j.sha; oldData = JSON.parse(Utilities.newBlob(Utilities.base64Decode(j.content.replace(/\n/g, ''))).getDataAsString()); }
     else if (od.code !== 404) throw reach(SITE_REPO, od.code);
     const pk = copyDir(PAY_REPO, pkKey, PAY_BRANCH, oldF, code, msg);
     const tl = copyDir(TL_REPO, tlKey, TL_BRANCH, oldF, code, msg);
     if (oldData) {
-      const sh = call(SITE_REPO, evKey, '/contents/' + enc(SITE_DIR) + '/client-shell.html?ref=' + SITE_BRANCH);
-      if (sh.code !== 200) throw new Error('client-shell.html not found in the New A site');
+      const sh = call(SITE_REPO, evKey, '/contents/' + enc(dir) + '/client-shell.html?ref=' + SITE_BRANCH);
+      if (sh.code !== 200) throw new Error('client-shell.html not found in the ' + dir + ' site');
       let html = Utilities.newBlob(Utilities.base64Decode(JSON.parse(sh.text).content.replace(/\n/g, ''))).getDataAsString();
       const esc = function (t) { return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); };
       const wd = String(oldData.wedding_date || p.date || '');
@@ -934,21 +957,21 @@ function api_site_migrate(pin, p) {
       html = html.split('__NAME__').join(esc(oldData.name || p.name || '')).split('__WEDDING_DATE__').join(longDate).split('__VENUE__').join(esc(oldData.venue || p.venue || '')).split('__FOLDER__').join(code);
       const nd = JSON.parse(fixLinks(JSON.stringify(oldData)));
       nd.folder = code; nd.code = code; delete nd.moved_to;
-      putNew(SITE_REPO, evKey, SITE_BRANCH, SITE_DIR + '/' + code + '/index.html', Utilities.base64Encode(Utilities.newBlob(html).getBytes()), msg);
-      putNew(SITE_REPO, evKey, SITE_BRANCH, SITE_DIR + '/' + code + '/data.json', Utilities.base64Encode(Utilities.newBlob(JSON.stringify(nd, null, 2) + '\n').getBytes()), msg);
+      putNew(SITE_REPO, evKey, SITE_BRANCH, dir + '/' + code + '/index.html', Utilities.base64Encode(Utilities.newBlob(html).getBytes()), msg);
+      putNew(SITE_REPO, evKey, SITE_BRANCH, dir + '/' + code + '/data.json', Utilities.base64Encode(Utilities.newBlob(JSON.stringify(nd, null, 2) + '\n').getBytes()), msg);
       // 2. only now, with everything copied, the old link points to the new one
-      const target = 'https://ivory-events.pages.dev/' + enc(SITE_DIR) + '/' + code + '/';
+      const target = 'https://ivory-events.pages.dev/' + enc(dir) + '/' + code + '/';
       const redirect = '<!DOCTYPE html>\n<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex">' +
         '<meta http-equiv="refresh" content="0; url=' + target + '"><title>Ivory Events</title></head>' +
         '<body style="font-family:sans-serif;text-align:center;padding:40px"><p>Opening your page... <a href="' + target + '">tap here if it does not open</a></p>' +
         '<script>location.replace("' + target + '"+location.hash)</script></body></html>\n';
-      const oi = call(SITE_REPO, evKey, '/contents/' + enc(SITE_DIR) + '/' + enc(oldF) + '/index.html?ref=' + SITE_BRANCH);
+      const oi = call(SITE_REPO, evKey, '/contents/' + enc(dir) + '/' + enc(oldF) + '/index.html?ref=' + SITE_BRANCH);
       if (oi.code === 200 && String(Utilities.newBlob(Utilities.base64Decode(JSON.parse(oi.text).content.replace(/\n/g, ''))).getDataAsString()).indexOf('location.replace') < 0) {
-        const w = call(SITE_REPO, evKey, '/contents/' + enc(SITE_DIR) + '/' + enc(oldF) + '/index.html', 'put', { message: msg + ' (old link redirects)', content: Utilities.base64Encode(Utilities.newBlob(redirect).getBytes()), sha: JSON.parse(oi.text).sha, branch: SITE_BRANCH });
+        const w = call(SITE_REPO, evKey, '/contents/' + enc(dir) + '/' + enc(oldF) + '/index.html', 'put', { message: msg + ' (old link redirects)', content: Utilities.base64Encode(Utilities.newBlob(redirect).getBytes()), sha: JSON.parse(oi.text).sha, branch: SITE_BRANCH });
         if (w.code !== 200 && w.code !== 201) throw reach(SITE_REPO, w.code);
       }
       oldData.moved_to = code;
-      call(SITE_REPO, evKey, '/contents/' + enc(SITE_DIR) + '/' + enc(oldF) + '/data.json', 'put', { message: msg + ' (marked as moved)', content: Utilities.base64Encode(Utilities.newBlob(JSON.stringify(oldData, null, 2) + '\n').getBytes()), sha: oldSha, branch: SITE_BRANCH });
+      call(SITE_REPO, evKey, '/contents/' + enc(dir) + '/' + enc(oldF) + '/data.json', 'put', { message: msg + ' (marked as moved)', content: Utilities.base64Encode(Utilities.newBlob(JSON.stringify(oldData, null, 2) + '\n').getBytes()), sha: oldSha, branch: SITE_BRANCH });
     }
     return { ok: true, link: !!oldData, quotes: pk.filter(function (n) { return /^\d{6}\.html$/.test(n); }).map(function (n) { return n.slice(0, 6); }), packages: pk.length, timeline: tl.length };
   } finally {
@@ -968,7 +991,8 @@ function api_site_rename(pin, p) {
   if (!name) throw new Error('Name cannot be empty');
   const hd = { Authorization: 'Bearer ' + key, Accept: 'application/vnd.github+json' };
   const api = 'https://api.github.com/repos/' + SITE_REPO + '/contents/';
-  const path = function (f) { return encodeURIComponent(SITE_DIR) + '/' + encodeURIComponent(folder) + '/' + encodeURIComponent(f); };
+  const dir = siteDirOf_(key, folder) || 'New A';
+  const path = function (f) { return encodeURIComponent(dir) + '/' + encodeURIComponent(folder) + '/' + encodeURIComponent(f); };
   const get = function (pth) {
     const r = UrlFetchApp.fetch(api + pth + '?ref=' + SITE_BRANCH, { headers: hd, muteHttpExceptions: true });
     const c = r.getResponseCode();
@@ -1019,7 +1043,8 @@ function api_site_create(pin, p) {
   if (!SITE_TYPES[type]) throw new Error('Choose the event type');
   const hd = { Authorization: 'Bearer ' + key, Accept: 'application/vnd.github+json' };
   const api = 'https://api.github.com/repos/' + SITE_REPO + '/contents/';
-  const path = function (f) { return encodeURIComponent(SITE_DIR) + '/' + (f ? encodeURIComponent(folder) + '/' + encodeURIComponent(f) : encodeURIComponent('client-shell.html')); };
+  let dir = '';   // set inside the lock
+  const path = function (f) { return encodeURIComponent(dir) + '/' + (f ? encodeURIComponent(folder) + '/' + encodeURIComponent(f) : encodeURIComponent('client-shell.html')); };
   const noReach = function (code) {
     if (code === 401) props.deleteProperty('SITE_KEY');
     return new Error('GitHub key does not reach Ivory-Events (GitHub answered ' + code + ')');
@@ -1042,11 +1067,11 @@ function api_site_create(pin, p) {
     throw new Error('GitHub answered ' + c);
   };
   const esc = function (t) { return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); };
-  const url = 'https://ivory-events.pages.dev/' + encodeURIComponent(SITE_DIR) + '/' + encodeURIComponent(folder) + '/';
-
   const lock = LockService.getScriptLock();
   lock.waitLock(20000);
   try {
+    dir = siteDirOf_(key, folder) || newSiteDir_(type);
+    const url = 'https://ivory-events.pages.dev/' + encodeURIComponent(dir) + '/' + encodeURIComponent(folder) + '/';
     const cur = get(path('data.json'));
     if (cur) {
       const data = JSON.parse(Utilities.newBlob(Utilities.base64Decode(cur.content.replace(/\n/g, ''))).getDataAsString());
@@ -1054,19 +1079,19 @@ function api_site_create(pin, p) {
         data.type = type;
         put(path('data.json'), JSON.stringify(data, null, 2) + '\n', cur.sha, 'Event type ' + folder + ': ' + SITE_TYPES[type]);
       }
-      return { ok: true, url: url, existed: true, type: type };
+      return { ok: true, url: url, existed: true, type: type, dir: dir };
     }
     const name = String(p.name || '').trim(), venue = String(p.venue || '').trim(), wd = String(p.date || '');
     if (!name || !/^\d{4}-\d{2}-\d{2}$/.test(wd)) throw new Error('Client name and event date are needed to make the client link');
     const shell = get(path(''));
-    if (!shell) throw new Error('client-shell.html not found in the New A site');
+    if (!shell) throw new Error('client-shell.html not found in the ' + dir + ' site');
     let html = Utilities.newBlob(Utilities.base64Decode(shell.content.replace(/\n/g, ''))).getDataAsString();
     const longDate = Utilities.formatDate(Utilities.parseDate(wd, tz_(), 'yyyy-MM-dd'), tz_(), 'd MMMM yyyy');
     html = html.split('__NAME__').join(esc(name)).split('__WEDDING_DATE__').join(longDate).split('__VENUE__').join(esc(venue)).split('__FOLDER__').join(folder);
     put(path('index.html'), html, (get(path('index.html')) || {}).sha || null, 'Client page ' + folder);
     const data = { folder: folder, name: name, wedding_date: wd, venue: venue, type: type, quotes: [] };
     put(path('data.json'), JSON.stringify(data, null, 2) + '\n', null, 'Client link ' + folder + ' (' + SITE_TYPES[type] + ')');
-    return { ok: true, url: url, type: type };
+    return { ok: true, url: url, type: type, dir: dir };
   } finally {
     lock.releaseLock();
   }
